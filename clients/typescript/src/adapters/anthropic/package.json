@@ -1,0 +1,16 @@
+{
+  "name": "@contexta/anthropic",
+  "version": "0.1.0",
+  "description": "contexta memory adapter for Anthropic Claude JS SDK",
+  "license": "MIT",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "peerDependencies": {
+    "@contexta/client": "^0.1.0",
+    "@anthropic-ai/sdk": "^0.30.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anomalyco/contexta"
+  }
+}

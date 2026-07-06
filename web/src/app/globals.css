@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  --color-background: oklch(0.115 0.006 255);
+  --color-foreground: oklch(0.96 0.004 255);
+  --color-card: oklch(0.16 0.007 255);
+  --color-card-foreground: oklch(0.96 0.004 255);
+  --color-popover: oklch(0.16 0.007 255);
+  --color-popover-foreground: oklch(0.96 0.004 255);
+  --color-primary: oklch(0.76 0.14 176);
+  --color-primary-foreground: oklch(0.1 0.006 255);
+  --color-secondary: oklch(0.22 0.008 255);
+  --color-secondary-foreground: oklch(0.96 0.004 255);
+  --color-muted: oklch(0.22 0.008 255);
+  --color-muted-foreground: oklch(0.68 0.012 255);
+  --color-accent: oklch(0.26 0.032 176);
+  --color-accent-foreground: oklch(0.94 0.02 176);
+  --color-destructive: oklch(0.62 0.19 28);
+  --color-border: oklch(0.26 0.009 255);
+  --color-input: oklch(0.22 0.008 255);
+  --color-ring: oklch(0.76 0.14 176);
+  --radius: 0.5rem;
+  --radius-sm: calc(var(--radius) * 0.75);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) * 1.25);
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+html {
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
+
+body {
+  min-height: 100vh;
+  background: linear-gradient(180deg, oklch(0.13 0.006 255), var(--color-background));
+  color: var(--color-foreground);
+}
+
+::selection {
+  background: oklch(0.76 0.14 176 / 0.24);
+}

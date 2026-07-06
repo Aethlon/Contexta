@@ -1,0 +1,1 @@
+"""Custom memory schema registry."""

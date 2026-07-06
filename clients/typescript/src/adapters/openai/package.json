@@ -1,0 +1,16 @@
+{
+  "name": "@contexta/openai",
+  "version": "0.1.0",
+  "description": "contexta memory adapter for OpenAI JS SDK",
+  "license": "MIT",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "peerDependencies": {
+    "@contexta/client": "^0.1.0",
+    "openai": "^4.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anomalyco/contexta"
+  }
+}

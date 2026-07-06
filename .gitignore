@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Build output
+dist/
+.next/
+out/
+*.egg-info/
+
+# Environment
+.env
+.env.local
+.env.production
+.env.development.local
+.env.test.local
+.env.staging
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.hypothesis/
+coverage/
+htmlcov/
+.pytest_cache/
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+*.log
+
+# Temp
+tmp/
+temp/

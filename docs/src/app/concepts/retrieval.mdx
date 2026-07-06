@@ -1,0 +1,178 @@
+# Hybrid Retrieval
+
+contexta's retrieval engine combines five signals to find the most relevant memories. It's a four-stage pipeline designed for speed and accuracy.
+
+## Pipeline Overview
+
+```
+                    Query (text + filters)
+                           │
+                           ▼
+        ┌──────────────────────────────────┐
+        │  Stage 0: Query Understanding    │
+        │   - Embed query                  │
+        │   - Detect entity mentions       │
+        │   - Optional HyDE expansion      │
+        └──────────────┬───────────────────┘
+                       │
+                       ▼
+        ┌──────────────────────────────────┐
+        │  Stage 1: Candidate Generation   │
+        │   ├── Semantic search (vector)   │
+        │   ├── Keyword search (tsvector)  │
+        │   └── Graph expansion (entities) │
+        └──────────────┬───────────────────┘
+                       │
+                       ▼
+        ┌──────────────────────────────────┐
+        │  Stage 2: Hybrid Scoring         │
+        │   RRF + weighted signals         │
+        └──────────────┬───────────────────┘
+                       │
+                       ▼
+        ┌──────────────────────────────────┐
+        │  Stage 3: Diversification        │
+        │   MMR λ=0.7 + entity caps       │
+        └──────────────┬───────────────────┘
+                       │
+                       ▼
+        ┌──────────────────────────────────┐
+        │  Stage 4: Optional LLM Rerank   │
+        │   (opt-in, +400-700ms)           │
+        └──────────────┬───────────────────┘
+                       │
+                       ▼
+                 Final Results
+```
+
+## The Five Signals
+
+### Semantic (Vector) — Weight: 0.40
+
+Dense vector search using OpenAI `text-embedding-3-small` embeddings in pgvector with HNSW indexing. Cluster-first: contexta searches inside matched entity clusters before falling back to tenant-wide search.
+
+### Keyword (Full-Text) — Weight: 0.05
+
+Postgres `tsvector` full-text search on memory content and titles. Handles exact term matching that vector search may miss.
+
+### Graph (Entity Relationships) — Weight: 0.25
+
+When the query mentions known entities (people, projects, technologies), contexta traverses the entity graph to find linked memories. Configurable depth (default 1, max 3 hops).
+
+### Importance — Weight: 0.20
+
+Each memory's stored importance score. High-importance memories (pinned, frequently referenced, decision-impacting) rank higher.
+
+### Recency — Weight: 0.10
+
+Exponential decay based on `last_accessed_at`:
+
+```
+recency = exp(-ln(2) × days_since_access / 30)
+```
+
+Half-life: 30 days. Memories accessed within the last day are near 1.0; memories untouched for 6 months are near 0.01.
+
+## Scoring Formula
+
+```
+final_score =
+    0.40 × semantic
+  + 0.25 × graph
+  + 0.20 × importance
+  + 0.10 × recency
+  + 0.05 × keyword
+  + 0.10 × same_cluster_bonus
+  - 0.30 × is_cold
+  - 0.50 × is_archived
+```
+
+## Cluster-First Search
+
+contexta groups memories into semantic clusters. When a query arrives:
+
+1. Find top-3 matching clusters by centroid embedding similarity
+2. Search inside those clusters first (fast, focused)
+3. If cluster match is poor (distance > 0.4), fall back to tenant-wide search
+4. Supplement with tenant-wide results if cluster results are insufficient
+
+This reduces vector search from millions to thousands of candidates per query.
+
+## Usage
+
+```python
+# Simple context retrieval (recommended)
+ctx = contexta.context(
+    user_id="u_123",
+    query="what databases does the user prefer?",
+    token_budget=1500,
+)
+
+# Raw retrieval with full control
+results = contexta.retrieve(
+    user_id="u_123",
+    query_text="postgresql preferences",
+    memory_types=["preference", "fact"],
+    tags=["database"],
+    limit=20,
+    graph_depth=2,
+    rerank=False,
+)
+```
+
+```ts
+const results = await contexta.retrieve({
+  userId: "u_123",
+  queryText: "postgresql preferences",
+  memoryTypes: ["preference", "fact"],
+  tags: ["database"],
+  limit: 20,
+  graphDepth: 2,
+  rerank: false,
+});
+```
+
+## Response Shape
+
+Each result includes a score breakdown:
+
+```json
+{
+  "memory_id": "01J...",
+  "memory_type": "preference",
+  "title": "Prefers Postgres",
+  "score": 0.872,
+  "score_breakdown": {
+    "semantic": 0.91,
+    "graph": 0.0,
+    "importance": 0.75,
+    "recency": 0.86,
+    "keyword": 0.50
+  },
+  "tags": ["database"],
+  "created_at": "2026-04-12T18:32:11Z"
+}
+```
+
+## Rerank (Optional)
+
+When `rerank=true`, the top 50 candidates are sent to an LLM for reordering. This adds 400-700ms latency and counts as a rerank billing operation. Use for high-stakes retrievals where precision matters most.
+
+## Performance Targets
+
+| Without rerank | p50: 22ms | p99: 150ms |
+| With rerank | p50: 420ms | p99: 850ms |
+
+## Filtering
+
+```python
+results = contexta.retrieve(
+    user_id="u_123",
+    query_text="deployment",
+    memory_types=["fact", "event"],  # only these types
+    tags=["production", "devops"],   # must match any
+    limit=20,
+    include_archived=False,
+    include_cold=False,
+)
+```

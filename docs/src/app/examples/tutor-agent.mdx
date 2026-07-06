@@ -1,0 +1,115 @@
+# Example: Tutor Agent
+
+A tutor agent that tracks student weak topics and adapts explanations over time.
+
+## What It Does
+
+- Tracks what topics a student struggles with
+- Remembers correct/incorrect answers across sessions
+- Adjusts explanation depth based on learner level
+- Identifies knowledge gaps automatically
+
+## Full Code
+
+```python
+from contexta_client import contexta, Asynccontexta
+from openai import AsyncOpenAI
+import asyncio
+
+contexta = Asynccontexta.from_env()
+openai = AsyncOpenAI()
+
+# Register schema for structured quiz results
+contexta.register_schema(
+    name="QuizResult",
+    fields=[
+        {"name": "topic", "type": "string", "required": True},
+        {"name": "score", "type": "number", "required": True},
+        {"name": "total_questions", "type": "number", "required": True},
+        {"name": "weak_areas", "type": "string", "required": False},
+    ],
+)
+
+async def tutor_turn(student_id: str, message: str) -> str:
+    # Get context about this student
+    ctx = await contexta.context(
+        user_id=student_id,
+        query=message,
+        token_budget=2000,
+    )
+
+    # Build system prompt with learning profile
+    system_prompt = """You are a personalized tutor.
+
+{context}
+
+Adjust your explanation based on the student's known weak areas.
+If they've struggled with this topic before, explain more thoroughly.
+If they've mastered it, go deeper or move to advanced concepts."""
+
+    response = await openai.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt.format(
+                context=ctx.to_system_prompt()
+            )},
+            {"role": "user", "content": message},
+        ],
+    )
+    reply = response.choices[0].message.content
+
+    await contexta.observe(
+        user_id=student_id,
+        messages=[
+            {"role": "user", "content": message},
+            {"role": "assistant", "content": reply},
+        ],
+        metadata={"agent": "tutor-agent"},
+    )
+    return reply
+
+async def record_quiz_result(
+    student_id: str,
+    topic: str,
+    score: int,
+    total: int,
+    weak_areas: str = "",
+):
+    """Record a quiz result as an observation with structured data."""
+    result_text = f"Quiz result: {topic} - {score}/{total}. Weak areas: {weak_areas or 'none'}"
+    await contexta.observe(
+        user_id=student_id,
+        messages=[
+            {"role": "user", "content": result_text},
+            {"role": "assistant", "content": f"Recorded quiz result for {topic}."},
+        ],
+        metadata={
+            "agent": "tutor-agent",
+            "structured": {
+                "_schema": "QuizResult",
+                "topic": topic,
+                "score": score,
+                "total_questions": total,
+                "weak_areas": weak_areas,
+            },
+        },
+    )
+
+async def main():
+    # Session 1
+    await record_quiz_result("student_42", "Linear Algebra", 3, 10, "eigenvectors, matrix multiplication")
+    
+    # Session 2 — the tutor remembers weak areas
+    reply = await tutor_turn(
+        "student_42",
+        "Can you explain eigenvectors again? I'm still confused."
+    )
+    print(reply)
+    # Tutors adapts based on known weak area
+
+asyncio.run(contexta())
+```
+
+## Key Takeaway
+
+The tutor doesn't just remember facts — it remembers the student's learning state and adapts dynamically.

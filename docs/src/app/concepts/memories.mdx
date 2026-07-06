@@ -1,0 +1,138 @@
+import { Callout } from 'nextra/components'
+
+# Memories
+
+A **memory** is a structured unit of stored intelligence. Each memory contains metadata, content, scores, embeddings, entity links, and lifecycle information.
+
+## Memory Lifecycle
+
+```
+Observation → Extraction → Classification → Scoring → Storage → Retrieval → Decay → Archive/Delete
+```
+
+### 1. Extraction
+
+The LLM extracts structured memories from raw observation messages. Each extracted memory gets a type, title, content, entity references, and confidence score.
+
+```python
+# The extraction is automatic — just submit observations
+contexta.observe(
+    user_id="u_123",
+    messages=[
+        {"role": "user", "content": "I'm building a RAG app with Postgres and want to use pgvector."},
+        {"role": "assistant", "content": "Great choice. I can help with that."},
+    ],
+)
+# contexta extracts: fact("Building a RAG app"), preference("Prefers Postgres")
+```
+
+### 2. Classification
+
+Memories are classified into types:
+
+| Type | Example |
+|------|---------|
+| `fact` | "User lives in Berlin" |
+| `preference` | "User prefers Postgres over Mongo" |
+| `goal` | "User wants to ship v2 by June" |
+| `project` | "Building a RAG application" |
+| `skill` | "User knows Rust and Python" |
+| `relationship` | "Alice is Bob's manager" |
+| `event` | "Deployed to production on May 12" |
+| `episodic` | "User mentioned frustration with slow CI" |
+| `pattern` | "User tends to prefer typed languages" |
+| `contact` | "Email: user@example.com" |
+| `custom` | User-defined via schemas |
+
+### 3. Importance Scoring
+
+Every memory receives an importance score (0–1):
+
+```
+importance = f(has_emphasis, impacts_decisions, mention_count, recency)
+```
+
+- **≥ 0.7** — critical, strongly influences retrieval
+- **0.4 – 0.7** — standard, included in default context
+- **< 0.4** — low value, excluded unless explicitly queried
+- **< 0.1** — rejected, not stored
+
+### 4. Storage
+
+Memories are stored in Postgres with a 1536-dimensional pgvector embedding. Each row is tenant-scoped by `organization_id` and `user_id`.
+
+### 5. Decay
+
+Unaccessed memories transition through states:
+
+| State | Score penalty | Retrieval inclusion |
+|-------|--------------|-------------------|
+| Active | None | Default |
+| Warm | -0.30 | Default |
+| Cold | -0.50 | Only with `include_cold: true` |
+| Archived | Excluded | Only with `include_archived: true` |
+
+### 6. Pinning and Archiving
+
+```python
+# Pin — protects from decay, stays active forever
+contexta.pin(memory_id="01J...")
+
+# Unpin — resumes normal decay
+contexta.unpin(memory_id="01J...")
+
+# Archive — soft-hide from retrieval, not deleted
+contexta.archive(memory_id="01J...")
+
+# Restore — unarchive, returns to active state
+contexta.restore(memory_id="01J...")
+
+# Delete — hard delete, removes all traces
+contexta.delete(memory_id="01J...")
+```
+
+### 7. Truth Maintenance
+
+When a new observation contradicts or supersedes existing memories, contexta's truth maintenance engine handles it:
+
+- **Supersession** — new memory marks old one as `valid_to = now()`
+- **Contradiction detected** — both are kept, but the newer one scores higher
+- **Merge** — duplicate content merges, mention count increases
+
+### 8. Explainability
+
+Every memory has an explain endpoint that shows exactly how it was created:
+
+```python
+explanation = contexta.explain(memory_id="01J...")
+print(explanation.extraction_source)    # original messages
+print(explanation.scoring_breakdown)    # importance modifiers
+print(explanation.supersession_history) # what this replaced
+```
+
+## Memory Schema
+
+```json
+{
+  "id": "01J9ZXAB1Q2R3S4T5V6W7X8Y9Z",
+  "memory_type": "preference",
+  "title": "Prefers Postgres",
+  "content": "User prefers Postgres over Mongo for relational data.",
+  "confidence": 0.92,
+  "importance": 0.75,
+  "tags": ["database", "postgres"],
+  "entities": ["entity_postgres"],
+  "memory_state": "active",
+  "is_pinned": false,
+  "created_at": "2026-04-12T18:32:11Z",
+  "last_accessed_at": "2026-04-13T10:15:00Z"
+}
+```
+
+## Limits per Tier
+
+| Plan | Active memories |
+|------|----------------|
+| Builder | 50,000 |
+| Scale | 250,000 |
+| Dedicated | 2,000,000+ |

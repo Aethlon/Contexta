@@ -1,0 +1,62 @@
+# Changelog
+
+## v0.1.0 — Initial Beta Release
+
+**Release date:** 2026-05-01
+
+Initial closed beta release. SDK-first memory layer for AI agents.
+
+### Features
+
+- **Observations** — submit conversation turns for asynchronous memory extraction
+- **Batch observations** — submit up to 50 observations in a single call
+- **Hybrid retrieval** — semantic (vector) + keyword (full-text) + graph + importance + recency
+- **Context bundle** — token-budgeted, structured context for LLM system prompts
+- **Memory lifecycle** — pin, unpin, archive, restore, delete
+- **Explainability** — per-memory extraction source and scoring breakdown
+- **Timeline** — chronological event log per user
+- **Policies** — custom extraction rules per agent type
+- **Custom schemas** — structured memory schemas for typed data
+- **Tenant isolation** — organization-scoped data separation
+- **Idempotency** — UUID7 idempotency keys on all writes
+- **Truth maintenance** — automatic supersession of contradictory memories
+
+### SDKs
+
+- **Python SDK** (`contexta-client`) — sync and async clients
+- **TypeScript SDK** (`@contexta/client`) — Node, Edge, Workers, Bun, Deno
+- **CLI** (`contexta`) — authentication, testing, key management, policy sync
+
+### Integrations
+
+- OpenAI Assistants (`contexta-openai`)
+- Anthropic Claude (`contexta-anthropic`)
+- LangChain (`contexta-langchain`)
+- LlamaIndex (`contexta-llamaindex`)
+
+### Engine
+
+- Extraction pipeline (LLM → dedup → entity resolution → classification → scoring → embedding → storage)
+- pgvector HNSW indexing for vector similarity search
+- Postgres full-text search (tsvector)
+- Entity resolution and knowledge graph
+- Semantic clustering for cluster-first retrieval
+- Importance scoring (emphasis, decision impact, recency, frequency)
+- Decay engine (active → warm → cold)
+- Redaction of sensitive patterns
+- Per-key rate limiting
+- Quota enforcement
+
+### Plans
+
+- **Builder** ($29/mo) — 50k active memories, 100k observations/mo, 1M retrievals/mo
+- **Scale** ($99/mo) — 250k active memories, 500k observations/mo, 5M retrievals/mo
+- **Dedicated** ($299+/mo) — custom limits, dedicated infrastructure
+
+### Known Limitations
+
+- Reflection engine: coming post-PMF
+- Dream cycle: coming post-PMF
+- Memory compression: coming post-PMF
+- US primary region: planned Q4 2026
+- SSO: planned Q4 2026

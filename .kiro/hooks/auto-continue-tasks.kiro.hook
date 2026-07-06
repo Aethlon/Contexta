@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Auto Continue Tasks",
+  "description": "After a spec task completes, automatically checks for remaining pending tasks and starts the next one. Only runs when no task is actively in progress.",
+  "version": "1",
+  "when": {
+    "type": "postTaskExecution"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A task just completed. Check the tasks.md file for any remaining pending tasks. If there are pending tasks, pick up the next one in order and start completing it. If all tasks are done, report that the spec is fully implemented."
+  }
+}

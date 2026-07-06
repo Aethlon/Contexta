@@ -1,0 +1,85 @@
+# LangChain Integration
+
+contexta implements LangChain's `BaseChatMessageHistory` interface for LCEL chains.
+
+## Installation
+
+```bash
+pip install contexta-client contexta-langchain langchain langchain-openai
+```
+
+## LCEL Usage
+
+```python
+from langchain.schema import AIMessage, HumanMessage
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.schema.output_parser import StrOutputParser
+from langchain.schema.runnable import RunnableWithMessageHistory
+from CONTEXTA_langchain import contextaChatHistory
+
+from contexta_client import contexta
+
+contexta = contexta.from_env()
+
+# Define chain with contexta context
+def get_context(user_id: str, query: str):
+    ctx = contexta.context(user_id=user_id, query=query, token_budget=1500)
+    return ctx.to_system_prompt()
+
+chain = (
+    ChatPromptTemplate.from_messages([
+        ("system", "{CONTEXTA_context}"),
+        MessagesPlaceholder(variable_name="history"),
+        ("human", "{input}"),
+    ])
+    | llm
+    | StrOutputParser()
+)
+
+with_history = RunnableWithMessageHistory(
+    chain,
+    lambda session_id: contextaChatHistory(
+        user_id=session_id,
+        session_id=session_id,
+    ),
+    input_messages_key="input",
+    history_messages_key="history",
+)
+
+result = with_history.invoke(
+    {
+        "input": "What database do I prefer?",
+        "CONTEXTA_context": get_context("u_123", "What database do I prefer?"),
+    },
+    config={"configurable": {"session_id": "u_123"}},
+)
+```
+
+## Legacy Memory API
+
+LangChain's deprecated `Memory` API is also supported:
+
+```python
+from CONTEXTA_langchain import contextaMemory
+
+memory = contextaMemory(
+    user_id="u_123",
+    session_id="s_456",
+)
+```
+
+## TypeScript
+
+```ts
+import { contexta } from "@contexta/client";
+import { contextaChatHistory } from "@contexta/langchain";
+
+const contexta = contexta.fromEnv();
+
+const history = new contextaChatHistory({
+  userId: "u_123",
+  sessionId: "s_456",
+});
+
+// Use in your LCEL chain or RunnableWithMessageHistory
+```

@@ -1,0 +1,98 @@
+# Example: Coding Agent
+
+A coding-policy agent that remembers developer tech preferences across sessions.
+
+## What It Does
+
+- Remembers preferred languages, frameworks, and databases
+- Recalls past project decisions across sessions
+- Maintains coding style preferences (type annotations, testing patterns)
+- Recognizes the user across multiple threads
+
+## Full Code
+
+```python
+import os
+from openai import OpenAI
+from contexta_client import contexta
+
+AGENT_NAME = "coding-agent"
+ASSISTANT_ID = os.environ["OPENAI_ASSISTANT_ID"]
+contexta = contexta.from_env()
+openai = OpenAI()
+
+# Register a policy tuned for coding preferences
+contexta.register_policy(
+    name=AGENT_NAME,
+    store_rules=[
+        {"memory_types": ["preference", "fact", "skill", "project"]},
+    ],
+    ignore_rules=[
+        {"patterns": [r"^(ok|thanks|got it|yes|no|sure)$"]},
+    ],
+    priority_weights={
+        "preference": 0.9,
+        "skill": 0.8,
+        "project": 0.7,
+    },
+)
+
+def code_chat(user_id: str, message: str) -> str:
+    # Fetch context
+    ctx = contexta.context(
+        user_id=user_id,
+        query=message,
+        token_budget=2000,
+    )
+
+    # Create thread and inject context
+    thread = openai.beta.threads.create(messages=[
+        {"role": "user", "content": message},
+    ])
+
+    run = openai.beta.threads.runs.create(
+        thread_id=thread.id,
+        assistant_id=ASSISTANT_ID,
+        additional_instructions=ctx.to_system_prompt(),
+    )
+
+    # Wait for completion (simplified)
+    import time
+    while run.status in ("queued", "in_progress"):
+        time.sleep(0.5)
+        run = openai.beta.threads.runs.retrieve(
+            thread_id=thread.id, run_id=run.id
+        )
+
+    messages = openai.beta.threads.messages.list(thread_id=thread.id)
+    reply = messages.data[0].content[0].text.value
+
+    # Observe the turn
+    contexta.observe(
+        user_id=user_id,
+        messages=[
+            {"role": "user", "content": message},
+            {"role": "assistant", "content": reply},
+        ],
+        metadata={"agent": AGENT_NAME, "thread_id": thread.id},
+        policy=AGENT_NAME,
+    )
+
+    return reply
+
+# Session 1
+print(code_chat("user_001", "I prefer TypeScript over JavaScript for new projects."))
+# → "Got it! I'll use TypeScript for new projects."
+
+# Session 2 (new thread, same user)
+print(code_chat("user_001", "What language should we use for this project?"))
+# → "Based on your previous preference, I recommend TypeScript."
+
+# Session 3 (different user)
+print(code_chat("user_002", "I like Python best for data work."))
+# → contexta keeps user_001 and user_002 memories isolated
+```
+
+## Key Takeaway
+
+The agent remembers preferences across completely separate OpenAI threads. The `user_id` is the stable identifier that links sessions together.

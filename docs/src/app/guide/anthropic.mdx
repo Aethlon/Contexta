@@ -1,0 +1,93 @@
+# Anthropic Claude Integration
+
+Claude doesn't have an Assistants API — you manage your own session IDs. contexta's Anthropic adapter wraps the context/observe lifecycle.
+
+## Installation
+
+```bash
+pip install contexta-client contexta-anthropic
+```
+
+## Basic Usage
+
+```python
+from anthropic import Anthropic
+from CONTEXTA_anthropic import contextaMemory
+
+claude = Anthropic()
+memory = contextaMemory.from_env()
+
+user_message = "What database do I prefer?"
+
+# 1. Fetch context
+context = memory.context_for(
+    user_id="u_123",
+    query=user_message,
+    token_budget=1500,
+)
+
+# 2. Call Claude with context as system prompt
+response = claude.messages.create(
+    model="claude-3-7-sonnet-20250219",
+    system=context.to_system_prompt(),
+    messages=[{"role": "user", "content": user_message}],
+    max_tokens=1024,
+)
+
+# 3. Observe the conversation turn
+memory.observe(
+    user_id="u_123",
+    session_id="s_456",
+    messages=[
+        {"role": "user", "content": user_message},
+        {"role": "assistant", "content": response.content[0].text},
+    ],
+)
+```
+
+## With contextaChat Helper
+
+```python
+from CONTEXTA_anthropic import contextaChat
+
+chat = contextaChat(
+    user_id="u_123",
+    session_id="s_456",
+)
+
+response = chat.send("What database do I prefer?")
+# Context auto-injected, observation auto-saved
+```
+
+## TypeScript
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+import { contexta } from "@contexta/client";
+import { contextaMemory } from "@contexta/anthropic";
+
+const claude = new Anthropic();
+const memory = new contextaMemory(contexta.fromEnv());
+
+const ctx = await memory.contextFor({
+  userId: "u_123",
+  query: userMessage,
+  tokenBudget: 1500,
+});
+
+const response = await claude.messages.create({
+  model: "claude-3-7-sonnet-20250219",
+  system: ctx.toSystemPrompt(),
+  messages: [{ role: "user", content: userMessage }],
+  max_tokens: 1024,
+});
+
+await memory.observe({
+  userId: "u_123",
+  sessionId: "s_456",
+  messages: [
+    { role: "user", content: userMessage },
+    { role: "assistant", content: response.content[0].text },
+  ],
+});
+```

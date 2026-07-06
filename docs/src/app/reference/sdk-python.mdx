@@ -1,0 +1,243 @@
+# Python SDK Reference
+
+Full API surface for `contexta-client`.
+
+## Installation
+
+```bash
+pip install contexta-client
+```
+
+## Classes
+
+### `contexta`
+
+Sync client.
+
+```python
+class contexta:
+    @classmethod
+    def from_env(cls) -> contexta: ...
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        base_url: str = "https://api.contexta.dev",
+        timeout: float = 30.0,
+        max_retries: int = 3,
+        telemetry: bool = True,
+        enable_buffer: bool = True,
+    ): ...
+```
+
+### `Asynccontexta`
+
+Async client. Same constructor and method signatures, but all methods are async.
+
+```python
+class Asynccontexta:
+    @classmethod
+    def from_env(cls) -> Asynccontexta: ...
+```
+
+## Methods
+
+### observe
+
+```python
+def observe(
+    self,
+    *,
+    user_id: UUID | str,
+    session_id: UUID | str | None = None,
+    messages: list[dict],
+    metadata: dict | None = None,
+    policy: str | None = None,
+    idempotency_key: str | None = None,
+) -> ObserveResponse: ...
+```
+
+Returns: `{"job_id": str, "status": str}`
+
+### observe_batch
+
+```python
+def observe_batch(
+    self,
+    observations: list[dict],
+) -> BatchObserveResponse: ...
+```
+
+### context
+
+```python
+def context(
+    self,
+    *,
+    user_id: UUID | str,
+    session_id: UUID | str | None = None,
+    query: str | None = None,
+    token_budget: int = 2000,
+    include_user_model: bool = True,
+    rerank: bool = False,
+) -> Context: ...
+```
+
+Returns `Context` with methods: `to_system_prompt()`, `to_messages()`, `to_markdown()`, `to_dict()`.
+
+### retrieve
+
+```python
+def retrieve(
+    self,
+    *,
+    user_id: UUID | str,
+    query_text: str,
+    memory_types: list[str] | None = None,
+    tags: list[str] | None = None,
+    limit: int = 20,
+    graph_depth: int = 1,
+    include_archived: bool = False,
+    include_cold: bool = False,
+    rerank: bool = False,
+) -> list[ScoredMemory]: ...
+```
+
+### explain
+
+```python
+def explain(
+    self,
+    memory_id: UUID | str,
+) -> Explanation: ...
+```
+
+### pin / unpin / archive / restore
+
+```python
+def pin(self, memory_id: UUID | str) -> Memory: ...
+def unpin(self, memory_id: UUID | str) -> Memory: ...
+def archive(self, memory_id: UUID | str) -> Memory: ...
+def restore(self, memory_id: UUID | str) -> Memory: ...
+```
+
+### delete
+
+```python
+def delete(self, memory_id: UUID | str) -> None: ...
+```
+
+### timeline
+
+```python
+def timeline(
+    self,
+    user_id: UUID | str,
+    limit: int = 50,
+) -> list[TimelineEvent]: ...
+```
+
+### register_policy
+
+```python
+def register_policy(
+    self,
+    *,
+    name: str,
+    store_rules: list[dict] | None = None,
+    ignore_rules: list[dict] | None = None,
+    priority_weights: dict[str, float] | None = None,
+) -> Policy: ...
+```
+
+### register_schema
+
+```python
+def register_schema(
+    self,
+    *,
+    name: str,
+    fields: list[dict],
+) -> Schema: ...
+```
+
+### list_policies
+
+```python
+def list_policies(self) -> list[Policy]: ...
+```
+
+### ping
+
+```python
+def ping(self) -> dict: ...
+```
+
+## Data Types
+
+```python
+@dataclass
+class Context:
+    user_profile: UserProfile | None
+    active_projects: list[Project]
+    preferences: list[Preference]
+    goals: list[Goal]
+    recent_events: list[Event]
+    relevant_memories: list[ScoredMemory]
+    token_usage: TokenUsage
+    cache_hit: bool
+    request_id: str
+
+    def to_system_prompt(self, *, template: str | None = None) -> str: ...
+    def to_messages(self) -> list[dict]: ...
+    def to_markdown(self) -> str: ...
+    def to_dict(self) -> dict: ...
+
+@dataclass
+class ScoredMemory:
+    memory_id: str
+    memory_type: str
+    title: str
+    content: str
+    score: float
+    score_breakdown: dict
+    tags: list[str]
+    created_at: str
+
+@dataclass
+class Explanation:
+    memory: Memory
+    extraction_source: list[dict]
+    scoring_breakdown: dict
+    supersession_history: list[dict]
+
+@dataclass
+class Memory:
+    id: str
+    memory_type: str
+    title: str
+    content: str
+    confidence: float
+    importance: float
+    tags: list[str]
+    memory_state: str
+    is_pinned: bool
+    is_archived: bool
+    created_at: str
+    last_accessed_at: str | None
+```
+
+## Exceptions
+
+```python
+contextaError(Exception)          # Base
+AuthenticationError(contextaError) # 401
+AuthorizationError(contextaError)  # 403
+NotFoundError(contextaError)       # 404
+ValidationError(contextaError)     # 422
+QuotaExceeded(contextaError)       # 429
+RateLimited(contextaError):        # 429
+    retry_after: int
+ServerError(contextaError)         # 500
+```

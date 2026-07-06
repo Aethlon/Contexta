@@ -1,0 +1,135 @@
+services:
+  # ─── Infra ──────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: contexta
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d contexta"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Python Backend ─────────────────────────────────
+  migration:
+    build: .
+    environment:
+      MODE: migrate
+      CONTEXTA_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/contexta
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: .
+    environment:
+      MODE: api
+      CONTEXTA_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/contexta
+      CONTEXTA_REDIS_URL: redis://redis:6379/0
+      CONTEXTA_CELERY_BROKER_URL: redis://redis:6379/1
+      CONTEXTA_CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
+      CONTEXTA_SECRET_KEY: dev-secret-key-change-in-prod
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+
+  worker:
+    build: .
+    environment:
+      MODE: worker
+      CONTEXTA_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/contexta
+      CONTEXTA_REDIS_URL: redis://redis:6379/0
+      CONTEXTA_CELERY_BROKER_URL: redis://redis:6379/1
+      CONTEXTA_CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+
+  beat:
+    build: .
+    environment:
+      MODE: beat
+      CONTEXTA_CELERY_BROKER_URL: redis://redis:6379/1
+      CONTEXTA_CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+
+  # ─── Go Services ────────────────────────────────────
+  gateway:
+    build: ./services/gateway
+    environment:
+      REDIS_ADDR: redis:6379
+      DATA_PLANE_URL: http://data-plane:8080
+      PYTHON_API_URL: http://api:8000
+      LISTEN_ADDR: :8443
+    ports:
+      - "8443:8443"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+
+  data-plane:
+    build: ./services/data-plane
+    environment:
+      REDIS_ADDR: redis:6379
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/contexta
+      LISTEN_ADDR: :8080
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  aggregator:
+    build: ./services/aggregator
+    environment:
+      REDIS_ADDR: redis:6379
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/contexta
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
