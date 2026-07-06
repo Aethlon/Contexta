@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Brain, CheckCircle2, Code2, Github, Globe2, KeyRound, Network, Server, Shield, Sparkles, Terminal, Zap } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, Brain, Check, Copy, Github, KeyRound, Network, Shield, Sparkles, Terminal, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 const springStiff = {
   type: "spring" as const,
@@ -23,66 +25,97 @@ const staggerContainer = {
 };
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 12 },
+  hidden: { opacity: 0, y: 16 },
   visible: { opacity: 1, y: 0, transition: springStiff },
 };
 
-const features = [
-  {
-    icon: Brain,
-    title: "Memory extraction",
-    text: "Ingest conversations, extract durable facts, and let your agents reason with reliable context.",
-  },
-  {
-    icon: Network,
-    title: "Hybrid retrieval",
-    text: "Blend semantic, keyword, graph, importance, and recency signals into one agent-ready response.",
-  },
-  {
-    icon: KeyRound,
-    title: "API key management",
-    text: "Create scoped keys from the backend with tenant-safe controls and clean admin workflows.",
-  },
-  {
-    icon: Shield,
-    title: "Tenant isolation",
-    text: "Every query is automatically scoped to the right organization without leaking cross-tenant state.",
-  },
-];
+const GITHUB_REPO = "https://github.com/Aethlon/Contexta";
 
-const quickstart = `# 1. Create an API key in the dashboard
-# 2. Export your environment
-export CONTEXTA_API_URL=http://localhost:8000
-export CONTEXTA_API_KEY=mk_live_...
-
-# 3. Send an observation
-curl $CONTEXTA_API_URL/v1/observations \\
+const quickstartSnippets = {
+  curl: `curl ${GITHUB_REPO.replace("github.com", "api.github.com")}/v1/observations \\
   -H "Authorization: Bearer $CONTEXTA_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{"user_id":"...","org_id":"...","messages":[{"role":"user","content":"I prefer python."}]}'
+  -d '{
+    "user_id": "usr_9102",
+    "messages": [{"role": "user", "content": "I prefer python."}]
+  }'`,
+  python: `from contexta import Contexta
 
-# 4. Retrieve context
-curl -X POST $CONTEXTA_API_URL/v1/retrieve \\
-  -H "Authorization: Bearer $CONTEXTA_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"user_id":"...","query_text":"preferences"}'`;
+client = Contexta(api_key="mk_live_...")
+client.observe(
+    user_id="usr_9102",
+    messages=[{"role": "user", "content": "I prefer python."}]
+)`,
+  javascript: `import { Contexta } from "contexta-node";
 
-const stats = [
-  { value: "< 200ms", label: "median retrieval" },
-  { value: "4x", label: "richer context" },
-  { value: "100%", label: "tenant scoped" },
-];
+const client = new Contexta({ apiKey: "mk_live_..." });
+await client.observe({
+  userId: "usr_9102",
+  messages: [{ role: "user", content: "I prefer python." }]
+});`,
+};
 
-const steps = [
-  { title: "Observe", desc: "Your agent sends conversation payloads to the gateway and they get validated instantly." },
-  { title: "Extract", desc: "An LLM extracts facts, preferences, entities, and relationships into durable memory." },
-  { title: "Retrieve", desc: "Hybrid search ranks the right context for every prompt and workflow." },
+const mockObservations = [
+  {
+    input: "I prefer working in Python and using dark mode.",
+    facts: [
+      { key: "language", value: "Python", confidence: 0.99 },
+      { key: "ui_preference", value: "dark_mode", confidence: 0.95 }
+    ]
+  },
+  {
+    input: "Remember that Aethlon is located in San Francisco.",
+    facts: [
+      { key: "company", value: "Aethlon", confidence: 0.98 },
+      { key: "location", value: "San Francisco", confidence: 0.92 }
+    ]
+  },
+  {
+    input: "I am the CTO of Contexta. I use VS Code.",
+    facts: [
+      { key: "role", value: "CTO", confidence: 0.97 },
+      { key: "editor", value: "VS Code", confidence: 0.99 },
+      { key: "organization", value: "Contexta", confidence: 0.96 }
+    ]
+  }
 ];
 
 export default function HomePage() {
+  const [activeTab, setActiveTab] = useState<"curl" | "python" | "javascript">("curl");
+  const [copied, setCopied] = useState(false);
+  const [demoIndex, setDemoIndex] = useState(0);
+  const [demoInput, setDemoInput] = useState(mockObservations[0].input);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [extractedFacts, setExtractedFacts] = useState<any[]>(mockObservations[0].facts);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(quickstartSnippets[activeTab]);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRunDemo = () => {
+    setIsProcessing(true);
+    setTimeout(() => {
+      setExtractedFacts(mockObservations[demoIndex].facts);
+      setIsProcessing(false);
+    }, 800);
+  };
+
+  const selectDemoObservation = (idx: number) => {
+    setDemoIndex(idx);
+    setDemoInput(mockObservations[idx].input);
+    setIsProcessing(true);
+    setTimeout(() => {
+      setExtractedFacts(mockObservations[idx].facts);
+      setIsProcessing(false);
+    }, 600);
+  };
+
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[var(--color-abyss)] py-6">
+    <main className="relative min-h-screen bg-[var(--color-abyss)] py-6 overflow-x-hidden selection:bg-[var(--color-charcoal)] selection:text-[var(--color-ghost)]">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
+        
         {/* Navigation Bar */}
         <motion.nav
           initial={{ opacity: 0, y: -10 }}
@@ -96,9 +129,9 @@ export default function HomePage() {
           </Link>
           <div className="flex items-center gap-6">
             <a
-              href="https://github.com"
+              href={GITHUB_REPO}
               target="_blank"
-              rel="noopener"
+              rel="noopener noreferrer"
               className="flex items-center gap-1.5 text-sm text-[var(--color-smoke)] transition-colors hover:text-[var(--color-ghost)] font-light"
             >
               <Github className="h-4 w-4" strokeWidth={1.2} /> GitHub
@@ -121,174 +154,294 @@ export default function HomePage() {
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
           variants={staggerContainer}
-          className="grid gap-16 py-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-32"
+          className="flex flex-col items-center text-center py-20 lg:py-32 space-y-8"
         >
-          <div className="space-y-8">
-            <motion.div variants={fadeUp} className="inline-flex items-center">
-              <Badge className="text-xs">
-                <Sparkles className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.2} /> Open source memory layer for AI agents
-              </Badge>
-            </motion.div>
-            <motion.h1
-              variants={fadeUp}
-              className="text-5xl font-light leading-[1.05] tracking-tighter sm:text-6xl lg:text-7xl text-[var(--color-ghost)]"
-            >
-              Give your agents
-              <br />
-              <span className="text-[var(--color-smoke)]">a durable memory.</span>
-            </motion.h1>
-            <motion.p variants={fadeUp} className="max-w-xl text-lg font-light leading-8 text-[var(--color-smoke)]">
-              Contexta turns raw conversations into structured, durable memory so your products can reason,
-              personalize, and stay grounded over time.
-            </motion.p>
-            <motion.div variants={fadeUp} className="flex flex-wrap gap-4">
-              <Button variant="default">
-                <Link href="/sign-up" className="flex items-center gap-1.5">
-                  Create free account <ArrowRight className="h-4 w-4" strokeWidth={1.2} />
-                </Link>
+          <motion.div variants={fadeUp}>
+            <Badge className="text-xs lowercase bg-[var(--color-ash)] border-[var(--color-graphite)]/50 text-[var(--color-smoke)] font-mono">
+              <Sparkles className="mr-1.5 h-3 w-3 text-[var(--color-smoke)]" strokeWidth={1.2} /> v0.2.0 • open source memory layer
+            </Badge>
+          </motion.div>
+          <motion.h1
+            variants={fadeUp}
+            className="text-5xl font-light leading-[1.05] tracking-tighter sm:text-7xl lg:text-8xl text-[var(--color-ghost)] max-w-4xl"
+          >
+            The memory plane for <br />
+            <span className="text-[var(--color-smoke)]">AI agent architectures.</span>
+          </motion.h1>
+          <motion.p
+            variants={fadeUp}
+            className="max-w-xl text-lg font-light leading-8 text-[var(--color-smoke)]"
+          >
+            Contexta parses multi-turn chat logs into structured, graph-relational entities. Keep your copilots, assistants, and production agents permanently grounded.
+          </motion.p>
+          <motion.div variants={fadeUp} className="flex flex-wrap gap-4 justify-center">
+            <Button variant="default" className="h-11 px-6 text-sm">
+              <Link href="/sign-up" className="flex items-center gap-1.5">
+                Deploy free instance <ArrowRight className="h-4 w-4" strokeWidth={1.2} />
+              </Link>
+            </Button>
+            <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer">
+              <Button variant="secondary" className="h-11 px-6 text-sm flex items-center gap-2">
+                <Github className="h-4 w-4" strokeWidth={1.2} /> Star on GitHub
               </Button>
-              <Button variant="secondary">
-                <Link href="/dashboard/docs">View docs</Link>
-              </Button>
-            </motion.div>
-            <motion.div variants={fadeUp} className="flex flex-wrap gap-5 text-xs font-mono tracking-widest uppercase text-[var(--color-smoke)] pt-4">
-              <span className="flex items-center gap-2"><Zap className="h-3.5 w-3.5" strokeWidth={1.2} /> FastAPI + Celery</span>
-              <span className="flex items-center gap-2"><Server className="h-3.5 w-3.5" strokeWidth={1.2} /> PostgreSQL + pgvector</span>
-              <span className="flex items-center gap-2"><Globe2 className="h-3.5 w-3.5" strokeWidth={1.2} /> OpenAI & DeepSeek</span>
-            </motion.div>
-          </div>
+            </a>
+          </motion.div>
+        </motion.section>
 
-          {/* Interactive Code Preview */}
-          <motion.div variants={fadeUp} className="relative">
-            <Card className="border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-0 shadow-[0_24px_50px_rgba(0,0,0,0.2)]">
-              <div className="flex items-center justify-between border-b border-[var(--color-graphite)]/30 px-6 py-4">
-                <div className="flex gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-graphite)]" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-graphite)]" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-graphite)]" />
+        {/* Interactive Live Extraction Playground */}
+        <motion.section
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={staggerContainer}
+          className="py-12"
+        >
+          <motion.div variants={fadeUp} className="space-y-4 text-center max-w-2xl mx-auto mb-12">
+            <h2 className="text-2xl font-light text-[var(--color-ghost)] tracking-tight">Interactive Memory Playground</h2>
+            <p className="text-sm font-light text-[var(--color-smoke)]">
+              Select a conversational payload below and watch contexta extract durable, graph-relational memory facts in real-time.
+            </p>
+          </motion.div>
+
+          <motion.div variants={fadeUp}>
+            <Card className="border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] overflow-hidden shadow-[0_24px_50px_rgba(0,0,0,0.15)]">
+              <div className="grid md:grid-cols-[0.9fr_1.1fr] divide-y md:divide-y-0 md:divide-x divide-[var(--color-graphite)]/20">
+                
+                {/* Left Controller Panel */}
+                <div className="p-6 space-y-6">
+                  <div className="space-y-2">
+                    <Label>Select Observation Template</Label>
+                    <div className="flex flex-col gap-2">
+                      {mockObservations.map((obs, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => selectDemoObservation(idx)}
+                          className={`text-left p-3.5 rounded-xl border text-xs font-light transition-all select-none ${
+                            demoIndex === idx
+                              ? "bg-[var(--color-charcoal)] border-[var(--color-ghost)]/40 text-[var(--color-ghost)] font-normal"
+                              : "bg-[var(--color-abyss)] border-[var(--color-graphite)]/30 text-[var(--color-smoke)] hover:border-[var(--color-smoke)]/40"
+                          }`}
+                        >
+                          &ldquo;{obs.input}&rdquo;
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 flex flex-col">
+                    <Label htmlFor="demo-input">Agent Observation Payload</Label>
+                    <textarea
+                      id="demo-input"
+                      value={demoInput}
+                      onChange={(e) => setDemoInput(e.target.value)}
+                      rows={3}
+                      className="w-full rounded-xl border border-[var(--color-graphite)]/30 bg-[var(--color-abyss)] p-3 text-xs font-light text-[var(--color-ghost)] outline-none focus:border-[var(--color-smoke)]/50 resize-none transition-colors"
+                    />
+                  </div>
+
+                  <Button onClick={handleRunDemo} className="w-full h-10 text-xs flex items-center justify-center gap-1.5" disabled={isProcessing}>
+                    <Zap size={14} className="text-[var(--color-smoke)]" strokeWidth={1.2} /> Ingest Observation
+                  </Button>
                 </div>
-                <span className="text-xs font-mono tracking-widest uppercase text-[var(--color-smoke)]">memory-preview</span>
+
+                {/* Right Result Terminal */}
+                <div className="bg-[var(--color-abyss)] p-6 flex flex-col justify-between min-h-[300px]">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-[var(--color-graphite)]/30 pb-3">
+                      <span className="text-[10px] font-mono tracking-widest uppercase text-[var(--color-smoke)] flex items-center gap-1.5">
+                        <Terminal size={12} strokeWidth={1.2} /> Extraction Gateway output
+                      </span>
+                      {isProcessing ? (
+                        <span className="flex h-1.5 w-1.5 rounded-full bg-[var(--color-smoke)] animate-ping" />
+                      ) : (
+                        <Badge className="bg-[var(--color-ash)] text-[var(--color-smoke)] lowercase font-mono px-2 py-0.5">synced</Badge>
+                      )}
+                    </div>
+
+                    <div className="space-y-3 min-h-[160px] flex flex-col justify-center">
+                      {isProcessing ? (
+                        <div className="flex flex-col items-center justify-center gap-2 py-8">
+                          <span className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--color-smoke)] border-t-transparent" />
+                          <span className="text-xs font-mono tracking-widest text-[var(--color-smoke)] uppercase">Extracting facts...</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <AnimatePresence mode="popLayout">
+                            {extractedFacts.map((fact, idx) => (
+                              <motion.div
+                                key={fact.key + idx}
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: 10 }}
+                                transition={springStiff}
+                                className="flex items-center justify-between rounded-xl border border-[var(--color-graphite)]/20 bg-[var(--color-ash)]/50 p-3 text-xs"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <code className="text-xs font-mono text-[var(--color-smoke)]">{fact.key}</code>
+                                  <span className="text-[var(--color-smoke)]">→</span>
+                                  <span className="text-[var(--color-ghost)] font-normal">{fact.value}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[10px] font-mono text-[var(--color-smoke)]">
+                                  <span>confidence:</span>
+                                  <span>{fact.confidence.toFixed(2)}</span>
+                                </div>
+                              </motion.div>
+                            ))}
+                          </AnimatePresence>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] font-mono tracking-wider text-[var(--color-smoke)] border-t border-[var(--color-graphite)]/20 pt-4 flex justify-between items-center">
+                    <span>observation pipeline active</span>
+                    <span>api response: 200 OK</span>
+                  </div>
+                </div>
+
               </div>
-              <CardContent className="p-6 space-y-6">
-                <pre className="overflow-x-auto rounded-xl bg-[var(--color-abyss)] p-4 font-mono text-[11px] leading-6 text-[var(--color-smoke)] border border-[var(--color-graphite)]/20">
-                  {quickstart}
-                </pre>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-xl border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-4">
-                    <div className="flex items-center gap-2 text-xs font-mono tracking-widest uppercase text-[var(--color-smoke)]">
-                      <Code2 className="h-4 w-4" strokeWidth={1.2} /> Structured facts
-                    </div>
-                    <div className="mt-3 text-3xl font-light text-[var(--color-ghost)]">12</div>
-                    <p className="mt-1 text-xs text-[var(--color-smoke)] font-light">preferences, constraints, and relationships extracted.</p>
-                  </div>
-                  <div className="rounded-xl border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-4">
-                    <div className="flex items-center gap-2 text-xs font-mono tracking-widest uppercase text-[var(--color-smoke)]">
-                      <Terminal className="h-4 w-4" strokeWidth={1.2} /> Retrieval ready
-                    </div>
-                    <p className="mt-3 text-xs text-[var(--color-smoke)] font-light leading-relaxed">
-                      The API returns ranked context for your agents in a single call.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
             </Card>
           </motion.div>
         </motion.section>
 
-        {/* Stats Section */}
+        {/* Bento Grid Features Section */}
         <motion.section
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
           variants={staggerContainer}
-          className="grid gap-8 sm:grid-cols-3 border-t border-[var(--color-graphite)]/30 py-16"
+          className="grid gap-6 md:grid-cols-6 py-20"
         >
-          {stats.map((stat) => (
-            <motion.div key={stat.label} variants={fadeUp} className="text-center sm:text-left py-4">
-              <div className="text-4xl font-light text-[var(--color-ghost)] tracking-tight">{stat.value}</div>
-              <div className="mt-2 text-xs font-mono tracking-widest uppercase text-[var(--color-smoke)]">{stat.label}</div>
-            </motion.div>
-          ))}
+          {/* Feature 1 - Left Wide Card */}
+          <motion.div variants={fadeUp} className="md:col-span-4">
+            <Card className="h-full border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-8 flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-charcoal)] text-[var(--color-ghost)]">
+                  <Brain className="h-5 w-5" strokeWidth={1.2} />
+                </div>
+                <h3 className="text-lg font-normal text-[var(--color-ghost)]">Graph-relational facts extraction</h3>
+                <p className="text-sm font-light text-[var(--color-smoke)] leading-relaxed max-w-xl">
+                  Contexta doesn&apos;t just store raw logs. Our LLM-powered extraction engine identifies preferences, temporal states, and organization connections, linking them in a durable Postgres relational memory graph.
+                </p>
+              </div>
+              <div className="pt-6 font-mono text-[10px] tracking-widest uppercase text-[var(--color-smoke)]">
+                auto-deduplication enabled
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* Feature 2 - Right Narrow Card */}
+          <motion.div variants={fadeUp} className="md:col-span-2">
+            <Card className="h-full border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-8 flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-charcoal)] text-[var(--color-ghost)]">
+                  <Network className="h-5 w-5" strokeWidth={1.2} />
+                </div>
+                <h3 className="text-lg font-normal text-[var(--color-ghost)]">Hybrid retrieval</h3>
+                <p className="text-sm font-light text-[var(--color-smoke)] leading-relaxed">
+                  Combine vector embeddings with keyword (BM25) and entity graph search in a single ranked query response.
+                </p>
+              </div>
+              <div className="pt-6 font-mono text-[10px] tracking-widest uppercase text-[var(--color-smoke)]">
+                median latency &lt; 200ms
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* Feature 3 - Left Narrow Card */}
+          <motion.div variants={fadeUp} className="md:col-span-2">
+            <Card className="h-full border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-8 flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-charcoal)] text-[var(--color-ghost)]">
+                  <Shield className="h-5 w-5" strokeWidth={1.2} />
+                </div>
+                <h3 className="text-lg font-normal text-[var(--color-ghost)]">Tenant-scoped isolation</h3>
+                <p className="text-sm font-light text-[var(--color-smoke)] leading-relaxed">
+                  Strict database and schema-level division. Rest assured that no tenant-scope data leaks into other requests.
+                </p>
+              </div>
+              <div className="pt-6 font-mono text-[10px] tracking-widest uppercase text-[var(--color-smoke)]">
+                enterprise grade
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* Feature 4 - Right Wide Card */}
+          <motion.div variants={fadeUp} className="md:col-span-4">
+            <Card className="h-full border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-8 flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-charcoal)] text-[var(--color-ghost)]">
+                  <KeyRound className="h-5 w-5" strokeWidth={1.2} />
+                </div>
+                <h3 className="text-lg font-normal text-[var(--color-ghost)]">Scoped API key manager</h3>
+                <p className="text-sm font-light text-[var(--color-smoke)] leading-relaxed max-w-xl">
+                  Allow developers to generate scoped write-only (observe) or read-only (retrieve) access tokens. Implement clean admin control pipelines across your organizations.
+                </p>
+              </div>
+              <div className="pt-6 font-mono text-[10px] tracking-widest uppercase text-[var(--color-smoke)]">
+                developer console ready
+              </div>
+            </Card>
+          </motion.div>
         </motion.section>
 
-        {/* Features Bento Grid */}
+        {/* Integration Quickstart Console */}
         <motion.section
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
           variants={staggerContainer}
-          className="grid gap-8 md:grid-cols-2 lg:grid-cols-4 py-20"
+          className="border-t border-[var(--color-graphite)]/30 py-24"
         >
-          {features.map((feature) => (
-            <motion.div key={feature.title} variants={fadeUp}>
-              <Card className="h-full border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] hover:border-[var(--color-smoke)]/40 transition-colors duration-300">
-                <CardContent className="space-y-4 p-6">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-charcoal)] text-[var(--color-ghost)]">
-                    <feature.icon className="h-5 w-5" strokeWidth={1.2} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-normal text-[var(--color-ghost)]">{feature.title}</h3>
-                    <p className="mt-2 text-sm leading-6 text-[var(--color-smoke)] font-light">{feature.text}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </motion.section>
-
-        {/* Architecture Section */}
-        <motion.section
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          variants={staggerContainer}
-          className="border-t border-[var(--color-graphite)]/30 py-24 lg:py-32"
-        >
-          <div className="grid gap-16 lg:grid-cols-[0.8fr_1.2fr]">
+          <div className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr]">
             <div className="space-y-6">
-              <Badge className="text-xs">Architecture</Badge>
-              <h2 className="text-3xl font-light tracking-tight sm:text-4xl text-[var(--color-ghost)]">
-                Built for fast, reliable memory workflows.
+              <Badge className="text-xs">Integration</Badge>
+              <h2 className="text-3xl font-light tracking-tight text-[var(--color-ghost)]">
+                Three lines of code to connect agent memory.
               </h2>
-              <p className="text-base leading-7 text-[var(--color-smoke)] font-light">
-                A polyglot stack designed to ingest, extract, and retrieve memory with the stability your agents need.
+              <p className="text-sm font-light text-[var(--color-smoke)] leading-relaxed">
+                Connect your FastAPI, LangChain, or custom agent flow in seconds. Open-sourced under the MIT license.
               </p>
-              <div className="space-y-4 pt-4">
-                {[
-                  "FastAPI gateway for every request",
-                  "Async extraction workers for durable memory",
-                  "PostgreSQL + pgvector for reliable retrieval",
-                  "Tenant-safe retrieval from the first request",
-                ].map((item) => (
-                  <div key={item} className="flex items-center gap-3 text-sm text-[var(--color-ghost)] font-light">
-                    <CheckCircle2 className="h-4 w-4 text-[var(--color-smoke)]" strokeWidth={1.2} />
-                    {item}
-                  </div>
+              <div className="flex gap-4 border-b border-[var(--color-graphite)]/20 pb-2">
+                {(["curl", "python", "javascript"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`relative cursor-pointer text-xs font-mono tracking-widest uppercase pb-2 select-none ${
+                      activeTab === tab
+                        ? "text-[var(--color-ghost)] font-normal"
+                        : "text-[var(--color-smoke)] font-light hover:text-[var(--color-ghost)]"
+                    }`}
+                  >
+                    {tab}
+                    {activeTab === tab && (
+                      <motion.div
+                        layoutId="activeHeroTabIndicator"
+                        className="absolute -bottom-[1px] left-0 right-0 h-[1.5px] bg-[var(--color-ghost)]"
+                        transition={springStiff}
+                      />
+                    )}
+                  </button>
                 ))}
               </div>
             </div>
-            <div className="rounded-2xl border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-6 shadow-[0_16px_36px_rgba(0,0,0,0.15)] space-y-6">
-              <div className="grid gap-4 md:grid-cols-3">
-                {steps.map((item) => (
-                  <div key={item.title} className="rounded-xl border border-[var(--color-graphite)]/20 bg-[var(--color-abyss)] p-4">
-                    <div className="text-xs font-mono tracking-widest uppercase text-[var(--color-ghost)]">{item.title}</div>
-                    <p className="mt-2 text-xs leading-5 text-[var(--color-smoke)] font-light">{item.desc}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="rounded-xl border border-[var(--color-graphite)]/20 bg-[var(--color-abyss)] p-4 overflow-x-auto">
-                <pre className="font-mono text-[10px] leading-5 text-[var(--color-smoke)]">
-{`POST /v1/observations      POST /v1/retrieve      GET /v1/memories
-      │                           │                      │
-      ▼                           ▼                      ▼
-┌──────────────┐        ┌──────────────────────┐      ┌──────────────────┐
-│  FastAPI     │ ─────▶ │  Celery Worker       │ ───▶ │  PostgreSQL      │
-│  Gateway     │        │  LLM Extraction      │      │  + pgvector      │
-└──────────────┘        │  Entity Resolution   │      │  + Redis cache   │
-                        │  Deduplication       │      └──────────────────┘
-                        └──────────────────────┘`}
-                </pre>
-              </div>
+
+            {/* Code Snippet Container */}
+            <div className="relative rounded-2xl border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-6 shadow-[0_16px_36px_rgba(0,0,0,0.12)]">
+              <pre className="overflow-x-auto font-mono text-xs text-[var(--color-smoke)] leading-relaxed min-h-[160px] pb-4">
+                {quickstartSnippets[activeTab]}
+              </pre>
+              <Button
+                variant="ghost"
+                onClick={handleCopy}
+                className="absolute right-4 top-4 h-8 w-8 p-0 rounded-lg hover:bg-[var(--color-charcoal)]"
+              >
+                {copied ? (
+                  <Check className="h-4 w-4 text-[var(--color-smoke)]" strokeWidth={1.2} />
+                ) : (
+                  <Copy className="h-4 w-4 text-[var(--color-smoke)]" strokeWidth={1.2} />
+                )}
+              </Button>
             </div>
           </div>
         </motion.section>
@@ -303,15 +456,16 @@ export default function HomePage() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-2.5 text-xs font-light text-[var(--color-smoke)]">
               <Brain className="h-4 w-4" strokeWidth={1.2} />
-              <span>contexta — memory intelligence for AI agents</span>
+              <span>contexta — open-source memory engine</span>
             </div>
             <div className="flex flex-wrap gap-6 text-xs text-[var(--color-smoke)] font-light">
+              <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--color-ghost)]">GitHub</a>
               <Link href="/sign-in" className="transition-colors hover:text-[var(--color-ghost)]">Sign in</Link>
               <Link href="/sign-up" className="transition-colors hover:text-[var(--color-ghost)]">Sign up</Link>
-              <a href="https://github.com" target="_blank" rel="noopener" className="transition-colors hover:text-[var(--color-ghost)]">GitHub</a>
             </div>
           </div>
         </motion.footer>
+
       </div>
     </main>
   );
