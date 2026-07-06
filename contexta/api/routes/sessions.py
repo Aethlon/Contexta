@@ -40,7 +40,7 @@ async def create_session(
         id=uuid4(),
         user_id=payload.user_id,
         organization_id=org_id,
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.utcnow(),
         metadata_=payload.metadata,
     )
     created = await repo.create(new_session)
@@ -70,7 +70,7 @@ async def end_session(
             detail="Session not found",
         )
 
-    ended_at = datetime.now(timezone.utc)
+    ended_at = datetime.utcnow()
     await repo.update_by_id(session_id, {"ended_at": ended_at})
 
     return {

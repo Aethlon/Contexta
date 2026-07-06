@@ -88,7 +88,7 @@ class MemoryRepository(TenantScopedRepository["MemoryRecord"]):
             memory_state=MemoryState.ACTIVE.value,
             is_pinned=is_pinned,
             is_archived=False,
-            valid_from=valid_from or datetime.now(timezone.utc),
+            valid_from=valid_from or datetime.utcnow(),
             valid_to=None,
         )
         persisted = await self.create(record)

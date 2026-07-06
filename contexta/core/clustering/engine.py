@@ -21,8 +21,8 @@ class SemanticClusterEngine:
             organization_id=organization_id,
             user_id=user_id,
             name=name,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
         )
         memberships = [
             ClusterMembership(cluster_id=cluster.id, memory_id=memory_id)

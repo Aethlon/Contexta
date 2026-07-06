@@ -47,7 +47,7 @@ class MemoryScoringEngine:
         half_life_days: float = 30.0,
     ) -> float:
         """Compute monotonically decreasing freshness from age."""
-        reference = now or datetime.now(timezone.utc)
+        reference = now or datetime.utcnow()
         age_seconds = max((reference - created_at).total_seconds(), 0.0)
         age_days = age_seconds / 86_400
         if half_life_days <= 0:

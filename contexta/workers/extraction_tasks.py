@@ -18,7 +18,7 @@ from contexta.core.extraction.worker import ExtractionWorker
 from contexta.core.schemas import ObservationPayload
 from contexta.core.scoring.engine import MemoryScoringEngine
 from contexta.core.truth.maintenance import TruthMaintenanceEngine
-from contexta.db import get_db_session
+from contexta.db import AsyncSessionFactory
 from contexta.repositories.api_key_repo import ApiKeyRepository
 from contexta.repositories.audit_repo import AuditRepository
 from contexta.repositories.entity_repo import (
@@ -48,97 +48,103 @@ async def _process_observation_async(self, payload: dict[str, Any]) -> dict[str,
 
     processed_details = []
 
-    async with get_db_session() as session:
-        # Initialize tenant-scoped repositories
-        memory_repo = MemoryRepository(session, tenant_id=org_id)
-        entity_repo = EntityRepository(session, tenant_id=org_id)
-        link_repo = MemoryEntityLinkRepository(session, tenant_id=org_id)
-        edge_repo = EntityEdgeRepository(session, tenant_id=org_id)
-        version_repo = MemoryVersionRepository(session)
-        audit_repo = AuditRepository(session, tenant_id=org_id)
+    async with AsyncSessionFactory() as session:
+        try:
+            # Initialize tenant-scoped repositories
+            memory_repo = MemoryRepository(session, tenant_id=org_id)
+            entity_repo = EntityRepository(session, tenant_id=org_id)
+            link_repo = MemoryEntityLinkRepository(session, tenant_id=org_id)
+            edge_repo = EntityEdgeRepository(session, tenant_id=org_id)
+            version_repo = MemoryVersionRepository(session)
+            audit_repo = AuditRepository(session, tenant_id=org_id)
 
-        # Initialize core engines
-        deduplicator = MemoryDeduplicator(memory_repo)
-        entity_resolver = EntityResolver(entity_repo, link_repo, edge_repo)
-        truth_engine = TruthMaintenanceEngine(
-            memory_repo,
-            version_repo,
-            edge_repository=edge_repo,
-            audit_repository=audit_repo,
-        )
-        scoring_engine = MemoryScoringEngine()
+            # Initialize core engines
+            deduplicator = MemoryDeduplicator(memory_repo)
+            entity_resolver = EntityResolver(entity_repo, link_repo, edge_repo)
+            truth_engine = TruthMaintenanceEngine(
+                memory_repo,
+                version_repo,
+                edge_repository=edge_repo,
+                audit_repository=audit_repo,
+            )
+            scoring_engine = MemoryScoringEngine()
 
-        for memory in extracted:
-            # 2. Deduplicate memory candidate against existing truths
-            dedup_result = await deduplicator.deduplicate(observation, memory)
+            for memory in extracted:
+                # 2. Deduplicate memory candidate against existing truths
+                dedup_result = await deduplicator.deduplicate(observation, memory)
 
-            if dedup_result.action == "discard":
-                logger.info(
-                    "Memory candidate discarded as duplicate: title='%s' existing_id=%s",
-                    memory.title,
-                    dedup_result.existing_id,
+                if dedup_result.action == "discard":
+                    logger.info(
+                        "Memory candidate discarded as duplicate: title='%s' existing_id=%s",
+                        memory.title,
+                        dedup_result.existing_id,
+                    )
+                    processed_details.append({
+                        "title": memory.title,
+                        "action": "discard",
+                        "existing_id": str(dedup_result.existing_id),
+                    })
+                    continue
+
+                if dedup_result.action == "merge":
+                    logger.info(
+                        "Memory candidate merged with existing memory: title='%s' existing_id=%s",
+                        memory.title,
+                        dedup_result.existing_id,
+                    )
+                    # Merges alter existing content; re-enqueue embedding generation
+                    enqueue_embedding_generation(str(dedup_result.existing_id))
+                    processed_details.append({
+                        "title": memory.title,
+                        "action": "merge",
+                        "existing_id": str(dedup_result.existing_id),
+                    })
+                    continue
+
+                # 3. Action is "store": persist, resolve entities, maintain truth, embed
+                # Importance scoring
+                score_breakdown = scoring_engine.compute_importance(memory.memory_type, memory.content)
+                confidence = scoring_engine.compute_confidence(memory.source_type)
+
+                # Persist memory record to DB
+                persisted_record = await memory_repo.persist(
+                    user_id=user_id,
+                    organization_id=org_id,
+                    session_id=session_id,
+                    memory=memory,
+                    confidence=confidence,
+                    importance=score_breakdown.final_score,
                 )
+
+                # Resolve entity mentions and map links
+                resolved_entities = await entity_resolver.resolve_memory_entities(
+                    payload=observation,
+                    memory_id=persisted_record.id,
+                    memory=memory,
+                )
+
+                # Contradiction check / historical supersession
+                await truth_engine.apply(
+                    persisted_record,
+                    entity_ids=[re.entity.id for re in resolved_entities],
+                    actor_id=user_id,
+                )
+
+                # Enqueue vector embedding generation
+                enqueue_embedding_generation(str(persisted_record.id))
+
                 processed_details.append({
                     "title": memory.title,
-                    "action": "discard",
-                    "existing_id": str(dedup_result.existing_id),
+                    "action": "store",
+                    "memory_id": str(persisted_record.id),
+                    "importance": score_breakdown.final_score,
+                    "confidence": confidence,
                 })
-                continue
 
-            if dedup_result.action == "merge":
-                logger.info(
-                    "Memory candidate merged with existing memory: title='%s' existing_id=%s",
-                    memory.title,
-                    dedup_result.existing_id,
-                )
-                # Merges alter existing content; re-enqueue embedding generation
-                enqueue_embedding_generation(str(dedup_result.existing_id))
-                processed_details.append({
-                    "title": memory.title,
-                    "action": "merge",
-                    "existing_id": str(dedup_result.existing_id),
-                })
-                continue
-
-            # 3. Action is "store": persist, resolve entities, maintain truth, embed
-            # Importance scoring
-            score_breakdown = scoring_engine.compute_importance(memory.memory_type, memory.content)
-            confidence = scoring_engine.compute_confidence(memory.source_type)
-
-            # Persist memory record to DB
-            persisted_record = await memory_repo.persist(
-                user_id=user_id,
-                organization_id=org_id,
-                session_id=session_id,
-                memory=memory,
-                confidence=confidence,
-                importance=score_breakdown.final_score,
-            )
-
-            # Resolve entity mentions and map links
-            resolved_entities = await entity_resolver.resolve_memory_entities(
-                payload=observation,
-                memory_id=persisted_record.id,
-                memory=memory,
-            )
-
-            # Contradiction check / historical supersession
-            await truth_engine.apply(
-                persisted_record,
-                entity_ids=[re.entity.id for re in resolved_entities],
-                actor_id=user_id,
-            )
-
-            # Enqueue vector embedding generation
-            enqueue_embedding_generation(str(persisted_record.id))
-
-            processed_details.append({
-                "title": memory.title,
-                "action": "store",
-                "memory_id": str(persisted_record.id),
-                "importance": score_breakdown.final_score,
-                "confidence": confidence,
-            })
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
 
     return {
         "task_id": task_id,

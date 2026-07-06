@@ -49,11 +49,13 @@ class Settings(BaseSettings):
     embedding_dimensions: int = 1536
     embedding_provider: str = "openai"
     embedding_api_key: str = ""
+    embedding_base_url: str = "https://api.openai.com/v1"
 
     # LLM provider
     llm_provider: str = "openai"
     llm_model: str = "gpt-4o-mini"
     llm_api_key: str = ""
+    llm_base_url: str = "https://api.openai.com/v1"
 
     # Feature flags
     feature_sensitive_data_filter: bool = True

@@ -95,7 +95,7 @@ class EntityResolver:
         observed_at: datetime | None = None,
     ) -> list[ResolvedEntity]:
         """Resolve all entity mentions on a memory and link them to the memory."""
-        timestamp = observed_at or datetime.now(timezone.utc)
+        timestamp = observed_at or datetime.utcnow()
         resolved: list[ResolvedEntity] = []
 
         for reference in memory.entities:
@@ -130,7 +130,7 @@ class EntityResolver:
         observed_at: datetime | None = None,
     ) -> ResolvedEntity:
         """Resolve one entity mention using semantic/name similarity."""
-        timestamp = observed_at or datetime.now(timezone.utc)
+        timestamp = observed_at or datetime.utcnow()
         candidates = [
             entity
             for entity in await self._entities.get_by_user(payload.user_id, limit=500)

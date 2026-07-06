@@ -30,7 +30,7 @@ class AuditLog(Base, UUIDPrimaryKeyMixin):
     )
     details: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        nullable=False, default=lambda: datetime.now(timezone.utc)
+        nullable=False, default=lambda: datetime.utcnow()
     )
 
     __table_args__ = (

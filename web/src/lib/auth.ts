@@ -38,11 +38,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (!res.ok) return null;
           const data = await res.json();
           return {
-            id: data.user_id ?? data.id,
+            id: data.account_id,
             email: data.email,
-            name: data.name ?? data.email?.split("@")[0] ?? "User",
+            name: data.display_name ?? data.name ?? data.email?.split("@")[0] ?? "User",
             image: data.avatar_url ?? null,
-            org_id: data.organization_id ?? data.org_id,
+            org_id: data.organization_id,
             role: data.role ?? "member",
           };
         } catch {

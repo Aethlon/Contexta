@@ -42,7 +42,7 @@ class EntityStateManager:
     ) -> dict[str, Any]:
         """Refresh entity summary and aggregate attributes from a linked memory."""
         entity = await self._get_entity(entity_id)
-        timestamp = observed_at or datetime.now(timezone.utc)
+        timestamp = observed_at or datetime.utcnow()
         attributes = self._aggregate_attributes(
             entity.aggregated_attributes or {},
             memory,
@@ -74,7 +74,7 @@ class EntityStateManager:
 
         values = {
             "status": new_status,
-            "last_updated": datetime.now(timezone.utc),
+            "last_updated": datetime.utcnow(),
         }
         await self._repository.update_by_id(entity_id, values)
         return values
@@ -90,7 +90,7 @@ class EntityStateManager:
         if entity.status != "active":
             return False
 
-        reference_time = now or datetime.now(timezone.utc)
+        reference_time = now or datetime.utcnow()
         if entity.last_updated > reference_time - timedelta(days=self.INACTIVITY_DAYS):
             return False
 

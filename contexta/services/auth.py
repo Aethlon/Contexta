@@ -32,8 +32,8 @@ def create_jwt(
     payload = {
         "sub": str(account_id),
         "org": str(organization_id),
-        "iat": datetime.now(timezone.utc),
-        "exp": datetime.now(timezone.utc) + (expires_delta or timedelta(days=7)),
+        "iat": datetime.utcnow(),
+        "exp": datetime.utcnow() + (expires_delta or timedelta(days=7)),
         "jti": str(uuid.uuid4()),
     }
     return jwt.encode(payload, settings.secret_key, algorithm="HS256")

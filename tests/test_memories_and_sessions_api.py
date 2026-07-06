@@ -38,7 +38,7 @@ class TestMemoriesApi:
             "x-organization-id": str(org_id),
             "x-user-id": str(uuid4()),
         }
-        response = await client.post(f"/memories/{memory_id}/pin", headers=headers)
+        response = await client.post(f"/v1/memories/{memory_id}/pin", headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert data["memory_id"] == str(memory_id)
@@ -57,7 +57,7 @@ class TestMemoriesApi:
             "x-organization-id": str(org_id),
             "x-user-id": str(uuid4()),
         }
-        response = await client.post(f"/memories/{memory_id}/pin", headers=headers)
+        response = await client.post(f"/v1/memories/{memory_id}/pin", headers=headers)
         assert response.status_code == 404
         assert response.json()["detail"] == "Memory not found"
 
@@ -73,7 +73,7 @@ class TestMemoriesApi:
             "x-organization-id": str(org_id),
             "x-user-id": str(uuid4()),
         }
-        response = await client.post(f"/memories/{memory_id}/unpin", headers=headers)
+        response = await client.post(f"/v1/memories/{memory_id}/unpin", headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert data["memory_id"] == str(memory_id)
@@ -91,7 +91,7 @@ class TestMemoriesApi:
             "x-organization-id": str(org_id),
             "x-user-id": str(uuid4()),
         }
-        response = await client.post(f"/memories/{memory_id}/archive", headers=headers)
+        response = await client.post(f"/v1/memories/{memory_id}/archive", headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert data["memory_id"] == str(memory_id)
@@ -109,7 +109,7 @@ class TestMemoriesApi:
             "x-organization-id": str(org_id),
             "x-user-id": str(uuid4()),
         }
-        response = await client.post(f"/memories/{memory_id}/restore", headers=headers)
+        response = await client.post(f"/v1/memories/{memory_id}/restore", headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert data["memory_id"] == str(memory_id)
@@ -127,7 +127,7 @@ class TestMemoriesApi:
             "x-organization-id": str(org_id),
             "x-user-id": str(uuid4()),
         }
-        response = await client.delete(f"/memories/{memory_id}", headers=headers)
+        response = await client.delete(f"/v1/memories/{memory_id}", headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert data["memory_id"] == str(memory_id)
@@ -180,7 +180,7 @@ class TestMemoriesApi:
             "x-organization-id": str(org_id),
             "x-user-id": str(user_id),
         }
-        response = await client.get(f"/memories/{memory_id}/explain", headers=headers)
+        response = await client.get(f"/v1/memories/{memory_id}/explain", headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert data["memory_id"] == str(memory_id)
@@ -200,7 +200,7 @@ class TestMemoriesApi:
             "x-organization-id": str(org_id),
             "x-user-id": str(uuid4()),
         }
-        response = await client.get(f"/memories/{memory_id}/explain", headers=headers)
+        response = await client.get(f"/v1/memories/{memory_id}/explain", headers=headers)
         assert response.status_code == 404
 
     async def test_timeline_success(self, client: AsyncClient, override_db_dependency) -> None:
@@ -234,7 +234,7 @@ class TestMemoriesApi:
             "x-organization-id": str(org_id),
             "x-user-id": str(user_id),
         }
-        response = await client.get(f"/memories/timeline/{user_id}", headers=headers)
+        response = await client.get(f"/v1/memories/timeline/{user_id}", headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert data["user_id"] == str(user_id)
@@ -278,7 +278,7 @@ class TestMemoriesApi:
             "organization_id": str(org_id),
             "session_id": str(session_id),
         }
-        response = await client.get("/memories/context", params=params, headers=headers)
+        response = await client.get("/v1/memories/context", params=params, headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert "preferences" in data
@@ -300,7 +300,7 @@ class TestMemoriesApi:
             "organization_id": str(other_org_id),
             "session_id": str(session_id),
         }
-        response = await client.get("/memories/context", params=params, headers=headers)
+        response = await client.get("/v1/memories/context", params=params, headers=headers)
         assert response.status_code == 403
 
 
@@ -332,7 +332,7 @@ class TestSessionsApi:
             "organization_id": str(org_id),
             "metadata": {"test": "data"},
         }
-        response = await client.post("/sessions", json=payload, headers=headers)
+        response = await client.post("/v1/sessions", json=payload, headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert "session_id" in data
@@ -353,7 +353,7 @@ class TestSessionsApi:
             "organization_id": str(other_org_id),
             "metadata": {},
         }
-        response = await client.post("/sessions", json=payload, headers=headers)
+        response = await client.post("/v1/sessions", json=payload, headers=headers)
         assert response.status_code == 403
 
     async def test_end_session_success(self, client: AsyncClient, override_db_dependency) -> None:
@@ -382,7 +382,7 @@ class TestSessionsApi:
             "x-organization-id": str(org_id),
             "x-user-id": str(user_id),
         }
-        response = await client.post(f"/sessions/{session_id}/end", headers=headers)
+        response = await client.post(f"/v1/sessions/{session_id}/end", headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert data["session_id"] == str(session_id)
@@ -400,7 +400,7 @@ class TestSessionsApi:
             "x-organization-id": str(org_id),
             "x-user-id": str(uuid4()),
         }
-        response = await client.post(f"/sessions/{session_id}/end", headers=headers)
+        response = await client.post(f"/v1/sessions/{session_id}/end", headers=headers)
         assert response.status_code == 404
 
     async def test_inspect_user_success(self, client: AsyncClient, override_db_dependency) -> None:
@@ -445,7 +445,7 @@ class TestSessionsApi:
             "x-organization-id": str(org_id),
             "x-user-id": str(user_id),
         }
-        response = await client.get(f"/sessions/inspect/{user_id}", headers=headers)
+        response = await client.get(f"/v1/sessions/inspect/{user_id}", headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert data["user_id"] == str(user_id)
@@ -495,7 +495,7 @@ class TestSessionsApi:
             "x-organization-id": str(org_id),
             "x-user-id": str(user_id),
         }
-        response = await client.get(f"/sessions/{session_id}", headers=headers)
+        response = await client.get(f"/v1/sessions/{session_id}", headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert data["session_id"] == str(session_id)

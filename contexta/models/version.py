@@ -36,5 +36,5 @@ class MemoryVersion(Base, UUIDPrimaryKeyMixin):
     valid_from: Mapped[datetime] = mapped_column(nullable=False)
     valid_to: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        nullable=False, default=lambda: datetime.now(timezone.utc)
+        nullable=False, default=lambda: datetime.utcnow()
     )

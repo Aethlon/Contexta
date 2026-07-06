@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { signIn, signOut } from "@/lib/auth";
-import { contextaFetch } from "@/lib/auth-helpers";
+import { contextaFetch, getSession } from "@/lib/auth-helpers";
 import { AuthError } from "next-auth";
 
 export async function signInAction(formData: FormData) {
@@ -68,6 +68,11 @@ export async function createApiKeyAction(formData: FormData) {
   const scopesRaw = String(formData.get("scopes") ?? "observe,retrieve");
   const scopes = scopesRaw.split(",").map((s) => s.trim()).filter(Boolean);
 
+  const session = await getSession();
+  if (!session) {
+    return { error: "Not authenticated." };
+  }
+
   if (!name) {
     return { error: "Key name is required." };
   }
@@ -75,7 +80,12 @@ export async function createApiKeyAction(formData: FormData) {
   try {
     const res = await contextaFetch("/v1/keys", {
       method: "POST",
-      body: JSON.stringify({ name, scopes }),
+      body: JSON.stringify({
+        name,
+        scopes,
+        organization_id: session.user.org_id,
+        actor_id: session.user.id,
+      }),
     });
     if (!res.ok) {
       const detail = await res.text();
@@ -107,15 +117,45 @@ export async function getUsageAction() {
   }
 }
 
+export async function listMemoriesAction(params?: {
+  memory_type?: string;
+  state?: string;
+  pinned?: boolean;
+  limit?: number;
+}) {
+  try {
+    const search = new URLSearchParams();
+    if (params?.memory_type) search.set("memory_type", params.memory_type);
+    if (params?.state) search.set("state", params.state);
+    if (params?.pinned !== undefined) search.set("pinned", String(params.pinned));
+    search.set("limit", String(params?.limit ?? 50));
+    const res = await contextaFetch(`/v1/memories?${search.toString()}`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
 export async function getMemoriesAction(query?: string, limit = 50) {
   try {
+    const session = await getSession();
     const res = await contextaFetch("/v1/retrieve", {
       method: "POST",
-      body: JSON.stringify({ query_text: query ?? "", limit }),
+      body: JSON.stringify({
+        query_text: query ?? "",
+        limit,
+        user_id: session?.user.id,
+        organization_id: session?.user.org_id,
+      }),
     });
     if (!res.ok) return [];
     const data = await res.json();
-    return data.memories ?? data.results ?? data;
+    const raw = data.memories ?? data.results ?? data;
+    if (Array.isArray(raw) && raw.length > 0 && raw[0]?.memory) {
+      return raw.map((r: any) => r.memory);
+    }
+    return raw;
   } catch {
     return [];
   }
@@ -128,6 +168,18 @@ export async function getAuditLogAction(limit = 10) {
     return await res.json();
   } catch {
     return [];
+  }
+}
+
+export async function getGraphAction() {
+  try {
+    const session = await getSession();
+    if (!session?.user.id) return { nodes: [], edges: [] };
+    const res = await contextaFetch(`/v1/entities/graph/${session.user.id}`);
+    if (!res.ok) return { nodes: [], edges: [] };
+    return await res.json();
+  } catch {
+    return { nodes: [], edges: [] };
   }
 }
 

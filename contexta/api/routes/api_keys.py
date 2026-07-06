@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Header, HTTPException, status, Depends
+from fastapi import APIRouter, Header, HTTPException, status, Depends, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -59,8 +59,10 @@ def _record_to_response(record: ApiKeyRecord) -> ApiKeyResponse:
 def _resolve_organization_id(
     organization_id: UUID | None,
     x_organization_id: str | None,
+    x_org_id: str | None = None,
+    state_org_id: str | None = None,
 ) -> UUID:
-    raw = str(organization_id) if organization_id else x_organization_id
+    raw = str(organization_id) if organization_id else (x_organization_id or x_org_id or state_org_id)
     if not raw:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -77,12 +79,15 @@ def _resolve_organization_id(
 
 @router.get("", response_model=list[ApiKeyResponse])
 async def list_keys(
+    request: Request,
     organization_id: UUID | None = None,
     x_organization_id: str | None = Header(default=None),
+    x_org_id: str | None = Header(default=None),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[ApiKeyResponse]:
     """Return API-key metadata for an organization."""
-    tenant_id = _resolve_organization_id(organization_id, x_organization_id)
+    state_org_id = getattr(request.state, "organization_id", None)
+    tenant_id = _resolve_organization_id(organization_id, x_organization_id, x_org_id, state_org_id)
     repo = ApiKeyRepository(session, tenant_id)
     records = await repo.list_by_org()
     return [_record_to_response(record) for record in records]

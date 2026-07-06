@@ -94,7 +94,7 @@ class MemoryDeduplicator:
             return DeduplicationResult(action="store", memory=memory)
 
         existing_id = getattr(best_candidate, "id")
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         if best_similarity > self.DUPLICATE_THRESHOLD:
             await self._repository.update_by_id(existing_id, {"updated_at": now})

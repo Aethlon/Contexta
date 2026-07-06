@@ -14,15 +14,23 @@ from contexta.models.account import Account, Organization, OrganizationMember
 from contexta.repositories.account_repo import AccountRepository, OrganizationRepository
 from contexta.services.auth import create_jwt, hash_password, verify_password, verify_jwt
 
+
+def _derive_name(email: str) -> str:
+    return email.split("@")[0].replace(".", " ").replace("_", " ").title()
+
+
+def _derive_slug(email: str) -> str:
+    return email.split("@")[0].replace(".", "-").replace("_", "-").lower()
+
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
 
 
 class SignupRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    display_name: str = Field(min_length=1, max_length=200)
-    organization_name: str = Field(min_length=1, max_length=200)
-    organization_slug: str = Field(min_length=1, max_length=100, pattern=r"^[a-z0-9-]+$")
+    display_name: str | None = Field(default=None, min_length=1, max_length=200)
+    organization_name: str | None = Field(default=None, min_length=1, max_length=200)
+    organization_slug: str | None = Field(default=None, min_length=1, max_length=100, pattern=r"^[a-z0-9-]+$")
 
 
 class SigninRequest(BaseModel):
@@ -65,7 +73,11 @@ async def signup(
             detail="An account with this email already exists.",
         )
 
-    existing_org = await org_repo.find_by_slug(payload.organization_slug)
+    display_name = payload.display_name or _derive_name(payload.email)
+    org_name = payload.organization_name or display_name
+    org_slug = payload.organization_slug or _derive_slug(payload.email)
+
+    existing_org = await org_repo.find_by_slug(org_slug)
     if existing_org:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -76,14 +88,14 @@ async def signup(
     account = Account(
         email=payload.email,
         password_hash=password_hash,
-        display_name=payload.display_name,
+        display_name=display_name,
         status="active",
     )
     account = await account_repo.create(account)
 
     org = Organization(
-        name=payload.organization_name,
-        slug=payload.organization_slug,
+        name=org_name,
+        slug=org_slug,
         plan_code="free",
         status="active",
     )
@@ -136,7 +148,7 @@ async def signin(
             detail="No organization membership found.",
         )
 
-    account.last_login_at = datetime.now(timezone.utc)
+    account.last_login_at = datetime.utcnow()
     await session.flush()
 
     token = create_jwt(account.id, org_member.organization_id)

@@ -5,8 +5,15 @@ import { fileURLToPath } from "node:url";
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   experimental: {},
   outputFileTracingRoot: projectDir,
+  poweredByHeader: false,
+  compress: true,
+  productionBrowserSourceMaps: false,
+  httpAgentOptions: {
+    keepAlive: true,
+  },
 };
 
 export default nextConfig;

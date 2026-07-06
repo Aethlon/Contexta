@@ -46,6 +46,11 @@ services:
       CONTEXTA_CELERY_RESULT_BACKEND: redis://redis:6379/2
       CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
       CONTEXTA_SECRET_KEY: dev-secret-key-change-in-prod
+      CONTEXTA_LLM_PROVIDER: deepseek
+      CONTEXTA_LLM_BASE_URL: https://api.deepseek.com/v1
+      CONTEXTA_LLM_MODEL: deepseek-chat
+      CONTEXTA_LLM_API_KEY: ${DEEPSEEK_API_KEY}
+      CONTEXTA_EMBEDDING_PROVIDER: deterministic
     ports:
       - "8000:8000"
     depends_on:
@@ -56,6 +61,20 @@ services:
       migration:
         condition: service_completed_successfully
 
+  # ─── Next.js Dashboard ─────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    environment:
+      CONTEXTA_API_URL: http://api:8000
+      AUTH_SECRET: dev-secret-key-change-in-prod
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_started
+
   worker:
     build: .
     environment:
@@ -65,6 +84,11 @@ services:
       CONTEXTA_CELERY_BROKER_URL: redis://redis:6379/1
       CONTEXTA_CELERY_RESULT_BACKEND: redis://redis:6379/2
       CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
+      CONTEXTA_LLM_PROVIDER: deepseek
+      CONTEXTA_LLM_BASE_URL: https://api.deepseek.com/v1
+      CONTEXTA_LLM_MODEL: deepseek-chat
+      CONTEXTA_LLM_API_KEY: ${DEEPSEEK_API_KEY}
+      CONTEXTA_EMBEDDING_PROVIDER: deterministic
     depends_on:
       postgres:
         condition: service_healthy

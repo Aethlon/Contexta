@@ -26,7 +26,7 @@ class TimestampMixin:
     """Mixin providing created_at timestamp."""
 
     created_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(timezone.utc),
+        default=datetime.utcnow,
         nullable=False,
     )
 

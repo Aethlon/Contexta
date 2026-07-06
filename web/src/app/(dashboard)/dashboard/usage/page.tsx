@@ -1,10 +1,8 @@
 import { getUsageAction, listApiKeysAction } from "@/app/actions";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UsageChart } from "./usage-chart";
-import Link from "next/link";
 
 export const revalidate = 30;
 
@@ -15,48 +13,48 @@ export default async function UsagePage() {
   ]);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Badge>Usage & billing</Badge>
-        <h2 className="mt-3 text-2xl font-semibold">Usage</h2>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+    <div className="space-y-8 animate-fade-in">
+      {/* Welcome Header */}
+      <div className="border-b border-[var(--color-graphite)]/30 pb-6">
+        <Badge>Usage</Badge>
+        <h2 className="mt-3 text-2xl font-light tracking-tight text-[var(--color-ghost)]">Usage</h2>
+        <p className="mt-1 text-sm font-light text-[var(--color-smoke)]">
           Current period usage and daily breakdown.
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Metrics Grid */}
+      <div className="grid gap-6 md:grid-cols-3">
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle>Observations</CardTitle>
             <CardDescription>Current period</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-semibold">{usage?.observations ?? 0}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              of {usage?.observation_limit ?? "—"} limit
-            </p>
+            <p className="text-3xl font-light tracking-tight text-[var(--color-ghost)] tabular-nums">{usage?.observations ?? 0}</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle>Memory operations</CardTitle>
-            <CardDescription>Stored + retrieved</CardDescription>
+          <CardHeader className="pb-3">
+            <CardTitle>Retrievals</CardTitle>
+            <CardDescription>Current period</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-semibold">{usage?.memory_operations ?? 0}</p>
+            <p className="text-3xl font-light tracking-tight text-[var(--color-ghost)] tabular-nums">{usage?.retrievals ?? 0}</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle>Storage</CardTitle>
-            <CardDescription>Total memories stored</CardDescription>
+          <CardHeader className="pb-3">
+            <CardTitle>Memory writes</CardTitle>
+            <CardDescription>Total stored</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-semibold">{usage?.total_memories ?? 0}</p>
+            <p className="text-3xl font-light tracking-tight text-[var(--color-ghost)] tabular-nums">{usage?.memory_writes ?? 0}</p>
           </CardContent>
         </Card>
       </div>
 
+      {/* Usage Chart Card */}
       <Card>
         <CardHeader>
           <CardTitle>Daily breakdown</CardTitle>
@@ -67,6 +65,7 @@ export default async function UsagePage() {
         </CardContent>
       </Card>
 
+      {/* Table Card */}
       <Card>
         <CardHeader>
           <CardTitle>Usage by API key</CardTitle>
@@ -85,38 +84,22 @@ export default async function UsagePage() {
             <TableBody>
               {(keys ?? []).length === 0 ? (
                 <TableRow>
-                  <TableCell className="text-muted-foreground" colSpan={4}>No API keys found.</TableCell>
+                  <TableCell className="text-[var(--color-smoke)] text-center py-6 font-light" colSpan={4}>
+                    No API keys found.
+                  </TableCell>
                 </TableRow>
               ) : (
                 (keys ?? []).map((key: any) => (
-                  <TableRow key={key.id}>
-                    <TableCell className="font-medium">{key.name}</TableCell>
-                    <TableCell className="font-mono text-xs">{key.prefix}...</TableCell>
-                    <TableCell>{key.usage?.observations ?? 0}</TableCell>
-                    <TableCell>{key.usage?.operations ?? 0}</TableCell>
+                  <TableRow key={key.id} className="hover:bg-[var(--color-charcoal)]/30 transition-colors duration-200">
+                    <TableCell className="font-normal text-[var(--color-ghost)]">{key.name}</TableCell>
+                    <TableCell className="font-mono text-xs text-[var(--color-smoke)]">{key.prefix}...</TableCell>
+                    <TableCell className="text-[var(--color-ghost)] font-light">{key.usage?.observations ?? 0}</TableCell>
+                    <TableCell className="text-[var(--color-ghost)] font-light">{key.usage?.operations ?? 0}</TableCell>
                   </TableRow>
                 ))
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Plan</CardTitle>
-          <CardDescription>Your current subscription plan.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-center justify-between">
-          <div>
-            <p className="text-lg font-semibold">{usage?.plan_name ?? "Builder"}</p>
-            <p className="text-sm text-muted-foreground">
-              {usage?.plan_description ?? "For solo developers and early agent apps."}
-            </p>
-          </div>
-          <Link href="/dashboard/billing">
-            <Button>Upgrade plan</Button>
-          </Link>
         </CardContent>
       </Card>
     </div>

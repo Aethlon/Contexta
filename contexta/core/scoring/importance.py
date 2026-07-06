@@ -111,7 +111,7 @@ class ImportanceFramework:
         """Return +0.05 for memories referenced within the last 7 days."""
         if last_referenced is None:
             return 0.0
-        reference = now or datetime.now(timezone.utc)
+        reference = now or datetime.utcnow()
         if last_referenced >= reference - timedelta(days=7):
             return 0.05
         return 0.0

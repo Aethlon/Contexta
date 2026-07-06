@@ -44,13 +44,13 @@ class MemoryRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     is_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     valid_from: Mapped[datetime] = mapped_column(
-        nullable=False, default=lambda: datetime.now(timezone.utc)
+        nullable=False, default=lambda: datetime.utcnow()
     )
     valid_to: Mapped[datetime | None] = mapped_column(nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.utcnow(),
+        onupdate=lambda: datetime.utcnow(),
     )
     last_accessed_at: Mapped[datetime | None] = mapped_column(nullable=True)
     embedding: Mapped[list[float] | None] = mapped_column(

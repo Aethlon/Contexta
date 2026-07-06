@@ -24,7 +24,7 @@ class Session(Base, UUIDPrimaryKeyMixin):
         UUID(as_uuid=True), nullable=False, index=True
     )
     started_at: Mapped[datetime] = mapped_column(
-        nullable=False, default=lambda: datetime.now(timezone.utc)
+        nullable=False, default=lambda: datetime.utcnow()
     )
     ended_at: Mapped[datetime | None] = mapped_column(nullable=True)
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)

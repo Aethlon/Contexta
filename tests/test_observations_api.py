@@ -32,10 +32,10 @@ async def client():
 
 
 class TestPostObservation:
-    """Tests for POST /observations endpoint."""
+    """Tests for POST /v1/observations endpoint."""
 
     async def test_valid_payload_returns_202(self, client: AsyncClient, valid_payload: dict) -> None:
-        response = await client.post("/observations", json=valid_payload)
+        response = await client.post("/v1/observations", json=valid_payload)
         assert response.status_code == 202
         data = response.json()
         assert "job_id" in data
@@ -44,48 +44,48 @@ class TestPostObservation:
     async def test_valid_payload_with_optional_fields(self, client: AsyncClient, valid_payload: dict) -> None:
         valid_payload["metadata"] = {"source": "test-sdk"}
         valid_payload["policy"] = "coding-agent"
-        response = await client.post("/observations", json=valid_payload)
+        response = await client.post("/v1/observations", json=valid_payload)
         assert response.status_code == 202
 
     async def test_payload_exceeding_1mb_returns_422(self, client: AsyncClient, valid_payload: dict) -> None:
         # Create a payload that exceeds 1MB
         valid_payload["messages"] = [{"role": "user", "content": "x" * (1024 * 1024)}]
-        response = await client.post("/observations", json=valid_payload)
+        response = await client.post("/v1/observations", json=valid_payload)
         assert response.status_code == 422
         data = response.json()
         assert "exceeds maximum" in data["detail"].lower() or "exceeds maximum" in data["errors"][0]["message"].lower()
 
     async def test_missing_user_id_returns_422(self, client: AsyncClient, valid_payload: dict) -> None:
         del valid_payload["user_id"]
-        response = await client.post("/observations", json=valid_payload)
+        response = await client.post("/v1/observations", json=valid_payload)
         assert response.status_code == 422
         data = response.json()
         assert any(e["field"] == "user_id" for e in data["errors"])
 
     async def test_missing_organization_id_returns_422(self, client: AsyncClient, valid_payload: dict) -> None:
         del valid_payload["organization_id"]
-        response = await client.post("/observations", json=valid_payload)
+        response = await client.post("/v1/observations", json=valid_payload)
         assert response.status_code == 422
         data = response.json()
         assert any(e["field"] == "organization_id" for e in data["errors"])
 
     async def test_missing_session_id_returns_422(self, client: AsyncClient, valid_payload: dict) -> None:
         del valid_payload["session_id"]
-        response = await client.post("/observations", json=valid_payload)
+        response = await client.post("/v1/observations", json=valid_payload)
         assert response.status_code == 422
         data = response.json()
         assert any(e["field"] == "session_id" for e in data["errors"])
 
     async def test_missing_messages_returns_422(self, client: AsyncClient, valid_payload: dict) -> None:
         del valid_payload["messages"]
-        response = await client.post("/observations", json=valid_payload)
+        response = await client.post("/v1/observations", json=valid_payload)
         assert response.status_code == 422
         data = response.json()
         assert any(e["field"] == "messages" for e in data["errors"])
 
     async def test_missing_multiple_fields_returns_all_errors(self, client: AsyncClient) -> None:
         payload = {"messages": [{"role": "user", "content": "hi"}]}
-        response = await client.post("/observations", json=payload)
+        response = await client.post("/v1/observations", json=payload)
         assert response.status_code == 422
         data = response.json()
         error_fields = {e["field"] for e in data["errors"]}
@@ -95,19 +95,19 @@ class TestPostObservation:
 
     async def test_invalid_uuid_returns_422(self, client: AsyncClient, valid_payload: dict) -> None:
         valid_payload["user_id"] = "not-a-uuid"
-        response = await client.post("/observations", json=valid_payload)
+        response = await client.post("/v1/observations", json=valid_payload)
         assert response.status_code == 422
 
     async def test_null_required_field_returns_422(self, client: AsyncClient, valid_payload: dict) -> None:
         valid_payload["user_id"] = None
-        response = await client.post("/observations", json=valid_payload)
+        response = await client.post("/v1/observations", json=valid_payload)
         assert response.status_code == 422
         data = response.json()
         assert any(e["field"] == "user_id" for e in data["errors"])
 
     async def test_invalid_json_returns_422(self, client: AsyncClient) -> None:
         response = await client.post(
-            "/observations",
+            "/v1/observations",
             content=b"not json at all",
             headers={"content-type": "application/json"},
         )
@@ -130,7 +130,7 @@ class TestPostObservation:
         assert len(encoded) <= 1024 * 1024
 
         response = await client.post(
-            "/observations",
+            "/v1/observations",
             content=encoded,
             headers={"content-type": "application/json"},
         )
@@ -138,11 +138,11 @@ class TestPostObservation:
 
 
 class TestPostObservationBatch:
-    """Tests for POST /observations/batch endpoint."""
+    """Tests for POST /v1/observations/batch endpoint."""
 
     async def test_valid_batch_returns_202(self, client: AsyncClient, valid_payload: dict) -> None:
         batch = [valid_payload, valid_payload]
-        response = await client.post("/observations/batch", json=batch)
+        response = await client.post("/v1/observations/batch", json=batch)
         assert response.status_code == 202
         data = response.json()
         assert data["status"] == "accepted"
@@ -152,34 +152,34 @@ class TestPostObservationBatch:
     async def test_batch_exceeding_1mb_returns_422(self, client: AsyncClient, valid_payload: dict) -> None:
         valid_payload["messages"] = [{"role": "user", "content": "x" * (1024 * 1024)}]
         batch = [valid_payload]
-        response = await client.post("/observations/batch", json=batch)
+        response = await client.post("/v1/observations/batch", json=batch)
         assert response.status_code == 422
 
     async def test_batch_with_invalid_item_returns_422(self, client: AsyncClient, valid_payload: dict) -> None:
         invalid = {"messages": [{"role": "user", "content": "hi"}]}  # missing required fields
         batch = [valid_payload, invalid]
-        response = await client.post("/observations/batch", json=batch)
+        response = await client.post("/v1/observations/batch", json=batch)
         assert response.status_code == 422
         data = response.json()
         # Errors should reference the index of the invalid item
         assert any("[1]" in e["field"] for e in data["errors"])
 
     async def test_empty_batch_returns_422(self, client: AsyncClient) -> None:
-        response = await client.post("/observations/batch", json=[])
+        response = await client.post("/v1/observations/batch", json=[])
         assert response.status_code == 422
 
     async def test_non_array_body_returns_422(self, client: AsyncClient, valid_payload: dict) -> None:
-        response = await client.post("/observations/batch", json=valid_payload)
+        response = await client.post("/v1/observations/batch", json=valid_payload)
         assert response.status_code == 422
 
     async def test_batch_item_not_object_returns_422(self, client: AsyncClient, valid_payload: dict) -> None:
         batch = [valid_payload, "not an object"]
-        response = await client.post("/observations/batch", json=batch)
+        response = await client.post("/v1/observations/batch", json=batch)
         assert response.status_code == 422
 
     async def test_single_item_batch_returns_202(self, client: AsyncClient, valid_payload: dict) -> None:
         batch = [valid_payload]
-        response = await client.post("/observations/batch", json=batch)
+        response = await client.post("/v1/observations/batch", json=batch)
         assert response.status_code == 202
         data = response.json()
         assert len(data["jobs"]) == 1

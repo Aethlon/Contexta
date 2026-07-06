@@ -91,7 +91,7 @@ class RetrievalEngine:
         now: datetime | None = None,
     ) -> list[RetrievalResult]:
         """Retrieve memories using weighted hybrid scoring."""
-        reference = now or datetime.now(timezone.utc)
+        reference = now or datetime.utcnow()
         candidates = await self._memories.get_by_user(
             query.user_id,
             limit=max(query.limit * 10, 100),
@@ -152,11 +152,11 @@ class RetrievalEngine:
         graph_memory_ids: set[uuid.UUID],
         now: datetime,
     ) -> RetrievalResult:
-        semantic = self._cosine_similarity(query_embedding, memory.embedding)
+        semantic = float(self._cosine_similarity(query_embedding, memory.embedding))
         graph = 1.0 if memory.id in graph_memory_ids else 0.0
-        importance = max(0.0, min(1.0, memory.importance))
-        recency = self._scoring.compute_freshness(memory.created_at, now=now)
-        keyword = self._keyword_score(query.query_text, memory)
+        importance = float(max(0.0, min(1.0, memory.importance)))
+        recency = float(self._scoring.compute_freshness(memory.created_at, now=now))
+        keyword = float(self._keyword_score(query.query_text, memory))
         score = (
             semantic * 0.4
             + graph * 0.25
@@ -224,11 +224,11 @@ class RetrievalEngine:
         left: list[float] | None,
         right: list[float] | None,
     ) -> float:
-        if not left or not right or len(left) != len(right):
+        if left is None or right is None or len(left) != len(right):
             return 0.0
-        dot = sum(a * b for a, b in zip(left, right))
-        left_norm = math.sqrt(sum(a * a for a in left))
-        right_norm = math.sqrt(sum(b * b for b in right))
+        dot = sum(float(a) * float(b) for a, b in zip(left, right))
+        left_norm = math.sqrt(sum(float(a) * float(a) for a in left))
+        right_norm = math.sqrt(sum(float(b) * float(b) for b in right))
         if left_norm == 0.0 or right_norm == 0.0:
             return 0.0
-        return max(0.0, min(1.0, dot / (left_norm * right_norm)))
+        return float(max(0.0, min(1.0, dot / (left_norm * right_norm))))

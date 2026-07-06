@@ -1,13 +1,20 @@
+import { cache } from "react";
 import { auth } from "@/lib/auth";
 
 const DEFAULT_CONTEXTA_API_URL = "http://localhost:8000";
+const FETCH_TIMEOUT_MS = 15000;
 
 function getcontextaApiUrl(): string {
   return (process.env.CONTEXTA_API_URL ?? DEFAULT_CONTEXTA_API_URL).replace(/\/$/, "");
 }
 
-async function getAuthHeaders(): Promise<Record<string, string>> {
+const getSession = cache(async () => {
   const session = await auth();
+  return session;
+});
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const session = await getSession();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
@@ -20,21 +27,28 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 async function requestcontexta<T>(path: string, init?: RequestInit): Promise<T> {
   const authHeaders = await getAuthHeaders();
-  const response = await fetch(`${getcontextaApiUrl()}${path}`, {
-    ...init,
-    headers: {
-      ...authHeaders,
-      ...(init?.headers as Record<string, string> ?? {}),
-    },
-    cache: "no-store",
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${getcontextaApiUrl()}${path}`, {
+      ...init,
+      headers: {
+        ...authHeaders,
+        ...(init?.headers as Record<string, string> ?? {}),
+      },
+      signal: controller.signal,
+      next: { revalidate: 30 },
+    });
 
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(detail || `contexta API returned ${response.status}`);
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(detail || `contexta API returned ${response.status}`);
+    }
+
+    return response.json() as Promise<T>;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  return response.json() as Promise<T>;
 }
 
 export type MemorySummary = {
@@ -139,8 +153,13 @@ export async function createcontextaApiKey(input: {
   name: string;
   scopes: string[];
 }): Promise<CreatedApiKey> {
+  const session = await auth();
   return requestcontexta<CreatedApiKey>("/v1/keys", {
     method: "POST",
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      ...input,
+      organization_id: (session?.user as any)?.org_id,
+      actor_id: session?.user?.id,
+    }),
   });
 }

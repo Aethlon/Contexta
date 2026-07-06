@@ -6,7 +6,7 @@ if [ "$MODE" = "api" ]; then
     exec uvicorn contexta.api.app:app --host 0.0.0.0 --port 8000
 elif [ "$MODE" = "worker" ]; then
     echo "Starting Celery worker..."
-    exec celery -A contexta.workers.celery_app.celery_app worker --loglevel=info
+    exec celery -A contexta.workers.celery_app.celery_app worker --loglevel=info -Q extraction,embedding,maintenance,celery
 elif [ "$MODE" = "beat" ]; then
     echo "Starting Celery beat..."
     exec celery -A contexta.workers.celery_app.celery_app beat --loglevel=info

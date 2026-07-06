@@ -13,7 +13,7 @@ class DecayEngine:
     def transition_for(self, memory, *, now: datetime | None = None) -> str:
         if memory.is_pinned:
             return memory.memory_state
-        reference = now or datetime.now(timezone.utc)
+        reference = now or datetime.utcnow()
         last_seen = memory.last_accessed_at or memory.updated_at or memory.created_at
         age = reference - last_seen
         if memory.memory_state == MemoryState.ACTIVE.value and age >= timedelta(days=30):

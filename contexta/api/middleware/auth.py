@@ -41,7 +41,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
         # Retrieve optional fallback headers (used for internal proxy/gateway requests)
         actor_id = request.headers.get("x-user-id")
-        organization_id = request.headers.get("x-organization-id")
+        organization_id = request.headers.get("x-organization-id") or request.headers.get("x-org-id")
 
         request.state.actor_id = actor_id
         request.state.organization_id = organization_id

@@ -36,5 +36,5 @@ class CompressedSummary(Base, UUIDPrimaryKeyMixin):
     )
     is_stale: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     generated_at: Mapped[datetime] = mapped_column(
-        nullable=False, default=lambda: datetime.now(timezone.utc)
+        nullable=False, default=lambda: datetime.utcnow()
     )

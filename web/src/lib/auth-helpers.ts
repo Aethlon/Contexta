@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 
@@ -15,7 +16,7 @@ export type TypedSession = {
   expires: string;
 };
 
-export async function getSession(): Promise<TypedSession | null> {
+const _uncachedGetSession = async (): Promise<TypedSession | null> => {
   const session = await auth();
   if (!session?.user?.email) return null;
   return {
@@ -29,7 +30,9 @@ export async function getSession(): Promise<TypedSession | null> {
     },
     expires: session.expires,
   } as TypedSession;
-}
+};
+
+export const getSession = cache(_uncachedGetSession);
 
 export async function requireSession(): Promise<TypedSession> {
   const session = await getSession();
@@ -37,9 +40,11 @@ export async function requireSession(): Promise<TypedSession> {
   return session;
 }
 
+const CONTEXTA_API_BASE = (process.env.CONTEXTA_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+const FETCH_TIMEOUT_MS = 15000;
+
 export async function contextaFetch(path: string, options?: RequestInit): Promise<Response> {
   const session = await getSession();
-  const baseUrl = (process.env.CONTEXTA_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options?.headers as Record<string, string>),
@@ -48,9 +53,16 @@ export async function contextaFetch(path: string, options?: RequestInit): Promis
     headers["X-User-Id"] = session.user.id;
     headers["X-Org-Id"] = session.user.org_id;
   }
-  return fetch(`${baseUrl}${path}`, {
-    ...options,
-    headers,
-    cache: "no-store",
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(`${CONTEXTA_API_BASE}${path}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+      next: { revalidate: 30 },
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }

@@ -20,7 +20,7 @@ async def test_create_api_key_returns_token_once(client: AsyncClient) -> None:
     actor_id = uuid4()
 
     response = await client.post(
-        "/api-keys",
+        "/v1/keys",
         json={
             "name": "Production agent",
             "organization_id": str(organization_id),
@@ -43,7 +43,7 @@ async def test_list_api_keys_is_tenant_scoped(client: AsyncClient) -> None:
     actor_id = uuid4()
 
     await client.post(
-        "/api-keys",
+        "/v1/keys",
         json={
             "name": "Visible",
             "organization_id": str(organization_id),
@@ -52,7 +52,7 @@ async def test_list_api_keys_is_tenant_scoped(client: AsyncClient) -> None:
         },
     )
     await client.post(
-        "/api-keys",
+        "/v1/keys",
         json={
             "name": "Hidden",
             "organization_id": str(other_organization_id),
@@ -62,7 +62,7 @@ async def test_list_api_keys_is_tenant_scoped(client: AsyncClient) -> None:
     )
 
     response = await client.get(
-        "/api-keys",
+        "/v1/keys",
         params={"organization_id": str(organization_id)},
     )
 

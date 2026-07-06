@@ -108,7 +108,7 @@ class TestProperty1PayloadSizeBoundary:
         assume(len(payload_bytes) > MAX_PAYLOAD_SIZE)
 
         response = await client.post(
-            "/observations",
+            "/v1/observations",
             content=payload_bytes,
             headers={"content-type": "application/json"},
         )
@@ -141,7 +141,7 @@ class TestProperty1PayloadSizeBoundary:
         assume(len(payload_bytes) <= MAX_PAYLOAD_SIZE)
 
         response = await client.post(
-            "/observations",
+            "/v1/observations",
             content=payload_bytes,
             headers={"content-type": "application/json"},
         )
@@ -194,7 +194,7 @@ class TestProperty2PayloadFieldValidation:
         for field in fields_to_omit:
             del payload[field]
 
-        response = await client.post("/observations", json=payload)
+        response = await client.post("/v1/observations", json=payload)
 
         assert response.status_code == 422
         data = response.json()
@@ -226,7 +226,7 @@ class TestProperty2PayloadFieldValidation:
         for field in fields_to_nullify:
             payload[field] = None
 
-        response = await client.post("/observations", json=payload)
+        response = await client.post("/v1/observations", json=payload)
 
         assert response.status_code == 422
         data = response.json()

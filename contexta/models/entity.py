@@ -31,7 +31,7 @@ class Entity(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
     aggregated_attributes: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     last_updated: Mapped[datetime] = mapped_column(
-        nullable=False, default=lambda: datetime.now(timezone.utc)
+        nullable=False, default=lambda: datetime.utcnow()
     )
 
     __table_args__ = (

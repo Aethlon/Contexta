@@ -1,7 +1,8 @@
 """LLM service abstraction for the contexta memory engine.
 
-Provides a unified interface for calling LLM providers (OpenAI, etc.)
+Provides a unified interface for calling LLM providers (OpenAI, DeepSeek, etc.)
 for memory extraction, classification, and other intelligence tasks.
+All OpenAI-compatible APIs are supported via the llm_base_url setting.
 """
 
 import json
@@ -128,13 +129,13 @@ class LLMService:
         """
         provider = self._settings.llm_provider
 
-        if provider == "openai":
-            return await self._call_openai(prompt, system_prompt)
+        if provider in ("openai", "deepseek"):
+            return await self._call_openai_compatible(prompt, system_prompt)
         else:
             raise LLMError(f"Unsupported LLM provider: {provider}")
 
-    async def _call_openai(self, prompt: str, system_prompt: str | None) -> str:
-        """Call OpenAI-compatible API.
+    async def _call_openai_compatible(self, prompt: str, system_prompt: str | None) -> str:
+        """Call any OpenAI-compatible API (OpenAI, DeepSeek, etc.).
 
         Uses httpx for async HTTP calls to avoid heavy SDK dependency.
         """
@@ -142,6 +143,7 @@ class LLMService:
 
         api_key = self._settings.llm_api_key
         model = self._settings.llm_model
+        base_url = self._settings.llm_base_url
 
         if not api_key:
             raise LLMError("LLM API key not configured (CONTEXTA_LLM_API_KEY)")
@@ -151,19 +153,22 @@ class LLMService:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
+        body: dict = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.1,
+        }
+        if self._settings.llm_provider == "openai":
+            body["response_format"] = {"type": "json_object"}
+
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
-                "https://api.openai.com/v1/chat/completions",
+                f"{base_url}/chat/completions",
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                 },
-                json={
-                    "model": model,
-                    "messages": messages,
-                    "temperature": 0.1,
-                    "response_format": {"type": "json_object"},
-                },
+                json=body,
             )
             response.raise_for_status()
             data = response.json()

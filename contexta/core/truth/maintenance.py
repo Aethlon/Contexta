@@ -105,7 +105,7 @@ class TruthMaintenanceEngine:
         now: datetime | None = None,
     ) -> list[Supersession]:
         """Supersede contradicted current memories for the same user and type."""
-        timestamp = now or datetime.now(timezone.utc)
+        timestamp = now or datetime.utcnow()
         supersessions: list[Supersession] = []
 
         for existing in await self._candidate_memories(new_memory):

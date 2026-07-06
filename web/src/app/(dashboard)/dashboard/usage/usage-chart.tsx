@@ -13,35 +13,39 @@ import {
 export function UsageChart({ data }: { data: { date: string; count: number }[] }) {
   if (!data || data.length === 0) {
     return (
-      <div className="flex h-48 items-center justify-center rounded-md border border-border bg-background text-sm text-muted-foreground">
+      <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-[var(--color-graphite)]/30 bg-[var(--color-ash)] text-sm text-[var(--color-smoke)] font-light">
         No usage data for this period.
       </div>
     );
   }
   return (
     <ResponsiveContainer width="100%" height={240}>
-      <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.22 0.008 255)" />
+      <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-graphite)" strokeOpacity={0.3} vertical={false} />
         <XAxis
           dataKey="date"
-          tick={{ fontSize: 12, fill: "oklch(0.68 0.012 255)" }}
+          tick={{ fontSize: 10, fill: "var(--color-smoke)", fontFamily: "monospace" }}
           tickLine={false}
-          axisLine={{ stroke: "oklch(0.26 0.009 255)" }}
+          axisLine={false}
         />
         <YAxis
-          tick={{ fontSize: 12, fill: "oklch(0.68 0.012 255)" }}
+          tick={{ fontSize: 10, fill: "var(--color-smoke)", fontFamily: "monospace" }}
           tickLine={false}
-          axisLine={{ stroke: "oklch(0.26 0.009 255)" }}
+          axisLine={false}
         />
         <Tooltip
+          cursor={{ fill: "var(--color-charcoal)", opacity: 0.15 }}
           contentStyle={{
-            backgroundColor: "oklch(0.16 0.007 255)",
-            border: "1px solid oklch(0.26 0.009 255)",
-            borderRadius: "0.5rem",
-            fontSize: "0.875rem",
+            backgroundColor: "var(--color-ash)",
+            border: "1px solid var(--color-graphite)",
+            borderRadius: "0.75rem",
+            fontSize: "0.75rem",
+            color: "var(--color-ghost)",
+            fontFamily: "inherit",
           }}
+          labelStyle={{ color: "var(--color-smoke)", fontWeight: 300 }}
         />
-        <Bar dataKey="count" fill="oklch(0.76 0.14 176)" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="count" fill="var(--color-ghost)" radius={[4, 4, 0, 0]} maxBarSize={40} />
       </BarChart>
     </ResponsiveContainer>
   );

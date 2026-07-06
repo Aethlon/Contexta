@@ -105,46 +105,6 @@ async def list_memories(
     ]
 
 
-@router.get("/{memory_id}")
-async def get_memory(
-    memory_id: UUID,
-    request: Request,
-    session: AsyncSession = Depends(get_db_session),
-) -> MemoryDetailResponse:
-    """Get full details for a single memory record."""
-    org_id = UUID(str(request.state.organization_id))
-    repo = MemoryRepository(session, tenant_id=org_id)
-    memory = await repo.get_by_id(memory_id)
-    if not memory:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Memory not found",
-        )
-    return MemoryDetailResponse(
-        id=str(memory.id),
-        user_id=str(memory.user_id),
-        organization_id=str(memory.organization_id),
-        memory_type=memory.memory_type,
-        title=memory.title,
-        content=memory.content,
-        structured_data=memory.structured_data,
-        source_type=memory.source_type,
-        confidence=memory.confidence,
-        importance=memory.importance,
-        utility_score=memory.utility_score,
-        tags=memory.tags,
-        session_id=str(memory.session_id) if memory.session_id else None,
-        memory_state=memory.memory_state,
-        is_pinned=memory.is_pinned,
-        is_archived=memory.is_archived,
-        valid_from=memory.valid_from.isoformat() if memory.valid_from else None,
-        valid_to=memory.valid_to.isoformat() if memory.valid_to else None,
-        created_at=memory.created_at.isoformat() if memory.created_at else None,
-        updated_at=memory.updated_at.isoformat() if memory.updated_at else None,
-        last_accessed_at=memory.last_accessed_at.isoformat() if memory.last_accessed_at else None,
-    )
-
-
 @router.get("/context")
 async def get_context(
     user_id: UUID,
@@ -166,11 +126,9 @@ async def get_context(
             detail="Forbidden: organization_id mismatch.",
         )
 
-    # 1. Fetch current truths (active, valid) for the user
     repo = MemoryRepository(session, tenant_id=org_id)
     memories = await repo.get_current_truths(user_id, limit=200)
 
-    # 2. Build context using ContextBuilder
     config = ContextConfig(
         num_recent_messages=num_recent_messages,
         num_relevant_memories=num_relevant_memories,
@@ -209,6 +167,46 @@ async def get_context(
         "cache_hit": False,
         "request_id": request.headers.get("x-request-id", "01J"),
     }
+
+
+@router.get("/{memory_id}")
+async def get_memory(
+    memory_id: UUID,
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+) -> MemoryDetailResponse:
+    """Get full details for a single memory record."""
+    org_id = UUID(str(request.state.organization_id))
+    repo = MemoryRepository(session, tenant_id=org_id)
+    memory = await repo.get_by_id(memory_id)
+    if not memory:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Memory not found",
+        )
+    return MemoryDetailResponse(
+        id=str(memory.id),
+        user_id=str(memory.user_id),
+        organization_id=str(memory.organization_id),
+        memory_type=memory.memory_type,
+        title=memory.title,
+        content=memory.content,
+        structured_data=memory.structured_data,
+        source_type=memory.source_type,
+        confidence=memory.confidence,
+        importance=memory.importance,
+        utility_score=memory.utility_score,
+        tags=memory.tags,
+        session_id=str(memory.session_id) if memory.session_id else None,
+        memory_state=memory.memory_state,
+        is_pinned=memory.is_pinned,
+        is_archived=memory.is_archived,
+        valid_from=memory.valid_from.isoformat() if memory.valid_from else None,
+        valid_to=memory.valid_to.isoformat() if memory.valid_to else None,
+        created_at=memory.created_at.isoformat() if memory.created_at else None,
+        updated_at=memory.updated_at.isoformat() if memory.updated_at else None,
+        last_accessed_at=memory.last_accessed_at.isoformat() if memory.last_accessed_at else None,
+    )
 
 
 @router.post("/{memory_id}/pin")

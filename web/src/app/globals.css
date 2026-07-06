@@ -1,30 +1,53 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-dm-sans), "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  --color-background: oklch(0.115 0.006 255);
-  --color-foreground: oklch(0.96 0.004 255);
-  --color-card: oklch(0.16 0.007 255);
-  --color-card-foreground: oklch(0.96 0.004 255);
-  --color-popover: oklch(0.16 0.007 255);
-  --color-popover-foreground: oklch(0.96 0.004 255);
-  --color-primary: oklch(0.76 0.14 176);
-  --color-primary-foreground: oklch(0.1 0.006 255);
-  --color-secondary: oklch(0.22 0.008 255);
-  --color-secondary-foreground: oklch(0.96 0.004 255);
-  --color-muted: oklch(0.22 0.008 255);
-  --color-muted-foreground: oklch(0.68 0.012 255);
-  --color-accent: oklch(0.26 0.032 176);
-  --color-accent-foreground: oklch(0.94 0.02 176);
-  --color-destructive: oklch(0.62 0.19 28);
-  --color-border: oklch(0.26 0.009 255);
-  --color-input: oklch(0.22 0.008 255);
-  --color-ring: oklch(0.76 0.14 176);
-  --radius: 0.5rem;
-  --radius-sm: calc(var(--radius) * 0.75);
-  --radius-md: var(--radius);
-  --radius-lg: calc(var(--radius) * 1.25);
+  
+  /* System 02 color mappings */
+  --color-background: var(--color-abyss);
+  --color-foreground: var(--color-ghost);
+  --color-card: var(--color-ash);
+  --color-card-foreground: var(--color-ghost);
+  --color-popover: var(--color-ash);
+  --color-popover-foreground: var(--color-ghost);
+  --color-primary: var(--color-ghost);
+  --color-primary-foreground: var(--color-abyss);
+  --color-secondary: var(--color-ash);
+  --color-secondary-foreground: var(--color-ghost);
+  --color-muted: var(--color-ash);
+  --color-muted-foreground: var(--color-smoke);
+  --color-accent: var(--color-charcoal);
+  --color-accent-foreground: var(--color-ghost);
+  --color-border: var(--color-graphite);
+  --color-input: var(--color-ash);
+  --color-ring: var(--color-smoke);
+  --radius: 0.75rem; /* rounded-xl (12px) for buttons/inputs */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem; /* rounded-2xl (16px) for cards/modals */
+}
+
+:root {
+  /* Light Mode Variables */
+  --color-abyss: #FAFAFA;
+  --color-ash: #F4F4F5;
+  --color-charcoal: #E4E4E7;
+  --color-graphite: rgba(212, 212, 236, 0.4);
+  --color-smoke: #71717A;
+  --color-ghost: #09090B;
+  --color-gold: #C9A96E;
+}
+
+:root.dark {
+  /* Dark Mode Variables */
+  --color-abyss: #09090B;
+  --color-ash: #121214;
+  --color-charcoal: #18181B;
+  --color-graphite: rgba(39, 39, 42, 0.4);
+  --color-smoke: #71717A;
+  --color-ghost: #E4E4E7;
+  --color-gold: #C9A96E;
 }
 
 * {
@@ -37,11 +60,29 @@ html {
 }
 
 body {
+  position: relative;
   min-height: 100vh;
-  background: linear-gradient(180deg, oklch(0.13 0.006 255), var(--color-background));
+  background-color: var(--color-background);
   color: var(--color-foreground);
 }
 
 ::selection {
-  background: oklch(0.76 0.14 176 / 0.24);
+  background-color: var(--color-charcoal);
+  color: var(--color-foreground);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-abyss);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-graphite);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-smoke);
 }

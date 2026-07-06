@@ -39,7 +39,7 @@ class RetrievalFeedback(Base, UUIDPrimaryKeyMixin):
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     signal: Mapped[str] = mapped_column(String(20), nullable=False)
     retrieved_at: Mapped[datetime] = mapped_column(
-        nullable=False, default=lambda: datetime.now(timezone.utc)
+        nullable=False, default=lambda: datetime.utcnow()
     )
 
     __table_args__ = (

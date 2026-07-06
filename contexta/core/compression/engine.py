@@ -29,7 +29,7 @@ class MemoryCompressionEngine:
             confidence=0.7,
             source_memory_count=len(memories),
             is_stale=False,
-            generated_at=datetime.now(timezone.utc),
+            generated_at=datetime.utcnow(),
         )
 
     def mark_stale(self, summary: CompressedSummary) -> CompressedSummary:

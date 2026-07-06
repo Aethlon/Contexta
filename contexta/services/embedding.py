@@ -111,7 +111,7 @@ class OpenAIEmbeddingProvider:
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
-                "https://api.openai.com/v1/embeddings",
+                f"{self._settings.embedding_base_url}/embeddings",
                 headers={
                     "Authorization": f"Bearer {self._settings.embedding_api_key}",
                     "Content-Type": "application/json",

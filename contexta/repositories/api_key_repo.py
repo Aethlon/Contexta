@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Sequence
 
 from sqlalchemy import select, update
@@ -62,7 +62,7 @@ class ApiKeyRepository(TenantScopedRepository[ApiKeyRecord]):
             organization_id=self.tenant_id,
             actor_id=actor_id,
             scopes=list(scopes),
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.utcnow(),
         )
         persisted = await self.create(record)
         return CreatedApiKey(token=token, record=persisted)
@@ -98,7 +98,7 @@ class ApiKeyRepository(TenantScopedRepository[ApiKeyRecord]):
         stmt = (
             update(self._model)
             .where(self._model.id == key_id)
-            .values(revoked_at=datetime.now(timezone.utc))
+            .values(revoked_at=datetime.utcnow())
         )
         stmt = self._scope_update(stmt)
         result = await self._session.execute(stmt)
