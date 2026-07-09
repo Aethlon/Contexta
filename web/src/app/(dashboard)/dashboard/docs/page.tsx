@@ -240,7 +240,7 @@ const memories = await contexta.retrieve({
                   ["DELETE", "/v1/keys/{id}", "Revoke an API key"],
                   ["GET", "/v1/usage", "Current period usage statistics"],
                 ].map(([method, path, desc]) => (
-                  <tr key={path} className="hover:bg-[var(--color-charcoal)]/20 transition-colors duration-200">
+                  <tr key={`${method}:${path}`} className="hover:bg-[var(--color-charcoal)]/20 transition-colors duration-200">
                     <td className="py-3.5 pr-4">
                       <Badge className="font-mono text-[9px]">{method}</Badge>
                     </td>

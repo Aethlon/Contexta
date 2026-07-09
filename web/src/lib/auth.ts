@@ -18,6 +18,7 @@ export type ExtendedSession = {
 };
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: process.env.AUTH_SECRET,
   providers: [
     Credentials({
       credentials: {
@@ -35,7 +36,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               password: credentials.password,
             }),
           });
-          if (!res.ok) return null;
+          if (!res.ok) {
+            console.error("[auth] Backend signin failed:", res.status);
+            return null;
+          }
           const data = await res.json();
           return {
             id: data.account_id,
@@ -45,7 +49,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             org_id: data.organization_id,
             role: data.role ?? "member",
           };
-        } catch {
+        } catch (err) {
+          console.error("[auth] Signin error:", err);
           return null;
         }
       },

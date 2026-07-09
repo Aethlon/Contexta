@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Brain, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Brain, CheckCircle2, ShieldCheck, Sparkles, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -75,6 +75,7 @@ export default async function SignInPage({
             <CardContent className="space-y-6">
               {params.error ? (
                 <div className="flex items-start gap-3 border-b border-[var(--color-graphite)]/30 pb-4">
+                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-400" strokeWidth={1.2} />
                   <span className="text-sm font-light text-red-400">{params.error}</span>
                 </div>
               ) : null}

@@ -2,29 +2,23 @@
 
 import { redirect } from "next/navigation";
 import { signIn, signOut } from "@/lib/auth";
-import { contextaFetch, getSession } from "@/lib/auth-helpers";
 import { AuthError } from "next-auth";
+import { contextaFetch, getSession } from "@/lib/auth-helpers";
 
 export async function signInAction(formData: FormData) {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
   try {
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
-    if (result?.error) {
-      const message = result.error === "CredentialsSignin"
+    await signIn("credentials", { email, password, redirectTo: "/dashboard" });
+  } catch (e) {
+    if (e instanceof AuthError) {
+      const message = e.type === "CredentialsSignin"
         ? "Invalid email or password"
-        : result.error;
+        : "Authentication failed";
       redirect(`/sign-in?error=${encodeURIComponent(message)}`);
     }
-  } catch (e) {
-    const message = e instanceof AuthError ? "Invalid email or password" : "Authentication failed";
-    redirect(`/sign-in?error=${encodeURIComponent(message)}`);
+    throw e;
   }
-  redirect("/dashboard");
 }
 
 export async function signUpAction(formData: FormData) {
@@ -48,8 +42,15 @@ export async function signUpAction(formData: FormData) {
       body: JSON.stringify({ email, password }),
     });
     if (!res.ok) {
-      const detail = await res.text();
-      return { error: detail || "Sign up failed. Please try again." };
+      let message = "Sign up failed. Please try again.";
+      try {
+        const body = await res.json();
+        if (body?.detail) message = body.detail;
+      } catch {
+        const text = await res.text();
+        if (text) message = text;
+      }
+      return { error: message };
     }
   } catch {
     return { error: "Unable to connect to backend. Please try again." };
@@ -88,8 +89,15 @@ export async function createApiKeyAction(formData: FormData) {
       }),
     });
     if (!res.ok) {
-      const detail = await res.text();
-      return { error: detail || "Failed to create API key." };
+      let message = "Failed to create API key.";
+      try {
+        const body = await res.json();
+        if (body?.detail) message = body.detail;
+      } catch {
+        const text = await res.text();
+        if (text) message = text;
+      }
+      return { error: message };
     }
     return { data: await res.json() };
   } catch {

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowRight, Brain, CheckCircle2, Sparkles } from "lucide-react";
+import { AlertCircle, ArrowRight, Brain, CheckCircle2, Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function SignUpPage() {
@@ -85,6 +85,7 @@ export default function SignUpPage() {
             <CardContent className="space-y-6">
               {error ? (
                 <div className="flex items-start gap-3 border-b border-[var(--color-graphite)]/30 pb-4">
+                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-400" strokeWidth={1.2} />
                   <span className="text-sm font-light text-red-400">{error}</span>
                 </div>
               ) : null}
