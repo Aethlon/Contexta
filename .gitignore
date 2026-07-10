@@ -48,3 +48,10 @@ docker-compose.override.yml
 # Temp
 tmp/
 temp/
+
+# Custom exclusions
+.kiro/
+[Bb]usiness [Pp]lan/
+business-plan/
+business_plan/
+
