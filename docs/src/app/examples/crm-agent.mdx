@@ -1,0 +1,103 @@
+# Example: CRM Agent
+
+A CRM agent that tracks contacts, deal stages, and relationship context across conversations.
+
+## What It Does
+
+- Remembers contact details across interactions
+- Tracks deal stages for multiple opportunities
+- Recalls conversation history per contact
+- Surfaces relevant context when a contact returns
+
+## Full Code
+
+```ts
+import { contexta } from "@contexta/client";
+import OpenAI from "openai";
+
+const contexta = contexta.fromEnv();
+const openai = new OpenAI();
+
+// Register CRM schemas
+await contexta.registerSchema({
+  name: "ContactInfo",
+  fields: [
+    { name: "name", type: "string", required: true },
+    { name: "company", type: "string", required: true },
+    { name: "email", type: "string", required: true },
+    { name: "role", type: "string", required: false },
+  ],
+});
+
+await contexta.registerSchema({
+  name: "DealStage",
+  fields: [
+    { name: "deal_name", type: "string", required: true },
+    { name: "stage", type: "enum", required: true, values: ["lead", "qualified", "proposal", "negotiation", "closed"] },
+    { name: "value_cents", type: "number", required: true },
+    { name: "next_action", type: "string", required: false },
+  ],
+});
+
+async function crmChat(
+  userId: string,
+  contactId: string,
+  message: string,
+): Promise<string> {
+  // Fetch context for this contact
+  const ctx = await contexta.context({
+    userId: contactId,  // Use contact as the user_id for isolation
+    query: message,
+    tokenBudget: 2000,
+  });
+
+  const systemPrompt = `You are a CRM assistant. Track contacts and deals.
+
+Current context for this contact:
+${ctx.toSystemPrompt()}
+
+If the user mentions new contact details or deal updates, acknowledge the update.
+Always confirm action items.`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: message },
+    ],
+  });
+
+  const reply = response.choices[0]?.message?.content ?? "";
+
+  await contexta.observe({
+    userId: contactId,
+    messages: [
+      { role: "user", content: message },
+      { role: "assistant", content: reply },
+    ],
+    metadata: { agent: "crm-agent", salesRepUserId: userId },
+  });
+
+  return reply;
+}
+
+// Usage
+const salesRep = "rep_alice";
+
+// Session 1: Add a contact
+await crmChat(salesRep, "contact_acme_corp",
+  "Alice Johnson is the CTO at Acme Corp. alice@acme.com. " +
+  "They're evaluating our API product. Deal value: $50k, stage: qualified."
+);
+
+// Session 2 (next day): Follow up
+const response = await crmChat(salesRep, "contact_acme_corp",
+  "What do I know about Acme Corp and what should I follow up on?"
+);
+// → "Acme Corp is evaluating our API product ($50k, qualified stage).
+//    Alice Johnson is the CTO. Suggested next action: send technical spec."
+```
+
+## Key Takeaway
+
+Use `userId` as the contact/entity identifier to maintain per-contact memory isolation. The sales rep's own user ID is stored in metadata for cross-referencing.

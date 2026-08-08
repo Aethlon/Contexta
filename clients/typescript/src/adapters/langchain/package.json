@@ -1,0 +1,16 @@
+{
+  "name": "@contexta/langchain",
+  "version": "0.1.0",
+  "description": "contexta memory adapter for LangChain JS",
+  "license": "MIT",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "peerDependencies": {
+    "@contexta/client": "^0.1.0",
+    "@langchain/core": "^0.3.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anomalyco/contexta"
+  }
+}

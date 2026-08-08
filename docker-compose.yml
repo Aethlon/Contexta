@@ -1,0 +1,169 @@
+services:
+  # ─── Infra ──────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-contexta}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d contexta"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─── Python Backend ─────────────────────────────────
+  migration:
+    build: .
+    environment:
+      MODE: migrate
+      CONTEXTA_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-contexta}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api:
+    build: .
+    environment:
+      MODE: api
+      CONTEXTA_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-contexta}
+      CONTEXTA_REDIS_URL: redis://redis:6379/0
+      CONTEXTA_CELERY_BROKER_URL: redis://redis:6379/1
+      CONTEXTA_CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
+      CONTEXTA_SECRET_KEY: ${CONTEXTA_SECRET_KEY:-change-me-in-production-use-a-long-random-string}
+      CONTEXTA_LLM_PROVIDER: deepseek
+      CONTEXTA_LLM_BASE_URL: https://api.deepseek.com/v1
+      CONTEXTA_LLM_MODEL: deepseek-chat
+      CONTEXTA_LLM_API_KEY: ${DEEPSEEK_API_KEY}
+      CONTEXTA_EMBEDDING_PROVIDER: deterministic
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # ─── Next.js Dashboard ─────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    environment:
+      CONTEXTA_API_URL: http://api:8000
+      AUTH_SECRET: ${AUTH_SECRET:-dev-secret-key-change-in-prod}
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+  worker:
+    build: .
+    environment:
+      MODE: worker
+      CONTEXTA_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-contexta}
+      CONTEXTA_REDIS_URL: redis://redis:6379/0
+      CONTEXTA_CELERY_BROKER_URL: redis://redis:6379/1
+      CONTEXTA_CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
+      CONTEXTA_LLM_PROVIDER: deepseek
+      CONTEXTA_LLM_BASE_URL: https://api.deepseek.com/v1
+      CONTEXTA_LLM_MODEL: deepseek-chat
+      CONTEXTA_LLM_API_KEY: ${DEEPSEEK_API_KEY}
+      CONTEXTA_EMBEDDING_PROVIDER: deterministic
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+  beat:
+    build: .
+    environment:
+      MODE: beat
+      CONTEXTA_CELERY_BROKER_URL: redis://redis:6379/1
+      CONTEXTA_CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+  # ─── Go Services ────────────────────────────────────
+  gateway:
+    build: ./services/gateway
+    environment:
+      REDIS_ADDR: redis:6379
+      DATA_PLANE_URL: http://data-plane:8080
+      PYTHON_API_URL: http://api:8000
+      LISTEN_ADDR: :8443
+    ports:
+      - "8443:8443"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+  data-plane:
+    build: ./services/data-plane
+    environment:
+      REDIS_ADDR: redis:6379
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-contexta}
+      LISTEN_ADDR: :8080
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  aggregator:
+    build: ./services/aggregator
+    environment:
+      REDIS_ADDR: redis:6379
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-contexta}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

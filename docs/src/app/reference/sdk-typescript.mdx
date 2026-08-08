@@ -1,0 +1,199 @@
+# TypeScript SDK Reference
+
+Full API surface for `@contexta/client`.
+
+## Installation
+
+```bash
+npm install @contexta/client
+```
+
+## Class: `contexta`
+
+```ts
+class contexta {
+  static fromEnv(): contexta;
+
+  constructor(opts: {
+    apiKey: string;
+    baseUrl?: string;
+    timeout?: number;
+    maxRetries?: number;
+    telemetry?: boolean;
+    enableBuffer?: boolean;
+  });
+
+  // Observations
+  observe(input: ObserveInput): Promise<ObserveResponse>;
+  observeBatch(input: ObserveInput[]): Promise<BatchObserveResponse>;
+
+  // Retrieval
+  retrieve(input: RetrieveInput): Promise<ScoredMemory[]>;
+  context(input: ContextInput): Promise<Context>;
+
+  // Memory lifecycle
+  getMemory(memoryId: string): Promise<Memory>;
+  explain(memoryId: string): Promise<Explanation>;
+  pin(memoryId: string): Promise<Memory>;
+  unpin(memoryId: string): Promise<Memory>;
+  archive(memoryId: string): Promise<Memory>;
+  restore(memoryId: string): Promise<Memory>;
+  delete(memoryId: string): Promise<void>;
+  timeline(userId: string, limit?: number): Promise<TimelineEvent[]>;
+
+  // Sessions
+  createSession(userId: string, metadata?: Record<string, unknown>): Promise<Session>;
+  endSession(sessionId: string): Promise<Session>;
+
+  // Policies & schemas
+  registerPolicy(input: PolicyInput): Promise<Policy>;
+  listPolicies(): Promise<Policy[]>;
+  registerSchema(input: SchemaInput): Promise<Schema>;
+
+  // Health
+  ping(): Promise<{ status: string; region: string }>;
+}
+```
+
+## Input Types
+
+```ts
+interface ObserveInput {
+  userId: string;
+  sessionId?: string;
+  messages: Array<{ role: string; content: string }>;
+  metadata?: Record<string, unknown>;
+  policy?: string;
+  idempotencyKey?: string;
+}
+
+interface RetrieveInput {
+  userId: string;
+  queryText: string;
+  memoryTypes?: string[];
+  tags?: string[];
+  limit?: number;
+  graphDepth?: number;
+  includeArchived?: boolean;
+  includeCold?: boolean;
+  rerank?: boolean;
+}
+
+interface ContextInput {
+  userId: string;
+  sessionId?: string;
+  query?: string;
+  tokenBudget?: number;
+  includeUserModel?: boolean;
+  rerank?: boolean;
+}
+
+interface PolicyInput {
+  name: string;
+  storeRules?: Array<{ memoryTypes: string[]; patterns?: string[] }>;
+  ignoreRules?: Array<{ patterns: string[] }>;
+  priorityWeights?: Record<string, number>;
+}
+
+interface SchemaInput {
+  name: string;
+  fields: Array<{
+    name: string;
+    type: string;
+    required: boolean;
+    values?: string[];
+  }>;
+}
+```
+
+## Response Types
+
+```ts
+interface ObserveResponse {
+  jobId: string;
+  status: string;
+  estimatedProcessingSeconds?: number;
+}
+
+interface BatchObserveResponse {
+  jobs: Array<{ jobId: string; status: string }>;
+}
+
+interface Context {
+  userProfile: UserProfile | null;
+  activeProjects: Project[];
+  preferences: Preference[];
+  goals: Goal[];
+  recentEvents: Event[];
+  relevantMemories: ScoredMemory[];
+  tokenUsage: TokenUsage;
+  cacheHit: boolean;
+  requestId: string;
+
+  toSystemPrompt(template?: string): string;
+  toMessages(): Array<{ role: string; content: string }>;
+  toMarkdown(): string;
+  toDict(): Record<string, unknown>;
+}
+
+interface ScoredMemory {
+  memoryId: string;
+  memoryType: string;
+  title: string;
+  content: string;
+  score: number;
+  scoreBreakdown: Record<string, number>;
+  tags: string[];
+  createdAt: string;
+}
+
+interface Explanation {
+  memory: Memory;
+  extractionSource: Array<{ role: string; content: string }>;
+  scoringBreakdown: Record<string, number>;
+  supersessionHistory: Array<Record<string, unknown>>;
+}
+
+interface Memory {
+  id: string;
+  memoryType: string;
+  title: string;
+  content: string;
+  confidence: number;
+  importance: number;
+  tags: string[];
+  memoryState: "active" | "warm" | "cold" | "archived";
+  isPinned: boolean;
+  isArchived: boolean;
+  createdAt: string;
+  lastAccessedAt: string | null;
+}
+```
+
+## Error Handling
+
+```ts
+import {
+  contextaError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ValidationError,
+  QuotaExceeded,
+  RateLimited,
+} from "@contexta/client";
+
+try {
+  const ctx = await contexta.context({ userId: "u_123", query: "hello" });
+} catch (err) {
+  if (err instanceof AuthenticationError) {
+    console.error("Check your API key");
+  } else if (err instanceof RateLimited) {
+    console.error(`Retry after ${err.retryAfter}s`);
+  }
+}
+```
+
+## Edge Runtime
+
+The SDK works in Vercel Edge, Cloudflare Workers, Bun, and Deno with no polyfills needed. It uses native `fetch`, `crypto`, and `URL`.

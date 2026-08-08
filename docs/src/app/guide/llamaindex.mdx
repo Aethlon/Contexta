@@ -1,0 +1,66 @@
+# LlamaIndex Integration
+
+contexta implements LlamaIndex's `BaseMemory` protocol, making it a drop-in replacement for `ChatMemoryBuffer`.
+
+## Installation
+
+```bash
+pip install contexta-client contexta-llamaindex llama-index
+```
+
+## Usage
+
+```python
+from llama_index.core.agent import ReActAgent
+from llama_index.core.tools import FunctionTool
+from CONTEXTA_llamaindex import contextaChatMemory
+
+memory = contextaChatMemory.from_env(
+    user_id="u_123",
+    session_id="s_456",
+    token_budget=1500,
+)
+
+agent = ReActAgent.from_tools(
+    tools=[FunctionTool.from_defaults(fn=some_tool)],
+    llm=llm,
+    memory=memory,
+    verbose=True,
+)
+
+response = agent.chat("What database did I say I prefer?")
+```
+
+## How It Works
+
+- `get_all()` calls `contexta.context()` and returns a list of `ChatMessage` synthesized from the context bundle
+- `put(message)` buffers messages and emits a single observation at turn boundaries
+- Token budget is passed through to contexta's context endpoint
+
+## Complementary to Vector Stores
+
+contexta does **not** replace LlamaIndex's `VectorMemory`. Use both:
+
+- **LlamaIndex VectorMemory** — for document RAG
+- **contexta ChatMemory** — for conversational memory
+
+```python
+from llama_index.core.memory import VectorMemory
+from CONTEXTA_llamaindex import contextaChatMemory
+
+# Document RAG
+doc_memory = VectorMemory.from_defaults(vector_store=...)
+
+# Conversational memory
+conv_memory = contextaChatMemory.from_env(
+    user_id="u_123",
+    session_id="s_456",
+)
+
+agent = ReActAgent.from_tools(
+    tools=[...],
+    llm=llm,
+    memory=conv_memory,  # contexta handles conversation
+    verbose=True,
+)
+```

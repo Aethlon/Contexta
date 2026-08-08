@@ -1,0 +1,176 @@
+# Custom Agent Loop
+
+If you're not using a framework, you only need three SDK calls per turn.
+
+## The Core Pattern
+
+```python
+from contexta_client import contexta
+from openai import OpenAI
+
+contexta = contexta.from_env()
+llm = OpenAI()
+
+def agent_turn(
+    user_message: str,
+    user_id: str,
+    session_id: str,
+) -> str:
+    # 1. FETCH context before generation
+    ctx = contexta.context(
+        user_id=user_id,
+        session_id=session_id,
+        query=user_message,
+        token_budget=1500,
+    )
+
+    # 2. CALL the LLM with context
+    response = llm.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": ctx.to_system_prompt()},
+            {"role": "user", "content": user_message},
+        ],
+    )
+    reply = response.choices[0].message.content
+
+    # 3. OBSERVE the turn
+    contexta.observe(
+        user_id=user_id,
+        session_id=session_id,
+        messages=[
+            {"role": "user", "content": user_message},
+            {"role": "assistant", "content": reply},
+        ],
+    )
+
+    return reply
+```
+
+That's it. Three SDK calls: `context()`, LLM, `observe()`.
+
+## TypeScript Version
+
+```ts
+import { contexta } from "@contexta/client";
+import OpenAI from "openai";
+
+const contexta = contexta.fromEnv();
+const openai = new OpenAI();
+
+async function agentTurn(
+  userMessage: string,
+  userId: string,
+  sessionId: string,
+): Promise<string> {
+  const ctx = await contexta.context({
+    userId,
+    sessionId,
+    query: userMessage,
+    tokenBudget: 1500,
+  });
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: ctx.toSystemPrompt() },
+      { role: "user", content: userMessage },
+    ],
+  });
+
+  const reply = response.choices[0]?.message?.content ?? "";
+
+  await contexta.observe({
+    userId,
+    sessionId,
+    messages: [
+      { role: "user", content: userMessage },
+      { role: "assistant", content: reply },
+    ],
+  });
+
+  return reply;
+}
+```
+
+## Context Object
+
+The `Context` object returned by `context()` has multiple render methods:
+
+```python
+ctx = contexta.context(user_id="u_123", query=user_message)
+
+# For system prompts
+ctx.to_system_prompt()
+
+# For structured chat (role/content pairs)
+ctx.to_messages()
+
+# For debugging
+ctx.to_markdown()
+
+# Raw dict
+ctx.to_dict()
+```
+
+The default system prompt format:
+
+```
+contexta Memory:
+─ User profile ─
+{...}
+
+─ Active projects ─
+{...}
+
+─ Preferences ─
+{...}
+
+─ Goals ─
+{...}
+
+─ Recent events ─
+{...}
+
+─ Relevant context ─
+{...}
+```
+
+## Custom Template
+
+Override the system prompt format:
+
+```python
+ctx.to_system_prompt(template="""
+# Memory Context for {user_id}
+## Preferences
+{preferences}
+## Facts
+{relevant_memories}
+""")
+```
+
+## Full Agent Class
+
+```python
+class contextaAgent:
+    def __init__(self, api_key: str | None = None):
+        self.contexta = contexta(api_key=api_key or os.environ["CONTEXTA_API_KEY"])
+        self.llm = OpenAI()
+
+    def run(self, user_id: str, message: str) -> str:
+        ctx = self.contexta.context(user_id=user_id, query=message)
+        response = self.llm.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": ctx.to_system_prompt()},
+                {"role": "user", "content": message},
+            ],
+        )
+        reply = response.choices[0].message.content
+        self.contexta.observe(user_id=user_id, messages=[
+            {"role": "user", "content": message},
+            {"role": "assistant", "content": reply},
+        ])
+        return reply
+```

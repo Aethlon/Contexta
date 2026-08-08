@@ -1,0 +1,135 @@
+# CLI Reference
+
+The `contexta` CLI ships in the `contexta-client` Pip package.
+
+## Installation
+
+```bash
+pip install contexta-client
+contexta --help
+```
+
+## Configuration
+
+The CLI stores credentials in `~/.contexta/config.toml`:
+
+```toml
+[default]
+api_url = "https://api.contexta.dev"
+api_key = "mk_live_..."
+org_id = "..."
+project_id = "..."
+
+[profiles.staging]
+api_url = "https://api.contexta.dev"
+api_key = "mk_test_..."
+project_id = "..."
+```
+
+Use profiles: `contexta --profile=staging memories list`.
+
+## Commands
+
+### Authentication
+
+| Command | Description |
+|---------|-------------|
+| `contexta login` | Authenticate via browser |
+| `contexta logout` | Clear stored credentials |
+| `contexta whoami` | Show active org, project, key |
+
+### Project Setup
+
+| Command | Description |
+|---------|-------------|
+| `contexta init` | Scaffold .env and integration snippet |
+| `contexta test` | Smoke test: ping, observe, retrieve |
+| `contexta projects list` | List projects |
+| `contexta projects create` | Create project |
+| `contexta projects use` | Set default project |
+
+### API Keys
+
+| Command | Description |
+|---------|-------------|
+| `contexta keys list` | List API keys |
+| `contexta keys create` | Create a key |
+| `contexta keys rotate` | Rotate a key |
+| `contexta keys revoke` | Revoke a key |
+
+### Policies
+
+| Command | Description |
+|---------|-------------|
+| `contexta policies list` | List policies |
+| `contexta policies show` | Show a policy |
+| `contexta policies create` | Register from YAML |
+| `contexta policies sync` | Sync from directory |
+
+### Schemas
+
+| Command | Description |
+|---------|-------------|
+| `contexta schemas list` | List schemas |
+| `contexta schemas create` | Register from YAML |
+
+### Memories
+
+| Command | Description |
+|---------|-------------|
+| `contexta memories list` | List memories (paginated) |
+| `contexta memories show` | Show a memory |
+| `contexta memories explain` | Show explainability |
+| `contexta memories pin` | Pin a memory |
+| `contexta memories archive` | Archive a memory |
+| `contexta memories delete` | Delete a memory |
+
+### Observations
+
+| Command | Description |
+|---------|-------------|
+| `contexta observations send` | Send observation from JSON or stdin |
+
+### Context
+
+| Command | Description |
+|---------|-------------|
+| `contexta context get` | Get context bundle |
+| `contexta context preview` | Preview with sample query |
+
+### Monitoring
+
+| Command | Description |
+|---------|-------------|
+| `contexta usage` | Show current period usage |
+| `contexta audit` | Tail audit log |
+| `contexta export` | Export memories to JSONL |
+
+## Sample Session
+
+```bash
+$ contexta login
+✓ Logged in as alice@acme.com (Acme Inc, project: default)
+
+$ contexta init
+✓ Created .env with CONTEXTA_API_KEY and CONTEXTA_API_URL
+✓ Created CONTEXTA_example.py
+
+$ contexta test
+→ Pinging api.contexta.dev...
+✓ API reachable (eu-fsn1)
+→ Sending sample observation...
+✓ Accepted (job_id 01J9ZX...)
+✓ Extracted 2 memories
+→ Retrieving context...
+✓ Got 2 memories
+🎉 contexta is working.
+
+$ contexta usage
+Builder plan, period 2026-05-01 to 2026-06-01
+  Active memories     91,245 / 250,000
+  Observations        213,400 / 500,000
+  Retrievals          1,843,200 / 5,000,000
+  Reranks             22,100 / 100,000
+  Estimated cost: $29.00
+```

@@ -1,0 +1,117 @@
+# SDK Overview
+
+contexta ships two first-party SDKs: Python (`contexta-client`) and TypeScript (`@contexta/client`). Both are MIT-licensed, async-first, and feature-identical.
+
+## Installation
+
+```bash
+# Python
+pip install contexta-client
+
+# TypeScript
+npm install @contexta/client
+# or
+pnpm add @contexta/client
+# or
+yarn add @contexta/client
+```
+
+## Configuration
+
+Both SDKs read from environment variables automatically:
+
+```env
+CONTEXTA_API_KEY=mk_live_your_key_here
+CONTEXTA_API_URL=https://api.contexta.dev
+CONTEXTA_TIMEOUT_MS=30000
+CONTEXTA_MAX_RETRIES=3
+CONTEXTA_TELEMETRY=true
+```
+
+Or pass options directly:
+
+```python
+contexta = contexta(
+    api_key="mk_live_...",
+    base_url="https://eu.api.contexta.dev",
+    timeout=30.0,
+    max_retries=3,
+)
+```
+
+## Initialization
+
+```python
+# From environment (recommended)
+from contexta_client import contexta, Asynccontexta
+m = contexta.from_env()
+am = Asynccontexta.from_env()
+
+# Explicit
+m = contexta(api_key="mk_live_...")
+```
+
+```ts
+import { contexta } from "@contexta/client";
+const m = contexta.fromEnv();
+// or: new contexta({ apiKey: "mk_live_..." })
+```
+
+## The Thirteen Methods
+
+| Method | Description |
+|--------|-------------|
+| `observe` | Ingest a conversation turn |
+| `observe_batch` | Ingest multiple turns at once |
+| `context` | Get token-budgeted context bundle |
+| `retrieve` | Low-level ranked memory search |
+| `explain` | Explainability for one memory |
+| `pin` | Protect a memory from decay |
+| `unpin` | Release protection |
+| `archive` | Soft-hide from retrieval |
+| `restore` | Unarchive a memory |
+| `delete` | Permanently delete |
+| `timeline` | Chronological event log |
+| `register_policy` | Custom extraction policy |
+| `register_schema` | Custom structured schema |
+| `ping` | Liveness check |
+
+## Error Handling
+
+```python
+from contexta_client import (
+    contextaError,
+    AuthenticationError,
+    AuthorizationError,
+    ValidationError,
+    NotFoundError,
+    QuotaExceeded,
+    RateLimited,
+)
+
+try:
+    ctx = contexta.context(user_id="u_123", query="hello")
+except AuthenticationError:
+    print("Check your API key")
+except QuotaExceeded:
+    print("Plan limit reached")
+except RateLimited as e:
+    print(f"Retry in {e.retry_after}s")
+```
+
+## Auto-Retry
+
+The SDK automatically retries on 5xx and 429 with exponential backoff (1s, 2s, 4s). It honors the `Retry-After` header.
+
+## Edge Runtime Support (TypeScript)
+
+The TypeScript SDK works in:
+- Node 20+
+- Vercel Edge Runtime
+- Cloudflare Workers
+- Bun, Deno
+- Browser (with CORS configured)
+
+## Telemetry
+
+Default-on, opt-out via `CONTEXTA_TELEMETRY=false` or `contexta({ telemetry: false })`. We send anonymized usage data — no keys, no content, no user IDs.

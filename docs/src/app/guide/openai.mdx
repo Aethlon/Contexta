@@ -1,0 +1,93 @@
+# OpenAI Assistants Integration
+
+contexta sits alongside the OpenAI Assistants API as the long-term memory layer that survives across threads.
+
+## Installation
+
+```bash
+pip install contexta-client contexta-openai
+```
+
+## Basic Usage
+
+```python
+from openai import OpenAI
+from contexta_client import contexta
+from CONTEXTA_openai import contextaMemory
+
+openai_client = OpenAI()
+contexta = contexta.from_env()
+memory = contextaMemory(contexta, openai_client)
+
+# Before sending user message, fetch context
+user_message = "What database do I prefer?"
+context = memory.context_for(
+    user_id="u_123",
+    query=user_message,
+    token_budget=1500,
+)
+
+# Inject context as additional instructions
+thread = openai_client.beta.threads.create(messages=[
+    {"role": "user", "content": user_message},
+])
+
+run = openai_client.beta.threads.runs.create(
+    thread_id=thread.id,
+    assistant_id=ASSISTANT_ID,
+    additional_instructions=context.to_system_prompt(),
+)
+
+# After run completes, observe the conversation
+messages = openai_client.beta.threads.messages.list(thread_id=thread.id)
+memory.observe_thread(user_id="u_123", session_id=thread.id, messages=messages)
+```
+
+## Drop-in Runner
+
+For a simpler pattern, use `contextaAssistantRunner`:
+
+```python
+from CONTEXTA_openai import contextaAssistantRunner
+
+runner = contextaAssistantRunner(
+    openai=openai_client,
+    contexta=contexta,
+    assistant_id=ASSISTANT_ID,
+    user_id_resolver=lambda thread_id: "u_123",
+)
+
+result = runner.run(thread_id=thread.id, message=user_message)
+# context is auto-injected, observations are auto-emitted
+```
+
+## TypeScript
+
+```ts
+import OpenAI from "openai";
+import { contexta } from "@contexta/client";
+import { contextaMemory } from "@contexta/openai";
+
+const openai = new OpenAI();
+const contexta = contexta.fromEnv();
+const memory = new contextaMemory(contexta, openai);
+
+const ctx = await memory.contextFor({
+  userId: "u_123",
+  query: userMessage,
+  tokenBudget: 1500,
+});
+
+const run = await openai.beta.threads.runs.create(thread.id, {
+  assistant_id: ASSISTANT_ID,
+  additional_instructions: ctx.toSystemPrompt(),
+});
+```
+
+## What the Adapter Handles
+
+- Translating OpenAI message objects to contexta observation format
+- Token-budget respect when injecting context as system instructions
+- Stable mapping from OpenAI thread ID to contexta session ID
+- Auto-batching observations
+- User ID propagation via a customer-supplied resolver function

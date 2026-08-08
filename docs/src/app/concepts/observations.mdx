@@ -1,0 +1,109 @@
+import { Callout } from 'nextra/components'
+
+# Observations
+
+An **observation** is a raw input to contexta — a conversation turn or event that the engine processes to extract and store memories.
+
+## Format
+
+```json
+{
+  "session_id": "33333333-3333-4333-8333-333333333333",
+  "messages": [
+    {"role": "user", "content": "I prefer Postgres over Mongo"},
+    {"role": "assistant", "content": "Noted, I'll prefer Postgres."}
+  ],
+  "metadata": {"agent": "coding-agent", "version": "1.4.0"},
+  "policy": "coding-agent"
+}
+```
+
+- `messages` — array of `{role, content}` pairs. Roles: `user`, `assistant`, `tool`.
+- `session_id` — optional. Auto-created if omitted.
+- `metadata` — opaque JSON, max 4 KB.
+- `policy` — registered policy name or omitted for default.
+
+## Idempotency
+
+All observation writes accept an `Idempotency-Key` header. The SDK generates UUIDv7 keys automatically. Replays of the same key return the original response.
+
+```python
+contexta.observe(
+    user_id="u_123",
+    messages=[...],
+    idempotency_key="my-stable-key",  # optional
+)
+```
+
+## Batch Submissions
+
+Submit up to 50 observations in a single call:
+
+```python
+contexta.observe_batch([
+    {"user_id": "u_123", "messages": [...]},
+    {"user_id": "u_456", "messages": [...]},
+])
+```
+
+Each observation in a batch gets its own `job_id` and processes independently.
+
+## Policies
+
+Policies control what gets extracted from observations:
+
+```python
+contexta.register_policy(
+    name="support-agent",
+    store_rules=[
+        {"memory_types": ["preference", "fact", "contact"]},
+    ],
+    ignore_rules=[
+        {"patterns": [r"^(thanks|hi|hello)\b"]},
+    ],
+    priority_weights={"preference": 0.9},
+)
+```
+
+Built-in policies: `default`, `minimal`, `verbose`. Register custom policies per project.
+
+## Redaction
+
+contexta automatically detects and redacts sensitive patterns (API keys, tokens, secrets) before extraction. The redaction engine runs before any LLM call.
+
+<Callout type="info">
+Redaction is always-on. You cannot disable it. If you need to observe raw sensitive data, hash it before sending.
+</Callout>
+
+## Processing Pipeline
+
+When you submit an observation:
+
+1. **Sensitive filter** — redact secrets
+2. **LLM extraction** — extract structured memories
+3. **Deduplication** — merge with existing memories via truth maintenance
+4. **Entity resolution** — link entities to knowledge graph
+5. **Classification** — assign memory type
+6. **Importance scoring** — compute 0–1 importance
+7. **Embedding** — generate vector embedding
+8. **Storage** — persist to Postgres + pgvector
+
+The full pipeline runs asynchronously. You get an `accepted` response immediately.
+
+## Limits
+
+| Dimension | Constraint |
+|-----------|-----------|
+| Body size | 1 MB max |
+| Messages per observation | 100 max |
+| Batch size | 50 max |
+| Processing latency | ~3s p95 |
+
+## Error Codes
+
+| Code | Meaning |
+|------|---------|
+| `PAYLOAD_TOO_LARGE` | Body exceeds 1 MB |
+| `INVALID_MESSAGES` | Messages array is empty or malformed |
+| `UNKNOWN_POLICY` | Referenced policy not found |
+| `RATE_LIMITED` | Per-key RPS exceeded |
