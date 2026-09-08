@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "contexta-client"
+version = "0.2.0"
+description = "Contexta SDK — persistent memory for AI agents"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Contexta Inc.", email = "dev@contexta.dev"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
+dependencies = [
+    "httpx>=0.28",
+    "pydantic>=2.0",
+    "pyyaml",
+    "typer>=0.15",
+    "python-dotenv>=1.0",
+]
+
+[project.urls]
+Homepage = "https://contexta.dev"
+Documentation = "https://docs.contexta.dev"
+Repository = "https://github.com/contexta-dev/python-client"
+Changelog = "https://github.com/contexta-dev/python-client/releases"
+
+[project.scripts]
+contexta = "contexta_client.cli.main:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["contexta_client*"]

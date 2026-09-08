@@ -1,0 +1,12 @@
+{
+  "__version__": {
+    "pytorch": "2.10.0+cu128",
+    "sentence_transformers": "5.4.0"
+  },
+  "activation_fn": "torch.nn.modules.linear.Identity",
+  "default_prompt_name": "query",
+  "model_type": "CrossEncoder",
+  "prompts": {
+    "query": "Given a web search query, retrieve relevant passages that answer the query"
+  }
+}

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth-helpers";
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { EngineStatusBadge } from "@/components/engine-status-badge";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
@@ -19,7 +20,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
               </p>
               <h1 className="text-base font-light text-[var(--color-ghost)]">Memory control plane</h1>
             </div>
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4">
+              <EngineStatusBadge />
               <ThemeToggle />
               <div className="rounded-xl border border-[var(--color-graphite)]/30 px-3 py-1.5 text-xs text-[var(--color-smoke)] font-mono">
                 {session.user.email}

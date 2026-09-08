@@ -1,7 +1,9 @@
 *
 !contexta/
+!scripts/
 !web/
 !pyproject.toml
+!uv.lock
 !alembic.ini
 !entrypoint.sh
 

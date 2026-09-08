@@ -1,115 +1,131 @@
 "use client";
 
-import React, { useState } from "react";
+import { motion } from "motion/react";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  Timeline,
+  TimelineContent,
+  TimelineDescription,
+  TimelineItem,
+  TimelineMarker,
+  TimelineTime,
+  TimelineTitle,
+} from "@aethlon/components";
+import { fadeUp, staggerContainer } from "@/lib/motion";
 import { sdkCodes } from "@/lib/content";
-import { Terminal } from "@/components/ui/terminal";
-import { MessageSquarePlus, BrainCircuit, Search, ArrowRight } from "lucide-react";
-import { cn } from "@/lib/utils";
+
+const steps = [
+  {
+    time: "WRITE / 4MS",
+    title: "Observe",
+    description:
+      "memory.observe() captures every interaction. Secrets are redacted at ingestion, before anything is stored.",
+  },
+  {
+    time: "ASYNC / DREAM CYCLE",
+    title: "Consolidate",
+    description:
+      "Background reflection merges duplicates, resolves contradictions, scores importance, and decays noise.",
+  },
+  {
+    time: "READ / P99 84MS",
+    title: "Recall",
+    description:
+      "memory.context() returns a token-budgeted, importance-weighted summary ready for your system prompt.",
+  },
+];
 
 export function HowItWorks() {
-  const [activeStep, setActiveStep] = useState(0);
-
-  const steps = [
-    {
-      title: "1. Observe Conversations",
-      desc: "Send chat logs through the Contexta Cloud API gateway or SDK client. Contexta analyzes user statements to find core details asynchronously.",
-      icon: MessageSquarePlus,
-      color: "border-blue-500/20 text-blue-400"
-    },
-    {
-      title: "2. Dream Cycles (Consolidate)",
-      desc: "Managed background workers trigger Reflection, consolidating fact structures, solving contradictions, and applying decay logic.",
-      icon: BrainCircuit,
-      color: "border-[var(--color-purple)]/20 text-[var(--color-purple)]"
-    },
-    {
-      title: "3. Retrieve Smart Context",
-      desc: "Retrieve structured background context for your tenant users in <100ms p99. Dynamic facts are formatted to feed directly to LLMs.",
-      icon: Search,
-      color: "border-emerald-500/20 text-emerald-400"
-    }
-  ];
-
-  const terminalTabs = {
-    python: {
-      label: "Python SDK",
-      code: sdkCodes.python,
-      language: "py"
-    },
-    typescript: {
-      label: "TypeScript SDK",
-      code: sdkCodes.typescript,
-      language: "ts"
-    }
-  };
-
   return (
-    <section className="py-24 border-t border-[var(--color-border)] bg-[var(--color-ash)]/10" id="how-it-works">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-center">
-          
-          {/* Steps Column */}
-          <div className="lg:col-span-5 flex flex-col justify-center">
-            <h2 className="text-3xl font-bold tracking-tight text-[var(--color-foreground)] sm:text-4xl mb-6">
-              Integration in Three Steps
-            </h2>
-            <p className="text-base text-[var(--color-smoke)] leading-relaxed font-light mb-10">
-              Integrate persistent AI memories into any application context. Contexta runs in the background so you can focus on building agents.
-            </p>
+    <section id="how-it-works" className="scroll-mt-24 border-t border-border/30">
+      <div className="mx-auto max-w-6xl px-4 py-24 sm:px-6">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-80px" }}
+        >
+          <motion.p variants={fadeUp} className="text-micro">
+            How it works
+          </motion.p>
+          <motion.h2
+            variants={fadeUp}
+            className="mt-4 max-w-2xl text-4xl font-semibold tracking-tight text-foreground"
+          >
+            Observe. Consolidate.{" "}
+            <span className="font-emphasis text-aurora">Recall</span>.
+          </motion.h2>
+        </motion.div>
 
-            <div className="space-y-4">
-              {steps.map((step, idx) => {
-                const Icon = step.icon;
-                const isActive = activeStep === idx;
-
-                return (
-                  <div
-                    key={idx}
-                    onClick={() => setActiveStep(idx)}
-                    className={cn(
-                      "group flex gap-4 p-5 rounded-xl border transition-all duration-300 cursor-pointer text-left",
-                      isActive
-                        ? "bg-[var(--color-charcoal)] border-[var(--color-purple)]/40 shadow-sm"
-                        : "bg-[var(--color-ash)]/40 border-transparent hover:bg-[var(--color-charcoal)]/50"
-                    )}
-                  >
-                    <div className={cn(
-                      "flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-lg border bg-[var(--color-abyss)]/60 transition-transform group-hover:scale-105",
-                      isActive ? "border-[var(--color-purple)]/40 text-[var(--color-purple)]" : "border-[var(--color-border)] text-[var(--color-smoke)]"
-                    )}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className={cn(
-                        "text-base font-semibold transition-colors",
-                        isActive ? "text-[var(--color-foreground)]" : "text-zinc-400 group-hover:text-zinc-200"
-                      )}>
+        <div className="mt-14 grid gap-8 lg:grid-cols-2">
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-80px" }}
+          >
+            <Timeline>
+              {steps.map((step, index) => (
+                <motion.div key={step.title} variants={fadeUp}>
+                  <TimelineItem>
+                    {index < 1 ? <TimelineMarker data-complete /> : null}
+                    {index === 1 ? <TimelineMarker data-running /> : null}
+                    {index > 1 ? <TimelineMarker /> : null}
+                    <TimelineContent>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <TimelineTime>{step.time}</TimelineTime>
+                      </div>
+                      <TimelineTitle
+                        className={index === 1 ? "text-brand" : undefined}
+                      >
                         {step.title}
-                      </h3>
-                      <p className="mt-1 text-sm text-[var(--color-smoke)] leading-relaxed font-light">
-                        {step.desc}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+                      </TimelineTitle>
+                      <TimelineDescription>{step.description}</TimelineDescription>
+                    </TimelineContent>
+                  </TimelineItem>
+                </motion.div>
+              ))}
+            </Timeline>
+          </motion.div>
 
-          {/* Code Terminal Column */}
-          <div className="lg:col-span-7 w-full">
-            <Terminal tabs={terminalTabs} />
-            <div className="mt-6 flex items-center justify-between px-4 text-xs font-mono text-[var(--color-smoke)]">
-              <span>Ready for production on Contexta Cloud</span>
-              <span className="flex items-center gap-1.5 text-[var(--color-purple)] hover:brightness-110 cursor-pointer" onClick={() => {
-                document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
-              }}>
-                View pricing details
-                <ArrowRight className="h-3 w-3" />
+          <motion.div
+            variants={fadeUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-80px" }}
+            className="flex flex-col rounded-2xl bg-card p-6 shadow-[var(--shadow-card)] sm:p-7"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-micro">SDK / minimal integration</p>
+              <span className="font-dotmatrix text-xs text-muted-foreground">
+                2 CALLS
               </span>
             </div>
-          </div>
-
+            <div className="mt-6">
+              <Tabs defaultValue="python">
+                <TabsList variant="line">
+                  <TabsTrigger value="python">python</TabsTrigger>
+                  <TabsTrigger value="typescript">typescript</TabsTrigger>
+                </TabsList>
+                <TabsContent value="python" className="mt-4">
+                  <pre className="overflow-x-auto font-dotmatrix text-xs leading-relaxed text-foreground">
+                    <code>{sdkCodes.python}</code>
+                  </pre>
+                </TabsContent>
+                <TabsContent value="typescript" className="mt-4">
+                  <pre className="overflow-x-auto font-dotmatrix text-xs leading-relaxed text-foreground">
+                    <code>{sdkCodes.typescript}</code>
+                  </pre>
+                </TabsContent>
+              </Tabs>
+            </div>
+            <p className="mt-auto pt-6 font-dotmatrix text-xs text-muted-foreground">
+              READY FOR PRODUCTION CLUSTERS
+            </p>
+          </motion.div>
         </div>
       </div>
     </section>

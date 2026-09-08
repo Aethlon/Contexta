@@ -68,3 +68,25 @@ class UsageSignal(str, Enum):
 
     USED = "used"
     IGNORED = "ignored"
+
+
+EXCLUDED_ENTITY_WORDS: frozenset[str] = frozenset({
+    "the", "a", "an", "this", "that", "these", "those",
+    "i", "me", "my", "we", "us", "our", "you", "your", "he", "him", "his",
+    "she", "her", "they", "them", "their", "it", "its",
+    "what", "when", "where", "who", "which", "whose", "why", "how",
+    "is", "am", "are", "was", "were", "be", "been", "being",
+    "do", "does", "did", "have", "has", "had", "having",
+    "would", "could", "should", "will", "can", "may", "might", "must",
+    "and", "or", "but", "if", "so", "then", "because", "as", "until", "while",
+    "of", "at", "by", "for", "with", "about", "against", "between", "into", "through",
+    "during", "before", "after", "above", "below", "to", "from", "up", "down", "in", "out",
+    "on", "off", "over", "under", "again", "further",
+    "there", "here", "all", "any", "both", "each", "few", "more", "most", "other",
+    "some", "such", "no", "nor", "not", "only", "own", "same", "too", "very",
+    "yeah", "yes", "nope", "hey", "good", "great", "thanks", "thank", "date",
+    "gonna", "wanna", "gotta", "yesterday", "today", "tomorrow", "sure", "well",
+    "just", "also", "wow", "hope", "congrats", "nothing", "anything", "something",
+    "maybe", "actually", "really", "since", "even", "speaker", "user", "time",
+    "day", "week", "month", "year", "lot", "lots", "thing", "things", "stuff", "mel",
+})

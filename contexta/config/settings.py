@@ -6,8 +6,45 @@ variables or a .env file.
 """
 
 from functools import lru_cache
+import json
+import os
+from pathlib import Path
+import time
+from typing import Any
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def get_engine_state_file() -> Path:
+    """Resolve the persistent engine state file location."""
+    base = os.environ.get("MODEL_CACHE_DIR", os.environ.get("CONTEXTA_MODEL_CACHE_DIR", "models"))
+    p = Path(base)
+    if not p.is_absolute():
+        p = Path.cwd() / p
+    return p / "engine_state.json"
+
+
+def load_persisted_engine_mode() -> str | None:
+    """Load engine mode from persistent storage if present."""
+    state_file = get_engine_state_file()
+    if state_file.exists():
+        try:
+            data = json.loads(state_file.read_text(encoding="utf-8"))
+            mode = data.get("mode")
+            if mode in ("offline", "online", "auto"):
+                return mode
+        except Exception:
+            pass
+    return None
+
+
+def persist_engine_mode(mode: str) -> None:
+    """Save engine mode to persistent storage and update active settings."""
+    state_file = get_engine_state_file()
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    state_file.write_text(json.dumps({"mode": mode, "updated_at": time.time()}), encoding="utf-8")
+    s = get_settings()
+    s.engine_mode = mode
 
 
 class Settings(BaseSettings):
@@ -58,6 +95,11 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: str = "https://api.openai.com/v1"
 
+    # Engine Mode & Local Model Server
+    engine_mode: str = "auto"  # "offline", "online", "auto"
+    local_model_server_url: str = "http://localhost:8001"
+    validate_online_providers_at_startup: bool = True
+
     # Feature flags
     feature_sensitive_data_filter: bool = True
     feature_reflection_engine: bool = True
@@ -94,6 +136,11 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     debug: bool = False
+
+    def model_post_init(self, __context: Any) -> None:
+        persisted = load_persisted_engine_mode()
+        if persisted:
+            self.engine_mode = persisted
 
 
 @lru_cache

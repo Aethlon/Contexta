@@ -134,6 +134,71 @@ class contexta:
         )
         return [ScoredMemory(**m) for m in data.get("results", [])]
 
+    def search(
+        self,
+        query: str,
+        *,
+        user_id: Optional[str] = None,
+        limit: int = 20,
+        threshold: float = 0.65,
+        memory_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Execute pure vector similarity search over pgvector embeddings."""
+        params = f"?query={query}&limit={limit}&threshold={threshold}"
+        if user_id:
+            params += f"&user_id={user_id}"
+        if memory_type:
+            params += f"&memory_type={memory_type}"
+        headers = {"X-contexta-User-Id": user_id} if user_id else None
+        return self._http._request(
+            method="GET",
+            endpoint=f"/memories/search{params}",
+            headers=headers,
+        )
+
+    def traverse(
+        self,
+        source: str,
+        *,
+        hops: int = 2,
+        relationship_types: Optional[str] = None,
+        direction: str = "both",
+    ) -> Dict[str, Any]:
+        """Execute multi-hop entity graph traversal starting from a root entity name or UUID."""
+        params = f"?source={source}&hops={hops}&direction={direction}"
+        if relationship_types:
+            params += f"&relationship_types={relationship_types}"
+        return self._http._request(
+            method="GET",
+            endpoint=f"/graph/traverse{params}",
+        )
+
+    def hybrid(
+        self,
+        query: str,
+        *,
+        user_id: Optional[str] = None,
+        limit: int = 20,
+        max_hops: int = 2,
+        vector_weight: float = 0.40,
+        graph_weight: float = 0.25,
+        include_cold: bool = False,
+    ) -> Dict[str, Any]:
+        """Execute multi-signal hybrid retrieval combining vector, graph, recency, and importance."""
+        params = (
+            f"?query={query}&limit={limit}&max_hops={max_hops}"
+            f"&vector_weight={vector_weight}&graph_weight={graph_weight}"
+            f"&include_cold={str(include_cold).lower()}"
+        )
+        if user_id:
+            params += f"&user_id={user_id}"
+        headers = {"X-contexta-User-Id": user_id} if user_id else None
+        return self._http._request(
+            method="GET",
+            endpoint=f"/memories/hybrid{params}",
+            headers=headers,
+        )
+
     def context(
         self,
         *,

@@ -84,7 +84,7 @@ export class HttpClient {
     method: string,
     path: string,
     body?: Record<string, unknown> | Record<string, unknown>[],
-    options?: { idempotent?: boolean }
+    options?: { idempotent?: boolean; headers?: Record<string, string> }
   ): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     const isWrite = ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase());
@@ -92,6 +92,7 @@ export class HttpClient {
       "Content-Type": "application/json",
       Authorization: `Bearer ${this.apiKey}`,
       "User-Agent": `contexta-sdk-ts/${SDK_VERSION}`,
+      ...(options?.headers ?? {}),
     };
 
     if (isWrite && !options?.idempotent) {

@@ -1,17 +1,17 @@
-FROM node:22-alpine AS base
+FROM oven/bun:1-alpine AS base
 WORKDIR /app
 
-COPY web/package.json web/package-lock.json* ./
-RUN npm ci
+COPY web/package.json web/bun.lock* web/package-lock.json* ./
+RUN if [ -f bun.lock ]; then bun install --frozen-lockfile; else bun install; fi
 
 FROM base AS dev
 COPY web/ ./
 
 FROM base AS builder
 COPY web/ ./
-RUN npm run build
+RUN bun run build
 
-FROM node:22-alpine AS runner
+FROM oven/bun:1-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
@@ -20,4 +20,4 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["bun", "server.js"]

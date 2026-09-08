@@ -1,0 +1,15 @@
+{
+    "transformer_task": "text-generation",
+    "modality_config": {
+        "text": {
+            "method": "forward",
+            "method_output_name": "logits"
+        },
+        "message": {
+            "method": "forward",
+            "method_output_name": "logits",
+            "format": "flat"
+        }
+    },
+    "module_output_name": "causal_logits"
+}

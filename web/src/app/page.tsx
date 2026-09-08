@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Benchmarks } from "@/components/benchmarks";
 import { motion, AnimatePresence } from "framer-motion";
 
 const springStiff = {
@@ -384,6 +385,9 @@ export default function HomePage() {
             </Card>
           </motion.div>
         </motion.section>
+
+        {/* Empirical Benchmarks Section */}
+        <Benchmarks />
 
         {/* Integration Quickstart Console */}
         <motion.section

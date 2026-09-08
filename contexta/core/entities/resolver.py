@@ -10,7 +10,7 @@ from difflib import SequenceMatcher
 from typing import Any, Protocol
 
 from contexta.core.schemas import ExtractedMemory, ObservationPayload
-from contexta.core.types import EntityType, MemoryType, RelationType
+from contexta.core.types import EXCLUDED_ENTITY_WORDS, EntityType, MemoryType, RelationType
 from contexta.models.entity import Entity, EntityEdge, MemoryEntityLink
 
 
@@ -98,10 +98,11 @@ class EntityResolver:
         """Resolve all entity mentions on a memory and link them to the memory."""
         timestamp = observed_at or datetime.now(UTC)
         resolved: list[ResolvedEntity] = []
+        seen_entity_ids: set[uuid.UUID] = set()
 
         for reference in memory.entities:
             name = reference.strip()
-            if not name:
+            if not name or len(name) < 3 or name.lower() in EXCLUDED_ENTITY_WORDS:
                 continue
 
             entity_type = self._infer_entity_type(name, memory.memory_type)
@@ -111,14 +112,30 @@ class EntityResolver:
                 entity_type=entity_type,
                 observed_at=timestamp,
             )
-            await self._links.create(
-                MemoryEntityLink(
-                    memory_id=memory_id,
-                    entity_id=result.entity.id,
-                    organization_id=payload.organization_id,
+            if result.entity.id not in seen_entity_ids:
+                seen_entity_ids.add(result.entity.id)
+                await self._links.create(
+                    MemoryEntityLink(
+                        memory_id=memory_id,
+                        entity_id=result.entity.id,
+                        organization_id=payload.organization_id,
+                    )
                 )
-            )
             resolved.append(result)
+
+        if len(seen_entity_ids) > 1 and self._edges is not None:
+            entity_id_list = list(seen_entity_ids)
+            for i in range(len(entity_id_list)):
+                for j in range(i + 1, len(entity_id_list)):
+                    try:
+                        await self.create_edge(
+                            source_entity_id=entity_id_list[i],
+                            target_entity_id=entity_id_list[j],
+                            organization_id=payload.organization_id,
+                            relationship_type=RelationType.RELATED_TO,
+                        )
+                    except Exception:
+                        pass
 
         return resolved
 

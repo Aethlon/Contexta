@@ -8,13 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, ArrowRight, Brain, CheckCircle2, Sparkles } from "lucide-react";
+import { AlertCircle, ArrowRight, Brain, CheckCircle2, Eye, EyeOff, Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function SignUpPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -96,13 +98,64 @@ export default function SignUpPage() {
                   <Input id="email" name="email" placeholder="you@company.com" type="email" required />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input id="password" name="password" placeholder="At least 8 characters" type="password" required />
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="flex items-center gap-1 text-[11px] text-[var(--color-smoke)] hover:text-[var(--color-ghost)] transition-colors focus:outline-none"
+                    >
+                      {showPassword ? (
+                        <>
+                          <EyeOff className="h-3.5 w-3.5" />
+                          <span>Hide</span>
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="h-3.5 w-3.5" />
+                          <span>Show</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <Input
+                    id="password"
+                    name="password"
+                    placeholder="At least 8 characters"
+                    type={showPassword ? "text" : "password"}
+                    required
+                  />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="confirmPassword">Confirm password</Label>
-                  <Input id="confirmPassword" name="confirmPassword" placeholder="Repeat password" type="password" required />
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="confirmPassword">Confirm password</Label>
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="flex items-center gap-1 text-[11px] text-[var(--color-smoke)] hover:text-[var(--color-ghost)] transition-colors focus:outline-none"
+                    >
+                      {showConfirmPassword ? (
+                        <>
+                          <EyeOff className="h-3.5 w-3.5" />
+                          <span>Hide</span>
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="h-3.5 w-3.5" />
+                          <span>Show</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <Input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    placeholder="Repeat password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    required
+                  />
                 </div>
+
                 <Button className="w-full mt-2 animate-none" disabled={pending} type="submit">
                   {pending ? (
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-1" />

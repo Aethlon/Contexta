@@ -1,18 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Providers } from "./providers";
-
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "700"],
-  variable: "--font-dm-sans",
-});
-
-const geistMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-geist-mono",
-});
 
 export const metadata: Metadata = {
   title: "Contexta | The Memory Intelligence Layer for AI Agents",
@@ -81,45 +68,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className="light">
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var saved = localStorage.getItem('theme');
-                  var darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
-                  if (saved === 'dark' || (!saved && darkQuery.matches)) {
-                    document.documentElement.classList.add('dark');
-                  } else {
-                    document.documentElement.classList.remove('dark');
-                  }
-                } catch (e) {}
-              })();
-            `
-          }}
-        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className="font-sans font-light antialiased text-[var(--color-ghost)] bg-[var(--color-abyss)] transition-colors duration-200">
-        {/* Subtle noise overlay */}
-        <div
-          className="fixed inset-0 opacity-[0.015] dark:opacity-[0.02] pointer-events-none z-0"
-          style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/stardust.png")' }}
-        />
-        {/* Ambient Glow Orbs */}
-        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-          <div className="absolute top-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-[var(--color-purple)]/5 dark:bg-[var(--color-purple)]/[0.06] blur-[120px]" />
-          <div className="absolute bottom-[-10%] left-[-10%] w-[60vw] h-[60vw] rounded-full bg-blue-500/[0.03] dark:bg-blue-500/[0.04] blur-[140px]" />
-          <div className="absolute top-[40%] left-[50%] -translate-x-1/2 w-[40vw] h-[40vw] rounded-full bg-[var(--color-purple)]/[0.02] dark:bg-[var(--color-purple)]/[0.03] blur-[120px]" />
-        </div>
-        <div className="relative z-10 min-h-screen flex flex-col">
-          <Providers>{children}</Providers>
-        </div>
+      <body className="bg-background font-sans font-light text-foreground antialiased">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-lg focus:bg-card focus:px-4 focus:py-2 focus:font-normal focus:text-foreground focus:shadow-[var(--shadow-card)] focus:ring-3 focus:ring-ring/50"
+        >
+          Skip to content
+        </a>
+        {children}
       </body>
     </html>
   );

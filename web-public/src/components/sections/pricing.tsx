@@ -1,238 +1,252 @@
 "use client";
 
-import React, { useState } from "react";
-import { pricingPlans, pricingComparison } from "@/lib/content";
-import { Check, Github } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { motion } from "motion/react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowUpRight01Icon, CheckmarkCircle01Icon } from "@hugeicons/core-free-icons";
+import {
+  Badge,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  buttonVariants,
+} from "@aethlon/components";
+import { fadeUp, staggerContainer } from "@/lib/motion";
+import { cn } from "@/lib/utils";
+import { pricingComparison, pricingPlans } from "@/lib/content";
 
-function annualPrice(price: string): string | null {
-  if (price.startsWith("$")) {
-    const n = parseFloat(price.slice(1));
-    if (!Number.isNaN(n) && n > 0) {
-      return `$${n * 10}`;
-    }
-  }
-  return null;
-}
+type Billing = "monthly" | "annual";
 
-function openHref(href: string) {
-  if (href.startsWith("mailto:")) {
-    window.location.href = href;
-  } else {
-    window.open(href, "_blank", "noopener,noreferrer");
-  }
-}
+const ANNUAL_PRICES: Record<string, string> = {
+  Free: "$0",
+  Hobby: "$190",
+  "Solo Pro": "$690",
+  Enterprise: "Custom",
+};
 
 export function Pricing() {
-  const [annual, setAnnual] = useState(false);
-
-  const displayPrice = (price: string, period: string) => {
-    if (annual) {
-      const annualValue = annualPrice(price);
-      if (annualValue) {
-        return { price: annualValue, period: "yr" };
-      }
-    }
-    return { price, period };
-  };
+  const [billing, setBilling] = useState<Billing>("monthly");
 
   return (
-    <section className="py-24 border-t border-[var(--color-border)] bg-[var(--color-ash)]/10 relative" id="pricing">
-      {/* Decorative Gold Radial Light */}
-      <div className="absolute top-[40%] right-[10%] w-[300px] h-[300px] rounded-full bg-[var(--color-purple)]/3 blur-[90px] pointer-events-none z-0" />
-
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="text-center max-w-3xl mx-auto mb-16 flex flex-col items-center">
-          <h2 className="text-3xl font-bold tracking-tight text-[var(--color-foreground)] sm:text-4xl">
-            Simple Pricing, Zero Token Markups
-          </h2>
-          <p className="mt-4 text-base text-[var(--color-smoke)] leading-relaxed font-light">
-            Start free. Bring your own LLM key — we never resell tokens. Upgrade when your agents outgrow the free tier.
-          </p>
-
-          {/* Monthly / Annual Toggle */}
-          <div className="mt-8 inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-charcoal)] p-1">
-            <button
-              onClick={() => setAnnual(false)}
-              className={`rounded-full px-5 py-1.5 text-sm font-medium transition-all ${
-                !annual
-                  ? "bg-[var(--color-purple)] text-[var(--color-abyss)] shadow-md shadow-[var(--color-purple)]/10"
-                  : "text-[var(--color-smoke)] hover:text-[var(--color-foreground)]"
-              }`}
+    <section id="pricing" className="scroll-mt-24 border-t border-border/30">
+      <div className="mx-auto max-w-6xl px-4 py-24 sm:px-6">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-80px" }}
+          className="flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-end"
+        >
+          <div>
+            <motion.p variants={fadeUp} className="text-micro">
+              Pricing
+            </motion.p>
+            <motion.h2
+              variants={fadeUp}
+              className="mt-4 max-w-2xl text-4xl font-semibold tracking-tight text-foreground"
             >
-              Monthly
-            </button>
-            <button
-              onClick={() => setAnnual(true)}
-              className={`rounded-full px-5 py-1.5 text-sm font-medium transition-all ${
-                annual
-                  ? "bg-[var(--color-purple)] text-[var(--color-abyss)] shadow-md shadow-[var(--color-purple)]/10"
-                  : "text-[var(--color-smoke)] hover:text-[var(--color-foreground)]"
-              }`}
-            >
-              Annual
-              <span className="ml-1.5 text-[10px] uppercase tracking-wide text-emerald-400 font-semibold">2 months free</span>
-            </button>
+              Start free. Scale when you&apos;re{" "}
+              <span className="font-emphasis text-aurora">ready</span>.
+            </motion.h2>
           </div>
-        </div>
-
-        {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 items-stretch">
-          {pricingPlans.map((plan, idx) => {
-            const isPopular = plan.popular;
-            const { price, period } = displayPrice(plan.price, plan.period);
-
-            return (
-              <div
-                key={idx}
-                className={`relative flex flex-col justify-between rounded-2xl border bg-[var(--color-ash)] p-8 transition-all duration-300 ${
-                  isPopular
-                    ? "border-[var(--color-purple)]/60 shadow-[0_12px_40px_rgba(168,85,247,0.05)] ring-1 ring-[var(--color-purple)]/30"
-                    : "border-[var(--color-border)]"
-                }`}
-              >
-                {/* Popular Tag */}
-                {plan.badge && (
-                  <span className="absolute -top-3.5 right-6 rounded-full bg-[var(--color-purple)] px-3 py-1 text-[10px] font-semibold text-[var(--color-abyss)] uppercase tracking-wider">
-                    {plan.badge}
-                  </span>
+          <motion.div
+            variants={fadeUp}
+            role="group"
+            aria-label="Billing period"
+            className="flex items-center gap-1 rounded-lg bg-muted p-1"
+          >
+            {(["monthly", "annual"] as const).map((period) => (
+              <button
+                key={period}
+                type="button"
+                aria-pressed={billing === period}
+                onClick={() => setBilling(period)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 font-light text-sm transition-[background-color,color,box-shadow] duration-200 ease-[var(--ease-snappy)] outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                  billing === period
+                    ? "bg-card text-foreground shadow-[var(--shadow-surface)]"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
+              >
+                {period === "monthly" ? "Monthly" : "Annual"}
+              </button>
+            ))}
+          </motion.div>
+        </motion.div>
 
-                <div>
-                  <h3 className="text-xl font-semibold text-[var(--color-foreground)] mb-2">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-80px" }}
+          className="mt-14 grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+        >
+          {pricingPlans.map((plan) => {
+            const isAnnual = billing === "annual";
+            const price = isAnnual
+              ? ANNUAL_PRICES[plan.name]
+              : plan.price;
+            return (
+              <motion.div
+                key={plan.name}
+                variants={fadeUp}
+                className={cn(
+                  "flex flex-col rounded-2xl bg-card p-6 shadow-[var(--shadow-card)]",
+                  plan.popular && "border border-border/30",
+                )}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-foreground">
                     {plan.name}
                   </h3>
-                  <p className="text-sm text-[var(--color-smoke)] mb-6 font-light leading-relaxed">
-                    {plan.description}
-                  </p>
-
-                  {/* Price */}
-                  <div className="flex items-baseline mb-2">
-                    <span className="text-4xl font-bold tracking-tight text-[var(--color-foreground)]">
-                      {price}
-                    </span>
-                    <span className="ml-2 text-sm text-[var(--color-smoke)]">
-                      / {period}
-                    </span>
-                  </div>
-                  {annual && annualPrice(plan.price) && (
-                    <p className="text-xs text-emerald-500 mb-6 font-medium">
-                      Billed annually — 10 months for the price of 10
-                    </p>
-                  )}
-
-                  {/* Divider */}
-                  <div className="h-px bg-[var(--color-border)] my-6" />
-
-                  {/* Features List */}
-                  <ul className="space-y-3">
-                    {plan.features.map((feat, fIdx) => (
-                      <li key={fIdx} className="flex gap-3 text-sm text-[var(--color-foreground)] font-light leading-relaxed">
-                        <Check className="h-4.5 w-4.5 text-[var(--color-purple)] flex-shrink-0 mt-0.5" />
-                        <span>{feat}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  {plan.popular ? (
+                    <Badge className="bg-brand/10 font-dotmatrix text-brand">
+                      Most popular
+                    </Badge>
+                  ) : null}
                 </div>
-
-                {/* Button */}
-                <Button
-                  variant={isPopular ? "gold" : "outline"}
-                  className="w-full mt-6"
-                  onClick={() => openHref(plan.ctaHref)}
+                <div className="mt-5 flex items-baseline gap-1.5">
+                  <span className="font-dotmatrix text-3xl text-foreground">
+                    {price}
+                  </span>
+                  <span className="font-dotmatrix text-xs text-muted-foreground">
+                    {plan.name === "Enterprise"
+                      ? "custom"
+                      : isAnnual
+                        ? "/yr"
+                        : plan.period === "month"
+                          ? "/mo"
+                          : plan.period}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm font-light text-muted-foreground">
+                  {plan.description}
+                </p>
+                <ul className="mt-6 grid gap-2.5">
+                  {plan.features.map((feature) => (
+                    <li
+                      key={feature}
+                      className="flex items-start gap-2.5 text-sm font-light text-foreground"
+                    >
+                      <HugeiconsIcon
+                        icon={CheckmarkCircle01Icon}
+                        size={15}
+                        strokeWidth={1.2}
+                        color="currentColor"
+                        className={cn(
+                          "mt-0.5 shrink-0",
+                          plan.popular ? "text-brand" : "text-muted-foreground",
+                        )}
+                      />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <a
+                  href={plan.ctaHref}
+                  target={plan.ctaHref.startsWith("http") ? "_blank" : undefined}
+                  rel={
+                    plan.ctaHref.startsWith("http")
+                      ? "noopener noreferrer"
+                      : undefined
+                  }
+                  className={cn(
+                    buttonVariants({
+                      variant: plan.popular ? "default" : "secondary",
+                      className: "mt-8 w-full",
+                    }),
+                    plan.name === "Enterprise" &&
+                      "font-light text-muted-foreground hover:text-foreground",
+                  )}
                 >
                   {plan.ctaText}
-                </Button>
-              </div>
+                </a>
+              </motion.div>
             );
           })}
-        </div>
+        </motion.div>
 
-        {/* Comparison Table */}
-        <div className="mt-20">
-          <h3 className="text-2xl font-bold tracking-tight text-[var(--color-foreground)] text-center mb-2">
-            Compare Every Tier
-          </h3>
-          <p className="text-sm text-[var(--color-smoke)] text-center font-light mb-10">
-            All plans include BYOK, redaction at ingestion, and explainable retrieval.
-          </p>
-
-          <div className="overflow-x-auto rounded-2xl border border-[var(--color-border)] bg-[var(--color-ash)]/40">
-            <table className="w-full min-w-[900px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--color-border)] bg-[var(--color-charcoal)]/60">
-                  <th className="px-6 py-4 text-xs uppercase tracking-wider text-[var(--color-smoke)] font-semibold">Plan</th>
-                  <th className="px-6 py-4 text-xs uppercase tracking-wider text-[var(--color-smoke)] font-semibold">Price</th>
-                  <th className="px-6 py-4 text-xs uppercase tracking-wider text-[var(--color-smoke)] font-semibold">Memories</th>
-                  <th className="px-6 py-4 text-xs uppercase tracking-wider text-[var(--color-smoke)] font-semibold">Observations / mo</th>
-                  <th className="px-6 py-4 text-xs uppercase tracking-wider text-[var(--color-smoke)] font-semibold">Retrievals / mo</th>
-                  <th className="px-6 py-4 text-xs uppercase tracking-wider text-[var(--color-smoke)] font-semibold">Projects</th>
-                  <th className="px-6 py-4 text-xs uppercase tracking-wider text-[var(--color-smoke)] font-semibold">Schemas</th>
-                  <th className="px-6 py-4 text-xs uppercase tracking-wider text-[var(--color-smoke)] font-semibold">Support & Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pricingComparison.map((row, idx) => {
-                  const { price, period } = displayPrice(row.price, "month");
-
-                  return (
-                    <tr
-                      key={idx}
-                      className={`border-b border-[var(--color-border)] last:border-b-0 transition-colors ${
-                        row.popular ? "bg-[var(--color-purple)]/[0.04]" : "hover:bg-[var(--color-charcoal)]/40"
-                      }`}
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-80px" }}
+          className="mt-16"
+        >
+          <p className="text-micro">Compare plans</p>
+          <div className="mt-6 overflow-x-auto rounded-2xl bg-card shadow-[var(--shadow-card)]">
+            <Table className="min-w-[720px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Plan</TableHead>
+                  <TableHead>Price</TableHead>
+                  <TableHead>Memories</TableHead>
+                  <TableHead>Observations / mo</TableHead>
+                  <TableHead>Retrievals / mo</TableHead>
+                  <TableHead>Projects</TableHead>
+                  <TableHead>Schemas</TableHead>
+                  <TableHead>Support</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pricingComparison.map((row) => (
+                  <TableRow key={row.name}>
+                    <TableCell
+                      className={cn(
+                        "font-normal text-foreground",
+                        row.popular && "text-brand",
+                      )}
                     >
-                      <td className="px-6 py-4">
-                        <span className={`font-semibold flex items-center gap-2 ${row.popular ? "text-[var(--color-purple)]" : "text-[var(--color-foreground)]"}`}>
-                          {row.name}
-                          {row.popular && (
-                            <span className="rounded-full bg-[var(--color-purple)]/10 px-2 py-0.5 text-[9px] font-semibold text-[var(--color-purple)] uppercase tracking-wider border border-[var(--color-purple)]/10">
-                              Most Popular
-                            </span>
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-[var(--color-foreground)] whitespace-nowrap">
-                        {price}
-                        {annual && period === "yr" && (
-                          <span className="block text-[10px] text-[var(--color-smoke)]">/ yr</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-[var(--color-smoke)]">{row.memories}</td>
-                      <td className="px-6 py-4 text-[var(--color-smoke)]">{row.observations}</td>
-                      <td className="px-6 py-4 text-[var(--color-smoke)]">{row.retrievals}</td>
-                      <td className="px-6 py-4 text-[var(--color-smoke)]">{row.projects}</td>
-                      <td className="px-6 py-4 text-[var(--color-smoke)]">{row.schemas}</td>
-                      <td className="px-6 py-4 text-[var(--color-smoke)] font-light leading-relaxed">{row.support}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      {row.name}
+                    </TableCell>
+                    <TableCell className="font-dotmatrix text-foreground">
+                      {row.price}
+                    </TableCell>
+                    <TableCell className="font-dotmatrix">{row.memories}</TableCell>
+                    <TableCell className="font-dotmatrix">{row.observations}</TableCell>
+                    <TableCell className="font-dotmatrix">{row.retrievals}</TableCell>
+                    <TableCell className="font-dotmatrix">{row.projects}</TableCell>
+                    <TableCell className="font-light">{row.schemas}</TableCell>
+                    <TableCell className="font-light">{row.support}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
-        </div>
+          <p className="mt-4 font-dotmatrix text-xs text-muted-foreground">
+            ANNUAL BILLING = 10 MONTHS · HOBBY $190/YR · SOLO PRO $690/YR · TEAM
+            $4,990/YR · ENTERPRISE CUSTOM
+          </p>
+        </motion.div>
 
-        {/* Community Edition Funnel */}
-        <div className="mt-12 rounded-2xl border border-[var(--color-border)] bg-[var(--color-ash)]/40 p-8 max-w-3xl mx-auto text-center">
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-            <div className="flex-1 text-left">
-              <h4 className="text-lg font-semibold text-[var(--color-foreground)] mb-1">
-                Community Edition — $0
-              </h4>
-              <p className="text-sm text-[var(--color-smoke)] font-light leading-relaxed">
-                Apache 2.0, self-hosted, unlimited tenants. The same memory engine, running in your own VPC.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              className="gap-2 flex-shrink-0"
-              onClick={() => window.open("https://github.com/Aethlon/Contexta", "_blank", "noopener,noreferrer")}
-            >
-              <Github className="h-4 w-4" />
-              Get it on GitHub
-            </Button>
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-80px" }}
+          className="mt-14 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-card p-6 shadow-[var(--shadow-card)]"
+        >
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              Community Edition
+            </p>
+            <p className="mt-1 font-dotmatrix text-xs text-muted-foreground">
+              $0 · APACHE 2.0 · SELF-HOST THE SAME ENGINE IN YOUR VPC
+            </p>
           </div>
-        </div>
+          <a
+            href="https://github.com/Aethlon/Contexta"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonVariants({ variant: "ghost" })}
+          >
+            GitHub
+            <HugeiconsIcon icon={ArrowUpRight01Icon} size={16} strokeWidth={1.2} />
+          </a>
+        </motion.div>
       </div>
     </section>
   );

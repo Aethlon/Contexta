@@ -1,107 +1,120 @@
-"use client";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowUpRight01Icon, DiscordIcon, GithubIcon } from "@hugeicons/core-free-icons";
+import { buttonVariants } from "@aethlon/components";
 
-import React, { useState } from "react";
-import { Github, Mail, Shield, Check, Copy } from "lucide-react";
-import { Button } from "@/components/ui/button";
+const columns = [
+  {
+    heading: "Product",
+    links: [
+      { label: "Features", href: "#features" },
+      { label: "Pricing", href: "#pricing" },
+      { label: "Dashboard", href: "https://app.contexta.dev" },
+      { label: "Docs", href: "https://docs.contexta.dev" },
+    ],
+  },
+  {
+    heading: "Community",
+    links: [
+      { label: "GitHub", href: "https://github.com/Aethlon/Contexta" },
+      { label: "Discord", href: "https://discord.gg/contexta" },
+      { label: "Changelog", href: "https://github.com/Aethlon/Contexta/releases" },
+    ],
+  },
+  {
+    heading: "Legal",
+    links: [
+      { label: "License", href: "https://opensource.org/licenses/Apache-2.0" },
+      { label: "Contact", href: "mailto:licensing@contexta.dev" },
+    ],
+  },
+];
 
 export function Footer() {
-  const [copied, setCopied] = useState(false);
-  const command = "git clone https://github.com/Aethlon/Contexta.git && cd Contexta && docker compose up --build";
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(command);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy command: ", err);
-    }
-  };
-
   return (
-    <footer className="border-t border-[var(--color-border)] bg-[var(--color-abyss)]" id="quickstart">
-      {/* Final CTA Banner */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20">
-        <div className="relative overflow-hidden rounded-3xl border border-[var(--color-purple)]/20 bg-gradient-to-br from-[var(--color-ash)] via-[var(--color-charcoal)] to-[var(--color-abyss)] px-8 py-16 text-center shadow-2xl">
-          {/* Subtle Glows */}
-          <div className="absolute -top-24 -left-24 h-48 w-48 rounded-full bg-[var(--color-purple)]/10 blur-[80px]" />
-          <div className="absolute -bottom-24 -right-24 h-48 w-48 rounded-full bg-[var(--color-purple)]/10 blur-[80px]" />
-
-          <div className="relative z-10 max-w-2xl mx-auto">
-            <h2 className="text-3xl font-bold tracking-tight text-[var(--color-foreground)] sm:text-4xl mb-4">
-              Prefer to self-host?
-            </h2>
-            <p className="text-base text-[var(--color-smoke)] mb-8 font-light leading-relaxed">
-              The Community Edition is free under Apache 2.0. Boot the complete Contexta stack — Go Gateway, FastAPI, Redis, Postgres + pgvector, Celery Workers, and the management explorer — with a single command.
+    <footer className="border-t border-border/30">
+      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <div className="grid gap-10 md:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))]">
+          <div>
+            <a
+              href="#top"
+              className="font-semibold tracking-tight text-foreground rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              Contexta
+            </a>
+            <p className="mt-3 max-w-xs text-sm font-light text-muted-foreground">
+              The memory intelligence layer for AI agents. Observe to remember,
+              context to recall.
             </p>
-
-            {/* Quickstart Command Box */}
-            <div className="flex flex-col sm:flex-row items-stretch justify-center gap-2 max-w-lg mx-auto bg-[var(--color-abyss)]/60 rounded-xl p-2 border border-[var(--color-border)] mb-4">
-              <div className="flex-1 font-mono text-xs text-zinc-300 flex items-center justify-start px-3 py-3 overflow-x-auto whitespace-nowrap">
-                <span className="text-[var(--color-purple)] mr-2 select-none">$</span>
-                <span className="select-all">{command}</span>
-              </div>
-              <Button
-                variant="gold"
-                size="md"
-                onClick={handleCopy}
-                className="gap-2 flex-shrink-0"
+            <div className="mt-5 flex items-center gap-2">
+              <a
+                href="https://github.com/Aethlon/Contexta"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Contexta on GitHub"
+                className={buttonVariants({
+                  variant: "ghost",
+                  size: "icon-sm",
+                })}
               >
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4" />
-                    <span>Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4" />
-                    <span>Copy</span>
-                  </>
-                )}
-              </Button>
+                <HugeiconsIcon icon={GithubIcon} size={16} strokeWidth={1.2} />
+              </a>
+              <a
+                href="https://discord.gg/contexta"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Contexta on Discord"
+                className={buttonVariants({
+                  variant: "ghost",
+                  size: "icon-sm",
+                })}
+              >
+                <HugeiconsIcon icon={DiscordIcon} size={16} strokeWidth={1.2} />
+              </a>
+              <a
+                href="https://app.contexta.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Contexta dashboard"
+                className={buttonVariants({
+                  variant: "ghost",
+                  size: "icon-sm",
+                })}
+              >
+                <HugeiconsIcon
+                  icon={ArrowUpRight01Icon}
+                  size={16}
+                  strokeWidth={1.2}
+                />
+              </a>
             </div>
-            
-            <p className="text-xs text-[var(--color-smoke)] font-mono">
-              Requires Docker & Docker Compose v2.0+
-            </p>
           </div>
+
+          {columns.map((column) => (
+            <nav key={column.heading} aria-label={column.heading}>
+              <p className="text-micro">{column.heading}</p>
+              <ul className="mt-4 grid gap-2.5">
+                {column.links.map((link) => (
+                  <li key={link.label}>
+                    <a
+                      href={link.href}
+                      className="rounded-lg font-light text-sm text-muted-foreground transition-colors duration-200 ease-[var(--ease-snappy)] hover:text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                    >
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ))}
         </div>
 
-        {/* Footer Links & Credits */}
-        <div className="mt-20 pt-8 border-t border-[var(--color-border)] flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-base font-bold text-[var(--color-foreground)] tracking-tight">
-              Contexta
-            </span>
-          </div>
-
-          <div className="flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm text-[var(--color-smoke)]">
-            <a href="https://app.contexta.dev" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-[var(--color-foreground)] transition-colors">
-              <span>Dashboard</span>
-            </a>
-            <a href="https://contexta.dev/docs" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-[var(--color-foreground)] transition-colors">
-              <span>Docs</span>
-            </a>
-            <a href="#pricing" className="flex items-center gap-1.5 hover:text-[var(--color-foreground)] transition-colors">
-              <span>Pricing</span>
-            </a>
-            <a href="https://github.com/Aethlon/Contexta" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-[var(--color-foreground)] transition-colors">
-              <Github className="h-4 w-4" />
-              <span>GitHub</span>
-            </a>
-            <a href="mailto:licensing@contexta.dev" className="flex items-center gap-1.5 hover:text-[var(--color-foreground)] transition-colors">
-              <Mail className="h-4 w-4" />
-              <span>licensing@contexta.dev</span>
-            </a>
-            <a href="https://github.com/Aethlon/Contexta/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-[var(--color-foreground)] transition-colors">
-              <Shield className="h-4 w-4" />
-              <span>License (Apache 2.0)</span>
-            </a>
-          </div>
-
-          <div className="text-xs text-[var(--color-smoke)] text-center md:text-right font-light">
-            &copy; 2026 Contexta. All rights reserved.
-          </div>
+        <div className="mt-14 flex flex-wrap items-center justify-between gap-3 border-t border-border/30 pt-8">
+          <p className="font-dotmatrix text-xs text-muted-foreground">
+            © 2026 CONTEXTA
+          </p>
+          <p className="font-dotmatrix text-xs text-muted-foreground">
+            BUILT ON @AETHLON/COMPONENTS
+          </p>
         </div>
       </div>
     </footer>

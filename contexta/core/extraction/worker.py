@@ -26,7 +26,10 @@ class ExtractionWorker:
         "You extract durable memories for an AI agent. Return strict JSON with "
         "a top-level 'memories' array. Each item must include memory_type, "
         "source_type, title, content, and may include structured_data, tags, "
-        "entities, has_emphasis, impacts_decisions."
+        "entities, has_emphasis, impacts_decisions. The 'entities' field, if "
+        "present, MUST be a flat JSON array of plain strings (entity names "
+        "only, e.g. [\"Caroline\", \"LGBTQ support group\"]) -- never objects "
+        "and never nested structures."
     )
 
     def __init__(self, llm_service: LLMService | None = None) -> None:
@@ -125,6 +128,7 @@ class ExtractionWorker:
         normalized.setdefault("entities", [])
         normalized.setdefault("has_emphasis", False)
         normalized.setdefault("impacts_decisions", False)
+        normalized["entities"] = self._normalize_entities(normalized.get("entities"))
 
         title = str(normalized.get("title") or "").strip()
         content = str(normalized.get("content") or "").strip()
@@ -133,4 +137,30 @@ class ExtractionWorker:
 
         normalized["title"] = title
         normalized["content"] = content
+        return normalized
+
+    def _normalize_entities(self, entities: Any) -> list[str]:
+        """Coerce LLM entity output into a flat list of plain strings.
+
+        LLMs sometimes return entity mentions as objects (e.g.
+        ``{"name": "Caroline", "type": "person"}``) despite prompt
+        instructions to return flat strings. Rather than let that fail
+        schema validation and silently drop the entire memory, extract a
+        usable name from common shapes and fall back to a string cast.
+        """
+        if not isinstance(entities, list):
+            return []
+
+        normalized: list[str] = []
+        for entity in entities:
+            if isinstance(entity, str):
+                name = entity.strip()
+            elif isinstance(entity, dict):
+                name = str(
+                    entity.get("name") or entity.get("entity") or entity.get("value") or ""
+                ).strip()
+            else:
+                name = str(entity).strip()
+            if name:
+                normalized.append(name)
         return normalized

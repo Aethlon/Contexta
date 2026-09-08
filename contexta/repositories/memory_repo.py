@@ -90,6 +90,7 @@ class MemoryRepository(TenantScopedRepository["MemoryRecord"]):
             is_archived=False,
             valid_from=valid_from or datetime.utcnow(),
             valid_to=None,
+            embedding=getattr(memory, "embedding", None),
         )
         persisted = await self.create(record)
 

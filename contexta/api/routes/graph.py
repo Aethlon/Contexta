@@ -36,6 +36,120 @@ class GraphResponse(BaseModel):
     edges: list[GraphEdge]
 
 
+@router.get("/traverse")
+@router.get("/graph/traverse")
+async def traverse_graph(
+    source: str,
+    request: Request,
+    hops: int = 2,
+    relationship_types: str | None = None,
+    direction: str = "both",
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Multi-hop entity graph traversal starting from a root entity name or UUID."""
+    org_id = uuid.UUID(str(getattr(request.state, "organization_id", "00000000-0000-0000-0000-000000000001")))
+    entity_repo = EntityRepository(session, tenant_id=org_id)
+    edge_repo = EntityEdgeRepository(session, tenant_id=org_id)
+    link_repo = MemoryEntityLinkRepository(session, tenant_id=org_id)
+
+    # 1. Find root entity by ID or name
+    root_entity: Entity | None = None
+    try:
+        source_uuid = uuid.UUID(source)
+        root_entity = await entity_repo.get_by_id(source_uuid)
+    except ValueError:
+        pass
+
+    if not root_entity:
+        stmt = select(Entity).where(Entity.name.ilike(source.strip()))
+        res = await session.execute(stmt)
+        root_entity = res.scalar_one_or_none()
+
+    if not root_entity:
+        return {
+            "mode": "graph",
+            "source": source,
+            "error": "Root entity not found",
+            "hops": hops,
+            "nodes": [],
+            "edges": [],
+            "linked_memories": [],
+        }
+
+    # 2. Multi-hop traversal
+    max_hops = min(3, max(1, hops))
+    visited: set[uuid.UUID] = {root_entity.id}
+    frontier: set[uuid.UUID] = {root_entity.id}
+    all_nodes: dict[uuid.UUID, Entity] = {root_entity.id: root_entity}
+    all_edges: list[dict[str, str]] = []
+    rel_filter = set(r.strip() for r in relationship_types.split(",")) if relationship_types else None
+
+    for _ in range(max_hops):
+        if not frontier:
+            break
+        next_frontier: set[uuid.UUID] = set()
+        for curr_id in frontier:
+            neighbors = await edge_repo.get_neighbors(curr_id)
+            for edge in neighbors:
+                if rel_filter and edge.relationship_type not in rel_filter:
+                    continue
+                all_edges.append({
+                    "source": str(edge.source_entity_id),
+                    "target": str(edge.target_entity_id),
+                    "relationship_type": edge.relationship_type,
+                })
+                for neighbor_id in (edge.source_entity_id, edge.target_entity_id):
+                    if neighbor_id not in visited:
+                        visited.add(neighbor_id)
+                        next_frontier.add(neighbor_id)
+        frontier = next_frontier
+
+    # Load missing node records
+    missing_ids = [nid for nid in visited if nid not in all_nodes]
+    if missing_ids:
+        stmt = select(Entity).where(Entity.id.in_(missing_ids))
+        res = await session.execute(stmt)
+        for ent in res.scalars().all():
+            all_nodes[ent.id] = ent
+
+    # 3. Find linked memories
+    all_entity_ids = list(all_nodes.keys())
+    linked_memories: list[dict] = []
+    if all_entity_ids:
+        stmt = (
+            select(MemoryRecord)
+            .join(MemoryEntityLink, MemoryRecord.id == MemoryEntityLink.memory_id)
+            .where(MemoryEntityLink.entity_id.in_(all_entity_ids))
+            .distinct()
+        )
+        res = await session.execute(stmt)
+        for mem in res.scalars().all():
+            linked_memories.append({
+                "id": str(mem.id),
+                "title": mem.title,
+                "content": mem.content,
+                "memory_type": mem.memory_type,
+                "created_at": mem.created_at.isoformat() if mem.created_at else None,
+            })
+
+    return {
+        "mode": "graph",
+        "root_entity": {
+            "id": str(root_entity.id),
+            "name": root_entity.name,
+            "entity_type": root_entity.entity_type,
+        },
+        "hops": max_hops,
+        "nodes": [
+            {"id": str(e.id), "name": e.name, "entity_type": e.entity_type, "summary": e.summary}
+            for e in all_nodes.values()
+            if e is not None
+        ],
+        "edges": all_edges,
+        "linked_memories": linked_memories,
+    }
+
+
 @router.get("/graph/{user_id}", response_model=GraphResponse)
 async def get_entity_graph(
     user_id: uuid.UUID,

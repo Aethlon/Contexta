@@ -10,6 +10,7 @@ import logging
 from typing import Any, Protocol
 
 from contexta.config.settings import Settings, get_settings
+from contexta.core.types import EXCLUDED_ENTITY_WORDS
 
 logger = logging.getLogger(__name__)
 
@@ -126,10 +127,87 @@ class LLMService:
         """
         provider = self._settings.llm_provider
 
-        if provider in ("openai", "deepseek"):
-            return await self._call_openai_compatible(prompt, system_prompt)
+        # Enforce offline mode strictly when set
+        if self._settings.engine_mode == "offline" or provider in ("local", "offline", "qwen"):
+            return await self._call_local_model_server(prompt, system_prompt)
+        elif provider in ("openai", "deepseek"):
+            try:
+                return await self._call_openai_compatible(prompt, system_prompt)
+            except Exception as exc:
+                logger.warning("Cloud LLM provider failed (%s); falling back to local model server.", exc)
+                return await self._call_local_model_server(prompt, system_prompt)
         else:
             raise LLMError(f"Unsupported LLM provider: {provider}")
+
+    async def _call_local_model_server(self, prompt: str, system_prompt: str | None) -> str:
+        """Execute local model server inference for structured extraction, classification, and scoring."""
+        import httpx
+
+        url = getattr(self._settings, "local_model_server_url", "http://localhost:8001")
+
+        # Parse observation messages if prompt is an ExtractionWorker payload
+        parsed_messages: list[dict] = []
+        try:
+            payload_data = json.loads(prompt)
+            if isinstance(payload_data, dict) and "messages" in payload_data:
+                parsed_messages = [m for m in payload_data["messages"] if isinstance(m, dict) and m.get("text")]
+        except Exception:
+            pass
+
+        texts_to_classify = [m["text"] for m in parsed_messages] if parsed_messages else [prompt[:500]]
+        predictions: list[dict] = []
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    f"{url}/v1/classify",
+                    json={"texts": texts_to_classify[:50], "labels": ["preference", "fact", "goal", "event", "other"]},
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    predictions = data.get("predictions", [])
+        except Exception as exc:
+            logger.warning("Local model server classify call failed (%s); using heuristic fallback.", exc)
+
+        import re
+        memories_out: list[dict] = []
+        for idx, text in enumerate(texts_to_classify):
+            pred_label = predictions[idx]["label"] if idx < len(predictions) else "fact"
+            speaker = parsed_messages[idx].get("speaker", "Speaker") if idx < len(parsed_messages) else "User"
+
+            clean_text = re.sub(r"\[Date:[^\]]+\]", "", text)
+            # 1. Proper nouns / capitalized entities
+            caps = re.findall(r"\b[A-Z][a-z]{1,}(?:\s+[A-Z][a-z]{1,})*\b", clean_text)
+            entities_set = {
+                c.strip() for c in caps
+                if c.lower() not in EXCLUDED_ENTITY_WORDS and len(c.strip()) > 2
+            }
+            if speaker and len(speaker) > 2 and speaker.lower() not in EXCLUDED_ENTITY_WORDS:
+                entities_set.add(speaker)
+            found_entities = list(entities_set)
+            memories_out.append({
+                "title": f"{speaker}: {text[:50].strip()}",
+                "content": f"{speaker}: {text.strip()}",
+                "memory_type": pred_label,
+                "source_type": "user_explicit",
+                "entities": found_entities,
+            })
+
+        first_label = predictions[0]["label"] if predictions else "fact"
+        first_score = predictions[0]["score"] if predictions else 0.85
+        structured = {
+            "memories": memories_out or [{
+                "title": prompt[:50],
+                "content": prompt[:200],
+                "memory_type": "fact",
+                "source_type": "user_explicit",
+                "entities": [],
+            }],
+            "facts": [{"statement": prompt[:200], "category": first_label, "confidence": first_score}],
+            "entities": [],
+            "memory_type": first_label,
+        }
+        return json.dumps(structured)
 
     async def _call_openai_compatible(self, prompt: str, system_prompt: str | None) -> str:
         """Call any OpenAI-compatible API (OpenAI, DeepSeek, etc.).
@@ -143,7 +221,8 @@ class LLMService:
         base_url = self._settings.llm_base_url
 
         if not api_key:
-            raise LLMError("LLM API key not configured (CONTEXTA_LLM_API_KEY)")
+            logger.info("LLM API key missing (CONTEXTA_LLM_API_KEY). Using local model server fallback.")
+            return await self._call_local_model_server(prompt, system_prompt)
 
         messages: list[dict[str, str]] = []
         if system_prompt:

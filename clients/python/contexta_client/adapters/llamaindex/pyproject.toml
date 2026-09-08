@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "contexta-llamaindex"
+version = "0.1.0"
+description = "contexta memory adapter for LlamaIndex"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+dependencies = [
+    "contexta-client>=0.1.0",
+    "llama-index-core>=0.12",
+]
+
+[project.urls]
+Homepage = "https://github.com/anomalyco/contexta"

@@ -10,7 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from contexta.core.retrieval.engine import RetrievalEngine
 from contexta.core.schemas import RetrievalQuery
 from contexta.db import get_db_session
-from contexta.repositories.entity_repo import EntityEdgeRepository, MemoryEntityLinkRepository
+from contexta.repositories.entity_repo import (
+    EntityEdgeRepository,
+    EntityRepository,
+    MemoryEntityLinkRepository,
+)
 from contexta.repositories.memory_repo import MemoryRepository
 from contexta.services.embedding import EmbeddingService
 
@@ -23,22 +27,18 @@ async def retrieve(
     query: RetrievalQuery,
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
-    """Execute hybrid semantic, keyword, and graph-based memory retrieval.
-
-    Generates the query embedding, executes the scorer engine, and returns
-    relevance-ranked memories.
-    """
+    """Retrieve memories using hybrid semantic, keyword, recency, importance, and graph scoring."""
+    # 1. Embed query text if provider is configured
+    embedding_service = EmbeddingService()
     try:
-        # 1. Generate text embedding for the search text
-        embed_service = EmbeddingService()
-        query_embedding = await embed_service.embed_text(query.query_text)
-    except Exception as exc:  # noqa: BLE001 - fall back to keyword-only retrieval
-        logger.error("Failed to generate query embedding: %s", exc)
-        # Fall back to keyword-only retrieval if embedding service is offline
+        query_embedding = await embedding_service.embed_text(query.query_text)
+    except Exception:  # noqa: BLE001 - graceful fallback to keyword + recency scoring
+        logger.warning("Query embedding generation failed, falling back to non-semantic scoring")
         query_embedding = None
 
     # 2. Instantiate repositories
     memory_repo = MemoryRepository(session, tenant_id=query.organization_id)
+    entity_repo = EntityRepository(session, tenant_id=query.organization_id)
     link_repo = MemoryEntityLinkRepository(session, tenant_id=query.organization_id)
     edge_repo = EntityEdgeRepository(session, tenant_id=query.organization_id)
 
@@ -47,6 +47,7 @@ async def retrieve(
         memory_repository=memory_repo,
         link_repository=link_repo,
         edge_repository=edge_repo,
+        entity_repository=entity_repo,
     )
 
     results = await engine.retrieve(query, query_embedding=query_embedding)

@@ -8,9 +8,6 @@ build/
 *.egg
 .env
 .contexta/
-*.toml
-*.yaml
-*.yml
 *.log
 .pytest_cache/
 .mypy_cache/

@@ -68,6 +68,66 @@ export class Asynccontexta {
     });
   }
 
+  async search(input: {
+    query: string;
+    userId?: string;
+    limit?: number;
+    threshold?: number;
+    memoryType?: string;
+  }): Promise<{ mode: string; query: string; count: number; results: any[] }> {
+    const params = new URLSearchParams({ query: input.query });
+    if (input.userId) params.set("user_id", input.userId);
+    if (input.limit !== undefined) params.set("limit", String(input.limit));
+    if (input.threshold !== undefined) params.set("threshold", String(input.threshold));
+    if (input.memoryType) params.set("memory_type", input.memoryType);
+
+    return this.http.request("GET", `/memories/search?${params.toString()}`, undefined, {
+      idempotent: true,
+      headers: input.userId ? { "X-contexta-User-Id": input.userId } : undefined,
+    });
+  }
+
+  async traverse(input: {
+    source: string;
+    hops?: number;
+    relationshipTypes?: string[];
+    direction?: "both" | "outgoing" | "incoming";
+  }): Promise<{ mode: string; root_entity: any; hops: number; nodes: any[]; edges: any[]; linked_memories: any[] }> {
+    const params = new URLSearchParams({ source: input.source });
+    if (input.hops !== undefined) params.set("hops", String(input.hops));
+    if (input.relationshipTypes && input.relationshipTypes.length > 0) {
+      params.set("relationship_types", input.relationshipTypes.join(","));
+    }
+    if (input.direction) params.set("direction", input.direction);
+
+    return this.http.request("GET", `/graph/traverse?${params.toString()}`, undefined, {
+      idempotent: true,
+    });
+  }
+
+  async hybrid(input: {
+    query: string;
+    userId?: string;
+    limit?: number;
+    maxHops?: number;
+    vectorWeight?: number;
+    graphWeight?: number;
+    includeCold?: boolean;
+  }): Promise<{ mode: string; query: string; count: number; results: any[] }> {
+    const params = new URLSearchParams({ query: input.query });
+    if (input.userId) params.set("user_id", input.userId);
+    if (input.limit !== undefined) params.set("limit", String(input.limit));
+    if (input.maxHops !== undefined) params.set("max_hops", String(input.maxHops));
+    if (input.vectorWeight !== undefined) params.set("vector_weight", String(input.vectorWeight));
+    if (input.graphWeight !== undefined) params.set("graph_weight", String(input.graphWeight));
+    if (input.includeCold !== undefined) params.set("include_cold", String(input.includeCold));
+
+    return this.http.request("GET", `/memories/hybrid?${params.toString()}`, undefined, {
+      idempotent: true,
+      headers: input.userId ? { "X-contexta-User-Id": input.userId } : undefined,
+    });
+  }
+
   async context(input: ContextInput): Promise<ContextResult> {
     const params = new URLSearchParams();
     params.set("user_id", input.userId);

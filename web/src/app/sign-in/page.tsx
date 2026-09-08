@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { signInAction, signInWithGoogleAction, signInWithGitHubAction } from "@/app/actions";
+import { signInWithGoogleAction, signInWithGitHubAction } from "@/app/actions";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { SignInForm } from "@/components/sign-in-form";
 
 export default async function SignInPage({
   searchParams,
@@ -85,19 +86,8 @@ export default async function SignInPage({
                 </div>
               ) : null}
 
-              <form action={signInAction} className="space-y-5">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" name="email" placeholder="you@company.com" type="email" required />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input id="password" name="password" placeholder="At least 8 characters" type="password" required />
-                </div>
-                <Button className="w-full mt-2" type="submit">
-                  Continue <ArrowRight className="h-4 w-4" strokeWidth={1.2} />
-                </Button>
-              </form>
+              <SignInForm />
+
 
               <div className="relative py-2">
                 <div className="absolute inset-0 flex items-center">

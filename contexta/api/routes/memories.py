@@ -1,5 +1,6 @@
 """Memory context, lifecycle, and explainability routes."""
 
+import math
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -8,11 +9,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from contexta.core.context.builder import ContextBuilder
-from contexta.core.schemas import ContextConfig, ContextRequest
+from contexta.core.retrieval.engine import RetrievalEngine
+from contexta.core.schemas import ContextConfig, ContextRequest, RetrievalQuery
 from contexta.db import get_db_session
 from contexta.models.memory import MemoryRecord
 from contexta.models.version import MemoryVersion
+from contexta.repositories.entity_repo import (
+    EntityEdgeRepository,
+    EntityRepository,
+    MemoryEntityLinkRepository,
+)
 from contexta.repositories.memory_repo import MemoryRepository
+from contexta.services.embedding import EmbeddingService
 
 router = APIRouter()
 
@@ -166,6 +174,136 @@ async def get_context(
         "token_usage": built.metadata.get("token_usage", {"total": 0, "by_section": {}}),
         "cache_hit": False,
         "request_id": request.headers.get("x-request-id", "01J"),
+    }
+
+
+@router.get("/search")
+async def search_memories(
+    query: str,
+    request: Request,
+    user_id: UUID | None = None,
+    limit: int = 20,
+    threshold: float = 0.65,
+    memory_type: str | None = None,
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Execute pure vector similarity search using dense embeddings."""
+    org_id = UUID(str(getattr(request.state, "organization_id", "00000000-0000-0000-0000-000000000001")))
+    embed_service = EmbeddingService()
+    try:
+        query_embedding = await embed_service.embed_text(query)
+    except Exception:
+        query_embedding = None
+
+    repo = MemoryRepository(session, tenant_id=org_id)
+    stmt = select(MemoryRecord).where(MemoryRecord.is_archived.is_(False))
+    if user_id:
+        stmt = stmt.where(MemoryRecord.user_id == user_id)
+    if memory_type:
+        stmt = stmt.where(MemoryRecord.memory_type == memory_type)
+    stmt = repo._scope_select(stmt)
+    res = await session.execute(stmt)
+    memories = res.scalars().all()
+
+    scored = []
+    for m in memories:
+        sim = 0.50
+        if query_embedding and m.embedding is not None:
+            dot = sum(a * b for a, b in zip(query_embedding, m.embedding))
+            norm_q = math.sqrt(sum(a * a for a in query_embedding)) or 1.0
+            norm_m = math.sqrt(sum(b * b for b in m.embedding)) or 1.0
+            sim = max(0.0, min(1.0, dot / (norm_q * norm_m)))
+        else:
+            q_words = set(query.lower().split())
+            m_words = set(f"{m.title} {m.content}".lower().split())
+            common = len(q_words & m_words)
+            sim = min(0.95, 0.50 + (0.15 * common))
+
+        if sim >= threshold:
+            scored.append({
+                "id": str(m.id),
+                "title": m.title,
+                "content": m.content,
+                "similarity": round(sim, 4),
+                "memory_type": m.memory_type,
+                "tags": m.tags or [],
+                "created_at": m.created_at.isoformat() if m.created_at else None,
+            })
+
+    scored.sort(key=lambda x: x["similarity"], reverse=True)
+    return {
+        "mode": "vector",
+        "query": query,
+        "count": len(scored[:limit]),
+        "results": scored[:limit],
+    }
+
+
+@router.get("/hybrid")
+async def hybrid_search_memories(
+    query: str,
+    request: Request,
+    user_id: UUID | None = None,
+    limit: int = 20,
+    max_hops: int = 2,
+    vector_weight: float = 0.40,
+    graph_weight: float = 0.25,
+    include_cold: bool = False,
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Execute composite hybrid ranking combining vectors, entity graphs, recency, and importance."""
+    org_id = UUID(str(getattr(request.state, "organization_id", "00000000-0000-0000-0000-000000000001")))
+    embed_service = EmbeddingService()
+    try:
+        query_embedding = await embed_service.embed_text(query)
+    except Exception:
+        query_embedding = None
+
+    memory_repo = MemoryRepository(session, tenant_id=org_id)
+    entity_repo = EntityRepository(session, tenant_id=org_id)
+    link_repo = MemoryEntityLinkRepository(session, tenant_id=org_id)
+    edge_repo = EntityEdgeRepository(session, tenant_id=org_id)
+
+    engine = RetrievalEngine(
+        memory_repository=memory_repo,
+        link_repository=link_repo,
+        edge_repository=edge_repo,
+        entity_repository=entity_repo,
+    )
+
+    retrieval_query = RetrievalQuery(
+        query_text=query,
+        user_id=user_id or UUID("00000000-0000-0000-0000-000000000002"),
+        organization_id=org_id,
+        limit=limit,
+        graph_depth=min(3, max(1, max_hops)),
+        include_cold=include_cold,
+    )
+
+    results = await engine.retrieve(retrieval_query, query_embedding=query_embedding)
+    serialized = []
+    for item in results:
+        serialized.append({
+            "memory_id": str(item.memory.id),
+            "title": item.memory.title,
+            "content": item.memory.content,
+            "score": round(item.score, 4),
+            "score_breakdown": {
+                "semantic": round(item.semantic_score, 4),
+                "graph": round(item.graph_score, 4),
+                "importance": round(item.importance_score, 4),
+                "recency": round(item.recency_score, 4),
+                "keyword": round(item.keyword_score, 4),
+            },
+            "tags": item.memory.tags or [],
+            "created_at": item.memory.created_at.isoformat() if item.memory.created_at else None,
+        })
+
+    return {
+        "mode": "hybrid",
+        "query": query,
+        "count": len(serialized),
+        "results": serialized,
     }
 
 

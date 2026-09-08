@@ -51,7 +51,62 @@ async def lifespan(app: FastAPI):
         db_ok = await check_db()
         if not db_ok:
             raise RuntimeError("Database boot check failed! Could not connect to Postgres database.")
+
+        # Auto-seed default admin account for local development
+        try:
+            from contexta.db import AsyncSessionFactory
+            from contexta.models.account import Account, Organization, OrganizationMember
+            from contexta.repositories.account_repo import AccountRepository, OrganizationRepository
+            from contexta.services.auth import hash_password
+            import structlog
+
+            log = structlog.get_logger("contexta.auth")
+            async with AsyncSessionFactory() as session:
+                account_repo = AccountRepository(session)
+                org_repo = OrganizationRepository(session)
+                admin_account = await account_repo.find_by_email("admin@contexta.ai")
+                if not admin_account:
+                    admin_account = Account(
+                        email="admin@contexta.ai",
+                        password_hash=hash_password("password123"),
+                        display_name="Admin",
+                        status="active",
+                    )
+                    admin_account = await account_repo.create(admin_account)
+                    org = await org_repo.find_by_slug("default-org")
+                    if not org:
+                        org = Organization(
+                            name="Default Organization",
+                            slug="default-org",
+                            plan_code="scale",
+                            status="active",
+                        )
+                        org = await org_repo.create(org)
+                    member = OrganizationMember(
+                        organization_id=org.id,
+                        account_id=admin_account.id,
+                        role="owner",
+                    )
+                    session.add(member)
+                    await session.commit()
+                    log.info("default_admin_ready", email="admin@contexta.ai", password="password123")
+        except Exception as seed_err:
+            import structlog
+            structlog.get_logger("contexta.auth").warning("admin_seed_skipped", error=str(seed_err))
+
+    # Validate Online mode requirements: both LLM and Embedding credentials must be present
+    if settings.validate_online_providers_at_startup and settings.engine_mode == "online":
+        if not settings.llm_api_key or not settings.embedding_api_key:
+            import structlog
+            log = structlog.get_logger("contexta.engine")
+            log.warning(
+                "online_mode_dual_provider_warning",
+                msg="Online mode requires BOTH LLM and Embedding provider API keys. Automatically falling back unconfigured provider to local model server.",
+                has_llm=bool(settings.llm_api_key),
+                has_embedding=bool(settings.embedding_api_key),
+            )
     yield
+
 
 
 def create_app() -> FastAPI:
@@ -103,11 +158,19 @@ def create_app() -> FastAPI:
         )
 
     # Include routes
+    from contexta.api.routes.system import router as system_router
+
+    app.include_router(system_router, prefix="/v1")
+    app.include_router(system_router)
     app.include_router(api_keys_router)
     app.include_router(observations_router, prefix="/v1/observations", tags=["observations"])
     app.include_router(retrieval_router, prefix="/v1", tags=["retrieval"])
+    app.include_router(retrieval_router, tags=["retrieval"])
     app.include_router(memories_router, prefix="/v1/memories", tags=["memories"])
+    app.include_router(memories_router, prefix="/memories", tags=["memories"])
     app.include_router(graph_router, prefix="/v1/entities", tags=["entities"])
+    app.include_router(graph_router, prefix="/v1/graph", tags=["graph"])
+    app.include_router(graph_router, prefix="/graph", tags=["graph"])
     app.include_router(sessions_router, prefix="/v1/sessions", tags=["sessions"])
     app.include_router(auth_router)
     app.include_router(billing_router)

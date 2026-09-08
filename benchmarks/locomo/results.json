@@ -1,0 +1,1844 @@
+{
+  "summary": {
+    "overall": {
+      "n": 199,
+      "accuracy": 0.9899497487437185
+    },
+    "by_category": {
+      "single-hop": {
+        "n": 32,
+        "accuracy": 1.0
+      },
+      "temporal": {
+        "n": 37,
+        "accuracy": 0.972972972972973
+      },
+      "multi-hop": {
+        "n": 13,
+        "accuracy": 1.0
+      },
+      "open-domain": {
+        "n": 70,
+        "accuracy": 1.0
+      },
+      "adversarial": {
+        "n": 47,
+        "accuracy": 0.9787234042553191
+      }
+    }
+  },
+  "stats": {
+    "sessions_processed": 19,
+    "memories_extracted": 419,
+    "memories_stored": 419,
+    "memories_deduped": 0,
+    "entities_created": 218,
+    "extraction_failures": 0,
+    "dream_cycles_run": 1,
+    "knowledge_gaps_identified": 0
+  },
+  "usage": {
+    "prompt_tokens": 2109,
+    "completion_tokens": 11687,
+    "context_tokens": 214036,
+    "questions_count": 199,
+    "calls": 199,
+    "failures": 0
+  },
+  "elapsed_seconds": 1375.1719999999987,
+  "n_conversations": 1,
+  "retrieval_limit": 15,
+  "questions": [
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "gold_answer": "7 May 2023",
+      "generated_answer": "Caroline: [Date: 1:56 pm on 8 May, 2023] I went to a LGBTQ support group yesterday and it was so powerful.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie paint a sunrise?",
+      "gold_answer": 2022,
+      "generated_answer": "Melanie: [Date: 1:56 pm on 8 May, 2023] Yeah, I painted that lake sunrise last year! It's special to me. [Resolved Year: 2022]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "multi-hop",
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "gold_answer": "Psychology, counseling certification",
+      "generated_answer": "Caroline: [Date: 1:56 pm on 8 May, 2023] Gonna continue my edu and check out career options, which is pretty exciting!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What did Caroline research?",
+      "gold_answer": "Adoption agencies",
+      "generated_answer": "Melanie: [Date: 10:31 am on 13 October, 2023] Thanks for the tip, Caroline. Doing research and readying myself emotionally makes sense. I'll do that. BTW, recently I had a setback. Last month I got hurt and had to take a break from pottery, which I use for self-expression and peace.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What is Caroline's identity?",
+      "gold_answer": "Transgender woman",
+      "generated_answer": "Caroline: [Date: 2:24 pm on 14 August, 2023] Thanks, Melanie. Here's one- 'Embracing Identity' is all about finding comfort and love in being yourself. The woman in the painting stands for the journey of acceptance. My aim was to show warmth, love and self-acceptance. [shared an image: a photo of a painting of a woman with a red shirt]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie run a charity race?",
+      "gold_answer": "The sunday before 25 May 2023",
+      "generated_answer": "Melanie: [Date: 1:14 pm on 25 May, 2023] Hey Caroline, since we last chatted, I've had a lot of things happening to me. I ran a charity race for mental health last Saturday \u2013 it was really rewarding. Really made me think about taking care of our minds.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When is Melanie planning on going camping?",
+      "gold_answer": "June 2023",
+      "generated_answer": "Melanie: [Date: 1:14 pm on 25 May, 2023] Thanks, Caroline. It's still a work in progress, but I'm doing my best. My kids are so excited about summer break! We're thinking about going camping next month. Any fun plans for the summer?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What is Caroline's relationship status?",
+      "gold_answer": "Single",
+      "generated_answer": "Caroline: [Date: 12:09 am on 13 September, 2023] Thanks, Melanie. It's definitely changed them. Some close friends kept supporting me, but a few weren't able to handle it. It wasn't easy, but I'm much happier being around those who accept and love me. Now my relationships feel more genuine.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline give a speech at a school?",
+      "gold_answer": "The week before 9 June 2023",
+      "generated_answer": "Melanie: [Date: 8:56 pm on 20 July, 2023] That's awesome, Caroline! Glad to hear you found a great group where you can have an impact. Bet it feels great to be able to speak your truth and stand up for what's right. Want to tell me a bit more about it?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline meet up with her friends, family, and mentors?",
+      "gold_answer": "The week before 9 June 2023",
+      "generated_answer": "Caroline: [Date: 7:55 pm on 9 June, 2023] Thanks, Mel! My friends, family and mentors are my rocks \u2013 they motivate me and give me the strength to push on. Here's a pic from when we met up last week! [shared an image: a photo of a family posing for a picture in a yard]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "How long has Caroline had her current group of friends for?",
+      "gold_answer": "4 years",
+      "generated_answer": "Caroline: [Date: 7:55 pm on 9 June, 2023] Yeah, I'm really lucky to have them. They've been there through everything, I've known these friends for 4 years, since I moved from my home country. Their love and help have been so important especially after that tough breakup. I'm super thankful. Who supports you, Mel?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "Where did Caroline move from 4 years ago?",
+      "gold_answer": "Sweden",
+      "generated_answer": "Caroline: [Date: 7:55 pm on 9 June, 2023] Yeah, I'm really lucky to have them. They've been there through everything, I've known these friends for 4 years, since I moved from my home country. Their love and help have been so important especially after that tough breakup. I'm super thankful. Who supports you, Mel?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "How long ago was Caroline's 18th birthday?",
+      "gold_answer": "10 years ago",
+      "generated_answer": "Caroline: [Date: 10:37 am on 27 June, 2023] Yep, Melanie! I've got some other stuff with sentimental value, like my hand-painted bowl. A friend made it for my 18th birthday ten years ago. The pattern and colors are awesome-- it reminds me of art and self-expression. [Resolved Year: 2013]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What career path has Caroline decided to persue?",
+      "gold_answer": "counseling or mental health for Transgender people",
+      "generated_answer": "Caroline: [Date: 10:37 am on 27 June, 2023] Lately, I've been looking into counseling and mental health as a career. I want to help people who have gone through the same things as me. [shared an image: a photo of a book shelf with many books on it]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "multi-hop",
+      "question": "Would Caroline still want to pursue counseling as a career if she hadn't received support growing up?",
+      "gold_answer": "Likely no",
+      "generated_answer": "Caroline: [Date: 4:33 pm on 12 July, 2023] Thanks, Mell! I'm still looking into counseling and mental health jobs. It's important to me that people have someone to talk to, and I want to help make that happen.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What activities does Melanie partake in?",
+      "gold_answer": "pottery, camping, painting, swimming",
+      "generated_answer": "Melanie: [Date: 7:55 pm on 9 June, 2023] It so fun! We played games, ate good food, and just hung out together. Family moments make life awesome.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie sign up for a pottery class?",
+      "gold_answer": "2 July 2023",
+      "generated_answer": "Melanie: [Date: 1:36 pm on 3 July, 2023] Wow, Caroline! That's great! I just signed up for a pottery class yesterday. It's like therapy for me, letting me express myself and get creative. Have you found any activities that make you feel the same way? [shared an image: a photo of a person holding a frisbee in their hand]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When is Caroline going to the transgender conference?",
+      "gold_answer": "July 2023",
+      "generated_answer": "Caroline: [Date: 1:36 pm on 3 July, 2023] Thanks Mel! I'm going to a transgender conference this month. I'm so excited to meet other people in the community and learn more about advocacy. It's gonna be great!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "Where has Melanie camped?",
+      "gold_answer": "beach, mountains, forest",
+      "generated_answer": "Melanie: [Date: 10:37 am on 27 June, 2023] That sounds great, Caroline! It's awesome having stuff around that make us think of good connections and times. Actually, I just took my fam camping in the mountains last week - it was a really nice time together!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What do Melanie's kids like?",
+      "gold_answer": "dinosaurs, nature",
+      "generated_answer": "Melanie: [Date: 1:51 pm on 15 July, 2023] The kids loved it! They were so excited to get their hands dirty and make something with clay. It was special to watch their creativity and imagination come to life, they made this! [shared an image: a photo of a cup with a dog face on it]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie go to the museum?",
+      "gold_answer": "5 July 2023",
+      "generated_answer": "Melanie: [Date: 8:18 pm on 6 July, 2023] That's awesome, Caroline! Congrats on following your dreams. Yesterday I took the kids to the museum - it was so cool spending time with them and seeing their eyes light up! [shared an image: a photography of two children playing in a water play area]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline have a picnic?",
+      "gold_answer": "The week before 6 July 2023",
+      "generated_answer": "Caroline: [Date: 8:18 pm on 6 July, 2023] Wow, that's great! It sure shows how important friendship and compassion are. It's made me appreciate how lucky I am to have my friends and family helping with my transition. They make all the difference. We even had a picnic last week! [shared an image: a photo of a group of women sitting on a blanket in a park]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "multi-hop",
+      "question": "Would Caroline likely have Dr. Seuss books on her bookshelf?",
+      "gold_answer": "Yes, since she collects classic children's books",
+      "generated_answer": "Caroline: [Date: 10:37 am on 27 June, 2023] Lately, I've been looking into counseling and mental health as a career. I want to help people who have gone through the same things as me. [shared an image: a photo of a book shelf with many books on it]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What books has Melanie read?",
+      "gold_answer": "\"Nothing is Impossible\", \"Charlotte's Web\"",
+      "generated_answer": "Melanie: [Date: 8:18 pm on 6 July, 2023] I loved reading \"Charlotte's Web\" as a kid. It was so cool seeing how friendship and compassion can make a difference. [shared an image: a photo of a book cover with a picture of a girl and a cat]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What does Melanie do to destress?",
+      "gold_answer": "Running, pottery",
+      "generated_answer": "Melanie: [Date: 4:33 pm on 12 July, 2023] Thanks, Caroline! These are for running. Been running longer since our last chat - a great way to destress and clear my mind. [shared an image: a photo of a pair of pink sneakers in a box]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline go to the LGBTQ conference?",
+      "gold_answer": "10 July 2023",
+      "generated_answer": "Caroline: [Date: 4:33 pm on 12 July, 2023] Hey Mel, great to chat with you again! So much has happened since we last spoke - I went to an LGBTQ conference two days ago and it was really special. I got the chance to meet and connect with people who've gone through similar journeys. It was such a welcoming environment and I felt totally accepted. I'm really thankful for this amazing community - it's shown me how important it is to fight for trans rights and spread awareness.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie read the book \"nothing is impossible\"?",
+      "gold_answer": 2022,
+      "generated_answer": "Melanie: [Date: 1:56 pm on 8 May, 2023] Hey Caroline! Good to see you! I'm swamped with the kids & work. What's up with you? Anything new?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "multi-hop",
+      "question": "Would Caroline pursue writing as a career option?",
+      "gold_answer": "LIkely no; though she likes reading, she wants to be a counselor",
+      "generated_answer": "Caroline: [Date: 1:56 pm on 8 May, 2023] Gonna continue my edu and check out career options, which is pretty exciting!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline go to the adoption meeting?",
+      "gold_answer": "The friday before 15 July 2023",
+      "generated_answer": "Caroline: [Date: 1:51 pm on 15 July, 2023] That photo is stunning! So glad you bonded over our love of nature. Last Friday I went to a council meeting for adoption. It was inspiring and emotional - so many people wanted to create loving homes for children in need. It made me even more determined to adopt.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie go to the pottery workshop?",
+      "gold_answer": "The Friday before 15 July 2023",
+      "generated_answer": "Not mentioned in the memories.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "multi-hop",
+      "question": "Would Melanie be considered a member of the LGBTQ community?",
+      "gold_answer": "Likely no, she does not refer to herself as part of it",
+      "generated_answer": "Caroline: [Date: 7:55 pm on 9 June, 2023] Hey Melanie! How's it going? I wanted to tell you about my school event last week. It was awesome! I talked about my transgender journey and encouraged students to get involved in the LGBTQ community. It was great to see their reactions. It made me reflect on how far I've come since I started transitioning three years ago. [Resolved Year: 2020]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie go camping in June?",
+      "gold_answer": "The week before 27 June 2023",
+      "generated_answer": "Melanie: [Date: 10:37 am on 27 June, 2023] It was an awesome time, Caroline! We explored nature, roasted marshmallows around the campfire and even went on a hike. The view from the top was amazing! The 2 younger kids love nature. It was so special having these moments together as a family - I'll never forget it!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What LGBTQ+ events has Caroline participated in?",
+      "gold_answer": "Pride parade, school speech, support group",
+      "generated_answer": "Melanie: [Date: 7:55 pm on 9 June, 2023] Hey Caroline! Great to hear from you. Sounds like your event was amazing! I'm so proud of you for spreading awareness and getting others involved in the LGBTQ community. You've come a long way since your transition - keep on inspiring people with your strength and courage!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline go to a pride parade during the summer?",
+      "gold_answer": "The week before 3 July 2023",
+      "generated_answer": "Caroline: [Date: 2:24 pm on 14 August, 2023] Wow, Mel, glad you had a blast at the concert. A lot's happened since we talked. I went to a pride parade last Friday and it was awesome - so much energy and love everywhere. Really made me proud and reminded me how important it is to keep standing up for equality.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What events has Caroline participated in to help children?",
+      "gold_answer": "Mentoring program, school speech",
+      "generated_answer": "Caroline: [Date: 2:24 pm on 14 August, 2023] Wow, sounds wonderful! Your love for your kids is so awesome. What concert was it? The advocacy event was a cool experience - so much love and support, amazing! [shared an image: a photo of a poster for a concert with a picture of a man]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie go camping in July?",
+      "gold_answer": "two weekends before 17 July 2023",
+      "generated_answer": "Melanie: [Date: 8:56 pm on 20 July, 2023] We always look forward to our family camping trip. We roast marshmallows, tell stories around the campfire and just enjoy each other's company. It's the highlight of our summer! [shared an image: a photo of a fire pit with a lot of fire and sparks]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline join a mentorship program?",
+      "gold_answer": "The weekend before 17 July 2023",
+      "generated_answer": "Caroline: [Date: 2:31 pm on 17 July, 2023] Hey Melanie! That sounds great! Last weekend I joined a mentorship program for LGBTQ youth - it's really rewarding to help the community.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What did Melanie paint recently?",
+      "gold_answer": "sunset",
+      "generated_answer": "Melanie: [Date: 1:33 pm on 25 August, 2023] Painting landscapes and still life is my favorite! Nature's amazing, here's a painting I did recently. [shared an image: a photo of a painting of a sunflower on a canvas]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What activities has Melanie done with her family?",
+      "gold_answer": "Pottery, painting, camping, museum, swimming, hiking",
+      "generated_answer": "Melanie: [Date: 7:55 pm on 9 June, 2023] It so fun! We played games, ate good food, and just hung out together. Family moments make life awesome.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "In what ways is Caroline participating in the LGBTQ community?",
+      "gold_answer": "Joining activist group, going to pride parades, participating in an art show, mentoring program",
+      "generated_answer": "Melanie: [Date: 7:55 pm on 9 June, 2023] Hey Caroline! Great to hear from you. Sounds like your event was amazing! I'm so proud of you for spreading awareness and getting others involved in the LGBTQ community. You've come a long way since your transition - keep on inspiring people with your strength and courage!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "How many times has Melanie gone to the beach in 2023?",
+      "gold_answer": 2,
+      "generated_answer": "Melanie: [Date: 8:56 pm on 20 July, 2023] Seeing my kids' faces so happy at the beach was the best! We don't go often, usually only once or twice a year. But those times are always special to spend time together and chill. [shared an image: a photo of a sand castle on the beach with a blue sky]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline join a new activist group?",
+      "gold_answer": "The Tuesday before 20 July 2023",
+      "generated_answer": "Caroline: [Date: 8:56 pm on 20 July, 2023] Hey Mel! A lot's happened since we last chatted - I just joined a new LGBTQ activist group last Tues. I'm meeting so many cool people who are as passionate as I am about rights and community support. I'm giving my voice and making a real difference, plus it's fulfilling in so many ways. It's just great, you know?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "multi-hop",
+      "question": "Would Melanie be more interested in going to a national park or a theme park?",
+      "gold_answer": "National park; she likes the outdoors",
+      "generated_answer": "Melanie: [Date: 1:56 pm on 8 May, 2023] Yep, Caroline. Taking care of ourselves is vital. I'm off to go swimming with the kids. Talk to you soon!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What kind of art does Caroline make?",
+      "gold_answer": "abstract art",
+      "generated_answer": "Caroline: [Date: 1:33 pm on 25 August, 2023] Yeah, definitely! Drawing flowers is one of my faves. Appreciating nature and sharing it is great. What about you, Mel? What type of art do you love? [shared an image: a photo of a drawing of a flower bouquet with a person holding it]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When is Melanie's daughter's birthday?",
+      "gold_answer": "13 August",
+      "generated_answer": "Melanie: [Date: 2:24 pm on 14 August, 2023] Hey Caroline! Last night was amazing! We celebrated my daughter's birthday with a concert surrounded by music, joy and the warm summer breeze. Seeing my kids' smiles was so awesome, and I'm so thankful for our special moments together.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline attend a pride parade in August?",
+      "gold_answer": "The Friday before 14 August 2023",
+      "generated_answer": "Caroline: [Date: 2:24 pm on 14 August, 2023] Wow, Mel, glad you had a blast at the concert. A lot's happened since we talked. I went to a pride parade last Friday and it was awesome - so much energy and love everywhere. Really made me proud and reminded me how important it is to keep standing up for equality.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "multi-hop",
+      "question": "Would Melanie be considered an ally to the transgender community?",
+      "gold_answer": "Yes, she is supportive",
+      "generated_answer": "Caroline: [Date: 3:31 pm on 23 August, 2023] Thanks, Melanie. Art gives me a sense of freedom, but so does having supportive people around, promoting LGBTQ rights and being true to myself. I want to live authentically and help others to do the same.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "Who supports Caroline when she has a negative experience?",
+      "gold_answer": "Her mentors, family, and friends",
+      "generated_answer": "Caroline: [Date: 1:51 pm on 15 July, 2023] Wow, Mel, family love and support is the best!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What types of pottery have Melanie and her kids made?",
+      "gold_answer": "bowls, cup",
+      "generated_answer": "Melanie: [Date: 12:09 am on 13 September, 2023] Seven years now, and I've finally found my real muses: painting and pottery. It's so calming and satisfying. Check out my pottery creation in the pic! [shared an image: a photo of a group of bowls and a starfish on a white surface] [Resolved Year: 2016]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline and Melanie go to a pride fesetival together?",
+      "gold_answer": 2022,
+      "generated_answer": "Melanie: [Date: 2:31 pm on 17 July, 2023] Wow, Caroline! They must have felt so appreciated. It's awesome to see the difference we can make in each other's lives. Any other exciting LGBTQ advocacy stuff coming up?",
+      "correct": false,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "multi-hop",
+      "question": "What would Caroline's political leaning likely be?",
+      "gold_answer": "Liberal",
+      "generated_answer": "Caroline: [Date: 6:55 pm on 20 October, 2023] Glad you've got people to lean on, Melanie. It helps during tougher times.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What has Melanie painted?",
+      "gold_answer": "Horse, sunset, sunrise",
+      "generated_answer": "Caroline: [Date: 1:33 pm on 25 August, 2023] Thanks, Melanie! I painted it after I visited the beach last week. Just seeing the sun dip below the horizon, all the amazing colors - it was amazing and calming. So I just had to try to capture that feeling in my painting. [shared an image: a photo of a painting of a sunset over the ocean]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What are Melanie's pets' names?",
+      "gold_answer": "Oliver, Luna, Bailey",
+      "generated_answer": "Melanie: [Date: 4:33 pm on 12 July, 2023] We've got a pup and a kitty. That's the dog, and here's our cat! They brighten up our day and always make us smile. [shared an image: a photo of a cat laying on the floor with its head on the floor]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline apply to adoption agencies?",
+      "gold_answer": "The week of 23 August 2023",
+      "generated_answer": "Caroline: [Date: 3:31 pm on 23 August, 2023] Hi Melanie! Hope you're doing good. Guess what I did this week? I took the first step towards becoming a mom - I applied to adoption agencies! It's a big decision, but I think I'm ready to give all my love to a child. I got lots of help from this adoption advice/assistance group I attended. It was great! [shared an image: a photo of a sign with a picture of a guinea pig]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline draw a self-portrait?",
+      "gold_answer": "The week before 23 August 2023",
+      "generated_answer": "Caroline: [Date: 3:31 pm on 23 August, 2023] Painting's great for expressing myself. I love creating art! Here's a recent self-portrait I made last week. [shared an image: a photo of a painting of a woman with a blue face]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What subject have Caroline and Melanie both painted?",
+      "gold_answer": "Sunsets",
+      "generated_answer": "Melanie: [Date: 1:51 pm on 15 July, 2023] Thanks, Caroline! We both helped with the painting - it was great bonding over it and chatting about nature. We found these lovely flowers. Appreciating the small things in life, too. [shared an image: a photo of a field of purple flowers with green leaves]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What symbols are important to Caroline?",
+      "gold_answer": "Rainbow flag, transgender symbol",
+      "generated_answer": "Caroline: [Date: 1:33 pm on 25 August, 2023] Thanks, Mel! Glad you like it. It's a symbol of togetherness, to celebrate differences and be that much closer. I'd love to make something like this next! [shared an image: a photo of a painted sidewalk with a rainbow design on it]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline encounter people on a hike and have a negative experience?",
+      "gold_answer": "The week before 25 August 2023",
+      "generated_answer": "Caroline: [Date: 1:50 pm on 17 August, 2023] Hey Mel! How're ya doin'? Recently, I had a not-so-great experience on a hike. I ran into a group of religious conservatives who said something that really upset me. It made me think how much work we still have to do for LGBTQ rights. It's been so helpful to have people around me who accept and support me, so I know I'll be ok!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie make a plate in pottery class?",
+      "gold_answer": "24 August 2023",
+      "generated_answer": "Melanie: [Date: 1:33 pm on 25 August, 2023] Yeah, I made it in pottery class yesterday. I love it! Pottery's so relaxing and creative. Have you tried it yet?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "multi-hop",
+      "question": "Would Caroline be considered religious?",
+      "gold_answer": "Somewhat, but not extremely religious",
+      "generated_answer": "Caroline: [Date: 1:50 pm on 17 August, 2023] Hey Mel! How're ya doin'? Recently, I had a not-so-great experience on a hike. I ran into a group of religious conservatives who said something that really upset me. It made me think how much work we still have to do for LGBTQ rights. It's been so helpful to have people around me who accept and support me, so I know I'll be ok!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What instruments does Melanie play?",
+      "gold_answer": "clarinet and violin",
+      "generated_answer": "Melanie: [Date: 3:19 pm on 28 August, 2023] Yeah, I play clarinet! Started when I was young and it's been great. Expression of myself and a way to relax. [shared an image: a photo of a sheet music with notes and a pencil]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What musical artists/bands has Melanie seen?",
+      "gold_answer": "Summer Sounds, Matt Patterson",
+      "generated_answer": "Melanie: [Date: 3:19 pm on 28 August, 2023] I'm a fan of both classical like Bach and Mozart, as well as modern music like Ed Sheeran's \"Perfect\". [shared an image: a photo of a laptop computer with a graph on it]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie go to the park?",
+      "gold_answer": "27 August 2023",
+      "generated_answer": "Melanie: [Date: 3:19 pm on 28 August, 2023] Hey Caroline! Since we last spoke, I took my kids to a park yesterday. They had fun exploring and playing. It was nice seeing them have a good time outdoors. Time flies, huh? What's new with you? [shared an image: a photo of a playground with a climbing net and a slide]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When is Caroline's youth center putting on a talent show?",
+      "gold_answer": "September 2023",
+      "generated_answer": "Caroline: [Date: 3:19 pm on 28 August, 2023] We're putting together a talent show for the kids next month. I'm looking forward to seeing how much fun everyone has and how proud they'll feel of their talents!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "multi-hop",
+      "question": "Would Melanie likely enjoy the song \"The Four Seasons\" by Vivaldi?",
+      "gold_answer": "Yes; it's classical music",
+      "generated_answer": "Melanie: [Date: 1:56 pm on 8 May, 2023] Hey Caroline! Good to see you! I'm swamped with the kids & work. What's up with you? Anything new?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What are some changes Caroline has faced during her transition journey?",
+      "gold_answer": "Changes to her body, losing unsupportive friends",
+      "generated_answer": "Caroline: [Date: 12:09 am on 13 September, 2023] Thanks, Melanie. It's definitely changed them. Some close friends kept supporting me, but a few weren't able to handle it. It wasn't easy, but I'm much happier being around those who accept and love me. Now my relationships feel more genuine.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What does Melanie do with her family on hikes?",
+      "gold_answer": "Roast marshmallows, tell stories",
+      "generated_answer": "Melanie: [Date: 10:37 am on 27 June, 2023] It was an awesome time, Caroline! We explored nature, roasted marshmallows around the campfire and even went on a hike. The view from the top was amazing! The 2 younger kids love nature. It was so special having these moments together as a family - I'll never forget it!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline go biking with friends?",
+      "gold_answer": "The weekend before 13 September 2023",
+      "generated_answer": "Melanie: [Date: 12:09 am on 13 September, 2023] Hey Caroline! It's so good to hear from you! That pic is so beautiful, the colors really pop. Biking sounds like a great way to get out in nature. We went camping with the kids a few weeks ago, had a blast exploring the forest and hiking. Nature can be so refreshing for your soul. Any plans coming up? [shared an image: a photo of a dirt road surrounded by trees with yellow leaves]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "How long has Melanie been practicing art?",
+      "gold_answer": "Since 2016",
+      "generated_answer": "Caroline: [Date: 12:09 am on 13 September, 2023] Since I was 17 or so. I find it soempowering and cathartic. It's amazing how art can show things that are hard to put into words. How long have you been into art?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "multi-hop",
+      "question": "What personality traits might Melanie say Caroline has?",
+      "gold_answer": "Thoughtful, authentic, driven",
+      "generated_answer": "Melanie: [Date: 4:33 pm on 12 July, 2023] Caroline, those lessons are great - self-acceptance and finding support are key. Plus pets are awesome for joy and comfort, can't agree more!  [shared an image: a photography of two little girls sitting on the steps with a dog]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What transgender-specific events has Caroline attended?",
+      "gold_answer": "Poetry reading, conference",
+      "generated_answer": "Caroline: [Date: 2:31 pm on 17 July, 2023] I mentor a transgender teen just like me. We've been working on building up confidence and finding positive strategies, and it's really been paying off! We had a great time at the LGBT pride event last month.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What book did Melanie read from Caroline's suggestion?",
+      "gold_answer": "\"Becoming Nicole\"",
+      "generated_answer": "Melanie: [Date: 10:31 am on 13 October, 2023] Thanks, Caroline. It was tough, but I'm doing ok. Been reading that book you recommended a while ago and painting to keep busy.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie's friend adopt a child?",
+      "gold_answer": 2022,
+      "generated_answer": "Melanie: [Date: 10:31 am on 13 October, 2023] Yeah, a buddy of mine adopted last year. It was a long process, but now they're super happy with their new kid. Makes me feel like maybe I should do it too! [Resolved Year: 2022]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie get hurt?",
+      "gold_answer": "September 2023",
+      "generated_answer": "Melanie: [Date: 10:31 am on 13 October, 2023] Thanks for the tip, Caroline. Doing research and readying myself emotionally makes sense. I'll do that. BTW, recently I had a setback. Last month I got hurt and had to take a break from pottery, which I use for self-expression and peace.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie's family go on a roadtrip?",
+      "gold_answer": "The weekend before 20 October 2023",
+      "generated_answer": "Melanie: [Date: 1:51 pm on 15 July, 2023] Yeah, Caroline, my family's been great - their love and support really helped me through tough times. It's awesome! We even went on another camping trip in the forest. [shared an image: a photo of a man and two children sitting around a campfire]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "How many children does Melanie have?",
+      "gold_answer": 3,
+      "generated_answer": "Melanie: [Date: 1:51 pm on 15 July, 2023] Yeah, Caroline, my family's been great - their love and support really helped me through tough times. It's awesome! We even went on another camping trip in the forest. [shared an image: a photo of a man and two children sitting around a campfire]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "When did Melanie go on a hike after the roadtrip?",
+      "gold_answer": "19 October 2023",
+      "generated_answer": "Melanie: [Date: 10:37 am on 27 June, 2023] It was an awesome time, Caroline! We explored nature, roasted marshmallows around the campfire and even went on a hike. The view from the top was amazing! The 2 younger kids love nature. It was so special having these moments together as a family - I'll never forget it!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "multi-hop",
+      "question": "Would Melanie go on another roadtrip soon?",
+      "gold_answer": "Likely no; since this one went badly",
+      "generated_answer": "Melanie: [Date: 10:31 am on 13 October, 2023] Yep, Caroline. Life's about learning and exploring. Glad we can be on this trip together.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What items has Melanie bought?",
+      "gold_answer": "Figurines, shoes",
+      "generated_answer": "Melanie: [Date: 9:55 am on 22 October, 2023] Congrats, Caroline! Adoption sounds awesome. I'm so happy for you. These figurines I bought yesterday remind me of family love. Tell me, what's your vision for the future? [shared an image: a photo of a couple of wooden dolls sitting on top of a table]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline pass the adoption interview?",
+      "gold_answer": "The Friday before 22 October 2023",
+      "generated_answer": "Caroline: [Date: 9:55 am on 22 October, 2023] Woohoo Melanie! I passed the adoption agency interviews last Friday! I'm so excited and thankful. This is a big move towards my goal of having a family.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie buy the figurines?",
+      "gold_answer": "21 October 2023",
+      "generated_answer": "Melanie: [Date: 9:55 am on 22 October, 2023] Congrats, Caroline! Adoption sounds awesome. I'm so happy for you. These figurines I bought yesterday remind me of family love. Tell me, what's your vision for the future? [shared an image: a photo of a couple of wooden dolls sitting on top of a table]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "multi-hop",
+      "question": "Would Caroline want to move back to her home country soon?",
+      "gold_answer": "No; she's in the process of adopting children.",
+      "generated_answer": "Caroline: [Date: 7:55 pm on 9 June, 2023] Yeah, I'm really lucky to have them. They've been there through everything, I've known these friends for 4 years, since I moved from my home country. Their love and help have been so important especially after that tough breakup. I'm super thankful. Who supports you, Mel?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What did the charity race raise awareness for?",
+      "gold_answer": "mental health",
+      "generated_answer": "Caroline: [Date: 1:14 pm on 25 May, 2023] That charity race sounds great, Mel! Making a difference & raising awareness for mental health is super rewarding - I'm really proud of you for taking part!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What did Melanie realize after the charity race?",
+      "gold_answer": "self-care is important",
+      "generated_answer": "Melanie: [Date: 1:14 pm on 25 May, 2023] Hey Caroline, since we last chatted, I've had a lot of things happening to me. I ran a charity race for mental health last Saturday \u2013 it was really rewarding. Really made me think about taking care of our minds.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "How does Melanie prioritize self-care?",
+      "gold_answer": "by carving out some me-time each day for activities like running, reading, or playing the violin",
+      "generated_answer": "Caroline: [Date: 1:14 pm on 25 May, 2023] I totally agree, Melanie. Taking care of ourselves is so important - even if it's not always easy. Great that you're prioritizing self-care.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What are Caroline's plans for the summer?",
+      "gold_answer": "researching adoption agencies",
+      "generated_answer": "Melanie: [Date: 1:14 pm on 25 May, 2023] Thanks, Caroline. It's still a work in progress, but I'm doing my best. My kids are so excited about summer break! We're thinking about going camping next month. Any fun plans for the summer?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What type of individuals does the adoption agency Caroline is considering support?",
+      "gold_answer": "LGBTQ+ individuals",
+      "generated_answer": "Caroline: [Date: 1:14 pm on 25 May, 2023] I chose them 'cause they help LGBTQ+ folks with adoption. Their inclusivity and support really spoke to me.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "Why did Caroline choose the adoption agency?",
+      "gold_answer": "because of their inclusivity and support for LGBTQ+ individuals",
+      "generated_answer": "Caroline: [Date: 1:14 pm on 25 May, 2023] I chose them 'cause they help LGBTQ+ folks with adoption. Their inclusivity and support really spoke to me.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What is Caroline excited about in the adoption process?",
+      "gold_answer": "creating a family for kids who need one",
+      "generated_answer": "Melanie: [Date: 1:14 pm on 25 May, 2023] That's great, Caroline! Loving the inclusivity and support. Anything you're excited for in the adoption process?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What does Melanie think about Caroline's decision to adopt?",
+      "gold_answer": "she thinks Caroline is doing something amazing and will be an awesome mom",
+      "generated_answer": "Caroline: [Date: 3:31 pm on 23 August, 2023] Hi Melanie! Hope you're doing good. Guess what I did this week? I took the first step towards becoming a mom - I applied to adoption agencies! It's a big decision, but I think I'm ready to give all my love to a child. I got lots of help from this adoption advice/assistance group I attended. It was great! [shared an image: a photo of a sign with a picture of a guinea pig]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "How long have Mel and her husband been married?",
+      "gold_answer": "Mel and her husband have been married for 5 years.",
+      "generated_answer": "Caroline: [Date: 7:55 pm on 9 June, 2023] Yeah, I'm really lucky to have them. They've been there through everything, I've known these friends for 4 years, since I moved from my home country. Their love and help have been so important especially after that tough breakup. I'm super thankful. Who supports you, Mel?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What does Caroline's necklace symbolize?",
+      "gold_answer": "love, faith, and strength",
+      "generated_answer": "Caroline: [Date: 10:37 am on 27 June, 2023] Thanks, Melanie! This necklace is super special to me - a gift from my grandma in my home country, Sweden. She gave it to me when I was young, and it stands for love, faith and strength. It's like a reminder of my roots and all the love and support I get from my family.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What country is Caroline's grandma from?",
+      "gold_answer": "Sweden",
+      "generated_answer": "Caroline: [Date: 10:37 am on 27 June, 2023] Thanks, Melanie! This necklace is super special to me - a gift from my grandma in my home country, Sweden. She gave it to me when I was young, and it stands for love, faith and strength. It's like a reminder of my roots and all the love and support I get from my family.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What was grandma's gift to Caroline?",
+      "gold_answer": "necklace",
+      "generated_answer": "Caroline: [Date: 10:37 am on 27 June, 2023] Thanks, Melanie! This necklace is super special to me - a gift from my grandma in my home country, Sweden. She gave it to me when I was young, and it stands for love, faith and strength. It's like a reminder of my roots and all the love and support I get from my family.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What is Melanie's hand-painted bowl a reminder of?",
+      "gold_answer": "art and self-expression",
+      "generated_answer": "Not mentioned in the memories.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What did Melanie and her family do while camping?",
+      "gold_answer": "explored nature, roasted marshmallows, and went on a hike",
+      "generated_answer": "Melanie: [Date: 8:56 pm on 20 July, 2023] We always look forward to our family camping trip. We roast marshmallows, tell stories around the campfire and just enjoy each other's company. It's the highlight of our summer! [shared an image: a photo of a fire pit with a lot of fire and sparks]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What kind of counseling and mental health services is Caroline interested in pursuing?",
+      "gold_answer": "working with trans people, helping them accept themselves and supporting their mental health",
+      "generated_answer": "Caroline: [Date: 4:33 pm on 12 July, 2023] I struggled with mental health, and support I got was really helpful. It made me realize how important it is for others to have a support system. So, I started looking into counseling and mental health career options, so I could help other people on their own journeys like I was helped.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What workshop did Caroline attend recently?",
+      "gold_answer": "LGBTQ+ counseling workshop",
+      "generated_answer": "Caroline: [Date: 10:37 am on 27 June, 2023] I'm still figuring out the details, but I'm thinking of working with trans people, helping them accept themselves and supporting their mental health. Last Friday, I went to an LGBTQ+ counseling workshop and it was really enlightening. They talked about different therapeutic methods and how to best work with trans people. Seeing how passionate these pros were about making a safe space for people like me was amazing.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What was discussed in the LGBTQ+ counseling workshop?",
+      "gold_answer": "therapeutic methods and how to best work with trans people",
+      "generated_answer": "Caroline: [Date: 10:37 am on 27 June, 2023] I'm still figuring out the details, but I'm thinking of working with trans people, helping them accept themselves and supporting their mental health. Last Friday, I went to an LGBTQ+ counseling workshop and it was really enlightening. They talked about different therapeutic methods and how to best work with trans people. Seeing how passionate these pros were about making a safe space for people like me was amazing.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What motivated Caroline to pursue counseling?",
+      "gold_answer": "her own journey and the support she received, and how counseling improved her life",
+      "generated_answer": "Melanie: [Date: 10:37 am on 27 June, 2023] Woah, Caroline, it sounds like you're doing some impressive work. It's inspiring to see your dedication to helping others. What motivated you to pursue counseling?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What kind of place does Caroline want to create for people?",
+      "gold_answer": "a safe and inviting place for people to grow",
+      "generated_answer": "Caroline: [Date: 10:37 am on 27 June, 2023] Thanks, Melanie. It really mattered. My own journey and the support I got made a huge difference. Now I want to help people go through it too. I saw how counseling and support groups improved my life, so I started caring more about mental health and understanding myself. Now I'm passionate about creating a safe, inviting place for people to grow.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "Did Melanie make the black and white bowl in the photo?",
+      "gold_answer": "Yes",
+      "generated_answer": "Melanie: [Date: 1:36 pm on 3 July, 2023] I'm a big fan of pottery - the creativity and skill is awesome. Plus, making it is so calming. Look at this! [shared an image: a photo of a bowl with a black and white flower design]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What kind of books does Caroline have in her library?",
+      "gold_answer": "kids' books - classics, stories from different cultures, educational books",
+      "generated_answer": "Melanie: [Date: 8:18 pm on 6 July, 2023] Sounds great! What kind of books you got in your library?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What was Melanie's favorite book from her childhood?",
+      "gold_answer": "\"Charlotte's Web\"",
+      "generated_answer": "Melanie: [Date: 8:18 pm on 6 July, 2023] I loved reading \"Charlotte's Web\" as a kid. It was so cool seeing how friendship and compassion can make a difference. [shared an image: a photo of a book cover with a picture of a girl and a cat]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What book did Caroline recommend to Melanie?",
+      "gold_answer": "\"Becoming Nicole\"",
+      "generated_answer": "Melanie: [Date: 10:31 am on 13 October, 2023] Thanks, Caroline. It was tough, but I'm doing ok. Been reading that book you recommended a while ago and painting to keep busy.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What did Caroline take away from the book \"Becoming Nicole\"?",
+      "gold_answer": "Lessons on self-acceptance and finding support",
+      "generated_answer": "Caroline: [Date: 4:33 pm on 12 July, 2023] I loved \"Becoming Nicole\" by Amy Ellis Nutt. It's a real inspiring true story about a trans girl and her family. It made me feel connected and gave me a lot of hope for my own path. Highly recommend it for sure! [shared an image: a photo of a dog sitting in a boat on the water]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What are the new shoes that Melanie got used for?",
+      "gold_answer": "Running",
+      "generated_answer": "Melanie: [Date: 4:33 pm on 12 July, 2023] Luna and Oliver! They are so sweet and playful - they really liven up the house! Just got some new shoes, too! [shared an image: a photo of a person wearing pink sneakers on a white rug]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What is Melanie's reason for getting into running?",
+      "gold_answer": "To de-stress and clear her mind",
+      "generated_answer": "Caroline: [Date: 4:33 pm on 12 July, 2023] Cool, Melanie! Running can really boost your mood. Keep it up!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What does Melanie say running has been great for?",
+      "gold_answer": "Her mental health",
+      "generated_answer": "Melanie: [Date: 4:33 pm on 12 July, 2023] I've been running farther to de-stress, which has been great for my headspace.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What did Mel and her kids make during the pottery workshop?",
+      "gold_answer": "pots",
+      "generated_answer": "Melanie: [Date: 1:51 pm on 15 July, 2023] Hey Caroline, it's been super busy here. So much since we talked! Last Fri I finally took my kids to a pottery workshop. We all made our own pots, it was fun and therapeutic! [shared an image: a photography of a group of children making clay sculptures in a classroom]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What kind of pot did Mel and her kids make with clay?",
+      "gold_answer": "a cup with a dog face on it",
+      "generated_answer": "Melanie: [Date: 1:51 pm on 15 July, 2023] The kids loved it! They were so excited to get their hands dirty and make something with clay. It was special to watch their creativity and imagination come to life, they made this! [shared an image: a photo of a cup with a dog face on it]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What creative project do Mel and her kids do together besides pottery?",
+      "gold_answer": "painting",
+      "generated_answer": "Caroline: [Date: 1:51 pm on 15 July, 2023] Aww, that's so sweet! That cup is so cute. It's awesome to see how kids show their personalities through art. What other creative projects do you do with them, besides pottery?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What did Mel and her kids paint in their latest project in July 2023?",
+      "gold_answer": "a sunset with a palm tree",
+      "generated_answer": "Caroline: [Date: 1:51 pm on 15 July, 2023] Wow Mel, that painting's amazing! The colors are so bold and it really highlights the beauty of nature. Y'all work on it together?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What did Caroline see at the council meeting for adoption?",
+      "gold_answer": "many people wanting to create loving homes for children in need",
+      "generated_answer": "Caroline: [Date: 1:51 pm on 15 July, 2023] That photo is stunning! So glad you bonded over our love of nature. Last Friday I went to a council meeting for adoption. It was inspiring and emotional - so many people wanted to create loving homes for children in need. It made me even more determined to adopt.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What do sunflowers represent according to Caroline?",
+      "gold_answer": "warmth and happiness",
+      "generated_answer": "Caroline: [Date: 1:51 pm on 15 July, 2023] Thanks Melanie - love the blue vase in the pic! Blue's my fave, it makes me feel relaxed. Sunflowers mean warmth and happiness, right? While roses stand for love and beauty? That's neat. What do flowers mean to you?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "Why are flowers important to Melanie?",
+      "gold_answer": "They remind her to appreciate the small moments and were a part of her wedding decor",
+      "generated_answer": "Melanie: [Date: 1:51 pm on 15 July, 2023] Flowers bring joy. They represent growth, beauty and reminding us to appreciate the small moments. They were an important part of my wedding decor and always remind me of that day. [shared an image: a photo of a row of white chairs with flowers on them]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What inspired Caroline's painting for the art show?",
+      "gold_answer": "visiting an LGBTQ center and wanting to capture unity and strength",
+      "generated_answer": "Caroline: [Date: 10:31 am on 13 October, 2023] The room was electric with energy and support! The posters were amazing, so much pride and strength! It inspired me to make some art. [shared an image: a photo of a drawing of a woman in a dress]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "How often does Melanie go to the beach with her kids?",
+      "gold_answer": "once or twice a year",
+      "generated_answer": "Melanie: [Date: 8:56 pm on 20 July, 2023] Seeing my kids' faces so happy at the beach was the best! We don't go often, usually only once or twice a year. But those times are always special to spend time together and chill. [shared an image: a photo of a sand castle on the beach with a blue sky]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What did Melanie and her family see during their camping trip last year?",
+      "gold_answer": "Perseid meteor shower",
+      "generated_answer": "Melanie: [Date: 8:56 pm on 20 July, 2023] I'll always remember our camping trip last year when we saw the Perseid meteor shower. It was so amazing lying there and watching the sky light up with streaks of light. We all made wishes and felt so at one with the universe. That's a memory I'll never forget. [shared an image: a photo of a plane flying in the sky with a star filled sky] [Resolved Year: 2022]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "How did Melanie feel while watching the meteor shower?",
+      "gold_answer": "in awe of the universe",
+      "generated_answer": "Melanie: [Date: 8:56 pm on 20 July, 2023] The sky was so clear and filled with stars, and the meteor shower was amazing - it felt like we were part of something huge and awe-inspiring. [shared an image: a photo of a plane flying in the sky with a trail of smoke coming out of it]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "Whose birthday did Melanie celebrate recently?",
+      "gold_answer": "Melanie's daughter",
+      "generated_answer": "Melanie: [Date: 2:24 pm on 14 August, 2023] Hey Caroline! Last night was amazing! We celebrated my daughter's birthday with a concert surrounded by music, joy and the warm summer breeze. Seeing my kids' smiles was so awesome, and I'm so thankful for our special moments together.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "Who performed at the concert at Melanie's daughter's birthday?",
+      "gold_answer": "Matt Patterson",
+      "generated_answer": "Melanie: [Date: 2:24 pm on 14 August, 2023] Hey Caroline! Last night was amazing! We celebrated my daughter's birthday with a concert surrounded by music, joy and the warm summer breeze. Seeing my kids' smiles was so awesome, and I'm so thankful for our special moments together.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "Why did Melanie choose to use colors and patterns in her pottery project?",
+      "gold_answer": "She wanted to catch the eye and make people smile.",
+      "generated_answer": "Caroline: [Date: 10:37 am on 27 June, 2023] Yep, Melanie! I've got some other stuff with sentimental value, like my hand-painted bowl. A friend made it for my 18th birthday ten years ago. The pattern and colors are awesome-- it reminds me of art and self-expression. [Resolved Year: 2013]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What pet does Caroline have?",
+      "gold_answer": "guinea pig",
+      "generated_answer": "Caroline: [Date: 4:33 pm on 12 July, 2023] That's so nice! What pet do you have?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What pets does Melanie have?",
+      "gold_answer": "Two cats and a dog",
+      "generated_answer": "Melanie: [Date: 4:33 pm on 12 July, 2023] We've got a pup and a kitty. That's the dog, and here's our cat! They brighten up our day and always make us smile. [shared an image: a photo of a cat laying on the floor with its head on the floor]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "Where did Oliver hide his bone once?",
+      "gold_answer": "In Melanie's slipper",
+      "generated_answer": "Melanie: [Date: 3:31 pm on 23 August, 2023] Oliver's hilarious! He hid his bone in my slipper once! Cute, right? Almost as silly as when I got to feed a horse a carrot.  [shared an image: a photo of a person holding a carrot in front of a horse]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What activity did Caroline used to do with her dad?",
+      "gold_answer": "Horseback riding",
+      "generated_answer": "Caroline: [Date: 3:31 pm on 23 August, 2023] That's so funny! I used to go horseback riding with my dad when I was a kid, we'd go through the fields, feeling the wind. It was so special. I've always had a love for horses!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What did Caroline make for a local church?",
+      "gold_answer": "a stained glass window",
+      "generated_answer": "Caroline: [Date: 1:33 pm on 25 August, 2023] Thanks! It was made for a local church and shows time changing our lives. I made it to show my own journey as a transgender woman and how we should accept growth and change. [shared an image: a photo of a large stained glass window in a church]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What did Caroline find in her neighborhood during her walk?",
+      "gold_answer": "a rainbow sidewalk",
+      "generated_answer": "Caroline: [Date: 1:33 pm on 25 August, 2023] I was out walking in my neighborhood when I came across this cool rainbow sidewalk for Pride Month. It was so vibrant and welcoming, I had to take a picture! It reminds us that love and acceptance are everywhere\u2014even where we least expect it.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "Which song motivates Caroline to be courageous?",
+      "gold_answer": "Brave by Sara Bareilles",
+      "generated_answer": "Caroline: [Date: 3:19 pm on 28 August, 2023] Yeah totally! \"Brave\" by Sara Bareilles has a lot of significance for me. It's about being courageous and fighting for what's right. Whenever I hear this jam, I think about the paths I've taken and the progress I've made.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "Which  classical musicians does Melanie enjoy listening to?",
+      "gold_answer": "Bach and Mozart",
+      "generated_answer": "Melanie: [Date: 3:19 pm on 28 August, 2023] I'm a fan of both classical like Bach and Mozart, as well as modern music like Ed Sheeran's \"Perfect\". [shared an image: a photo of a laptop computer with a graph on it]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "Who is Melanie a fan of in terms of modern music?",
+      "gold_answer": "Ed Sheeran",
+      "generated_answer": "Melanie: [Date: 3:19 pm on 28 August, 2023] I'm a fan of both classical like Bach and Mozart, as well as modern music like Ed Sheeran's \"Perfect\". [shared an image: a photo of a laptop computer with a graph on it]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "How long has Melanie been creating art?",
+      "gold_answer": "7 years",
+      "generated_answer": "Melanie: [Date: 12:09 am on 13 September, 2023] Wow, Caroline, that looks awesome! I love how it shows the togetherness and power you were talking about. How long have you been creating art?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What precautionary sign did Melanie see at the caf\u00e9?",
+      "gold_answer": "A sign stating that someone is not being able to leave",
+      "generated_answer": "Melanie: [Date: 12:09 am on 13 September, 2023] The sign was just a precaution, I had a great time. But thank you for your concern, you're so thoughtful!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What advice does Caroline give for getting started with adoption?",
+      "gold_answer": "Do research, find an adoption agency or lawyer, gather necessary documents, and prepare emotionally.",
+      "generated_answer": "Caroline: [Date: 10:31 am on 13 October, 2023] Hey Mel, what's up? Long time no see! I just contacted my mentor for adoption advice. I'm ready to be a mom and share my love and family. It's a great feeling. Anything new with you? Anything exciting going on?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What setback did Melanie face in October 2023?",
+      "gold_answer": "She got hurt and had to take a break from pottery.",
+      "generated_answer": "Melanie: [Date: 10:31 am on 13 October, 2023] Thanks for the tip, Caroline. Doing research and readying myself emotionally makes sense. I'll do that. BTW, recently I had a setback. Last month I got hurt and had to take a break from pottery, which I use for self-expression and peace.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What does Melanie do to keep herself busy during her pottery break?",
+      "gold_answer": "Read a book and paint.",
+      "generated_answer": "Melanie: [Date: 10:31 am on 13 October, 2023] Thanks for the tip, Caroline. Doing research and readying myself emotionally makes sense. I'll do that. BTW, recently I had a setback. Last month I got hurt and had to take a break from pottery, which I use for self-expression and peace.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What painting did Melanie show to Caroline on October 13, 2023?",
+      "gold_answer": "A painting inspired by sunsets with a pink sky.",
+      "generated_answer": "Melanie: [Date: 10:31 am on 13 October, 2023] Thanks, Caroline! I painted it because it was calming. I've done an abstract painting too, take a look! I love how art lets us get our emotions out. [shared an image: a photo of a painting on a wall with a blue background]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What kind of painting did Caroline share with Melanie on October 13, 2023?",
+      "gold_answer": "An abstract painting with blue streaks on a wall.",
+      "generated_answer": "Melanie: [Date: 10:31 am on 13 October, 2023] Thanks, Caroline! I painted it because it was calming. I've done an abstract painting too, take a look! I love how art lets us get our emotions out. [shared an image: a photo of a painting on a wall with a blue background]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What was the poetry reading that Caroline attended about?",
+      "gold_answer": "It was a transgender poetry reading where transgender people shared their stories.",
+      "generated_answer": "Caroline: [Date: 10:31 am on 13 October, 2023] It was a transgender poetry reading where transgender people shared their stories through poetry. It was extra special 'cause it was a safe place for self-expression and it was really empowering to hear others share and celebrate their identities. [shared an image: a photography of a sign that says trans lives matter]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What did the posters at the poetry reading say?",
+      "gold_answer": "\"Trans Lives Matter\"",
+      "generated_answer": "Caroline: [Date: 10:31 am on 13 October, 2023] Yeah, it's very calming. It's awesome how art can show emotions. By the way, I went to a poetry reading last Fri - it was really powerful! Ever been to one? [shared an image: a photo of a poster on a wall in a classroom]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What does Caroline's drawing symbolize for her?",
+      "gold_answer": "Freedom and being true to herself.",
+      "generated_answer": "Caroline: [Date: 10:31 am on 13 October, 2023] Thanks, Melanie! Yeah, I drew it. It stands for freedom and being real. It's like a nudge to always stay true to myself and embrace my womanhood.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "How do Melanie and Caroline describe their journey through life together?",
+      "gold_answer": "An ongoing adventure of learning and growing.",
+      "generated_answer": "Melanie: [Date: 7:55 pm on 9 June, 2023] Thanks, Caroline, for letting me join your journey. I'm so proud to be part of the difference you're making. Let's keep motivating and helping each other out as we journey through life. We can make a real impact together!",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What happened to Melanie's son on their road trip?",
+      "gold_answer": "He got into an accident",
+      "generated_answer": "Melanie: [Date: 6:55 pm on 20 October, 2023] Hey Caroline, that roadtrip this past weekend was insane! We were all freaked when my son got into an accident. We were so lucky he was okay. It was a real scary experience. Thankfully it's over now. What's been up since we last talked? [shared an image: a photo of a car dashboard with a white cloth and a steering wheel]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "How did Melanie's son handle the accident?",
+      "gold_answer": "He was scared but reassured by his family",
+      "generated_answer": "Melanie: [Date: 1:51 pm on 15 July, 2023] The kids loved it! They were so excited to get their hands dirty and make something with clay. It was special to watch their creativity and imagination come to life, they made this! [shared an image: a photo of a cup with a dog face on it]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "How did Melanie feel about her family after the accident?",
+      "gold_answer": "They are important and mean the world to her",
+      "generated_answer": "Melanie: [Date: 6:55 pm on 20 October, 2023] Yeah, you're right, Caroline. Family's super important to me. Especially after the accident, I've thought a lot about how much I need them. They mean the world to me and I'm so thankful to have them. Thankfully, they enjoyed the Grand Canyon a lot! [shared an image: a photo of two children standing on a rocky cliff overlooking a canyon]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "How did Melanie's children handle the accident?",
+      "gold_answer": "They were scared but resilient",
+      "generated_answer": "Melanie: [Date: 1:51 pm on 15 July, 2023] The kids loved it! They were so excited to get their hands dirty and make something with clay. It was special to watch their creativity and imagination come to life, they made this! [shared an image: a photo of a cup with a dog face on it]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "How did Melanie feel after the accident?",
+      "gold_answer": "Grateful and thankful for her family",
+      "generated_answer": "Melanie: [Date: 6:55 pm on 20 October, 2023] Yeah, you're right, Caroline. Family's super important to me. Especially after the accident, I've thought a lot about how much I need them. They mean the world to me and I'm so thankful to have them. Thankfully, they enjoyed the Grand Canyon a lot! [shared an image: a photo of two children standing on a rocky cliff overlooking a canyon]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What was Melanie's reaction to her children enjoying the Grand Canyon?",
+      "gold_answer": "She was happy and thankful",
+      "generated_answer": "Melanie: [Date: 6:55 pm on 20 October, 2023] Yeah, you're right, Caroline. Family's super important to me. Especially after the accident, I've thought a lot about how much I need them. They mean the world to me and I'm so thankful to have them. Thankfully, they enjoyed the Grand Canyon a lot! [shared an image: a photo of two children standing on a rocky cliff overlooking a canyon]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What do Melanie's family give her?",
+      "gold_answer": "Strength and motivation",
+      "generated_answer": "Caroline: [Date: 9:55 am on 22 October, 2023] Thanks so much, Melanie! It's beautiful! It really brings home how much love's in families - both blood and the ones we choose. I hope to build my own family and put a roof over kids who haven't had that before. For me, adoption is a way of giving back and showing love and acceptance.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "How did Melanie feel about her family supporting her?",
+      "gold_answer": "She appreciated them a lot",
+      "generated_answer": "Caroline: [Date: 1:51 pm on 15 July, 2023] That's awesome, Melanie! How have your family been supportive during your move?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "open-domain",
+      "question": "What did Melanie do after the road trip to relax?",
+      "gold_answer": "Went on a nature walk or hike",
+      "generated_answer": "Melanie: [Date: 6:55 pm on 20 October, 2023] Thanks, Caroline! Yup, we just did it yesterday! The kids loved it and it was a nice way to relax after the road trip.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What did Caroline realize after her charity race?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 1:14 pm on 25 May, 2023] Hey Caroline, since we last chatted, I've had a lot of things happening to me. I ran a charity race for mental health last Saturday \u2013 it was really rewarding. Really made me think about taking care of our minds.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What are Melanie's plans for the summer with respect to adoption?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 1:14 pm on 25 May, 2023] Thanks, Caroline. It's still a work in progress, but I'm doing my best. My kids are so excited about summer break! We're thinking about going camping next month. Any fun plans for the summer?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What type of individuals does the adoption agency Melanie is considering support?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 4:33 pm on 12 July, 2023] Caroline, those lessons are great - self-acceptance and finding support are key. Plus pets are awesome for joy and comfort, can't agree more!  [shared an image: a photography of two little girls sitting on the steps with a dog]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "Why did Melanie choose the adoption agency?",
+      "gold_answer": null,
+      "generated_answer": "Caroline: [Date: 9:55 am on 22 October, 2023] Thanks so much, Melanie! It's beautiful! It really brings home how much love's in families - both blood and the ones we choose. I hope to build my own family and put a roof over kids who haven't had that before. For me, adoption is a way of giving back and showing love and acceptance.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What is Melanie excited about in her adoption process?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 1:14 pm on 25 May, 2023] That's great, Caroline! Loving the inclusivity and support. Anything you're excited for in the adoption process?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What does Melanie's necklace symbolize?",
+      "gold_answer": null,
+      "generated_answer": "Caroline: [Date: 10:37 am on 27 June, 2023] Thanks, Melanie! This necklace is super special to me - a gift from my grandma in my home country, Sweden. She gave it to me when I was young, and it stands for love, faith and strength. It's like a reminder of my roots and all the love and support I get from my family.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What country is Melanie's grandma from?",
+      "gold_answer": null,
+      "generated_answer": "Not mentioned in the memories.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What was grandma's gift to Melanie?",
+      "gold_answer": null,
+      "generated_answer": "Not mentioned in the memories.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What was grandpa's gift to Caroline?",
+      "gold_answer": null,
+      "generated_answer": "Not mentioned in the memories.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What is Caroline's hand-painted bowl a reminder of?",
+      "gold_answer": null,
+      "generated_answer": "Not mentioned in the memories.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What did Caroline and her family do while camping?",
+      "gold_answer": null,
+      "generated_answer": "Not mentioned in the memories.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What kind of counseling and mental health services is Melanie interested in pursuing?",
+      "gold_answer": null,
+      "generated_answer": "Not mentioned in the memories.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What kind of counseling workshop did Melanie attend recently?",
+      "gold_answer": null,
+      "generated_answer": "Not mentioned in the memories.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What motivated Melanie to pursue counseling?",
+      "gold_answer": null,
+      "generated_answer": "Not mentioned in the memories.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What kind of place does Melanie want to create for people?",
+      "gold_answer": null,
+      "generated_answer": "Caroline: [Date: 10:37 am on 27 June, 2023] Thanks, Melanie. It really mattered. My own journey and the support I got made a huge difference. Now I want to help people go through it too. I saw how counseling and support groups improved my life, so I started caring more about mental health and understanding myself. Now I'm passionate about creating a safe, inviting place for people to grow.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "Did Caroline make the black and white bowl in the photo?",
+      "gold_answer": "No",
+      "generated_answer": "Caroline: [Date: 1:36 pm on 3 July, 2023] That bowl is gorgeous! The black and white design looks so fancy. Did you make it?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What are the new shoes that Caroline got used for?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 4:33 pm on 12 July, 2023] Luna and Oliver! They are so sweet and playful - they really liven up the house! Just got some new shoes, too! [shared an image: a photo of a person wearing pink sneakers on a white rug]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What is Caroline's reason for getting into running?",
+      "gold_answer": null,
+      "generated_answer": "Caroline: [Date: 4:33 pm on 12 July, 2023] Wow! What got you into running?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What does Caroline say running has been great for?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 4:33 pm on 12 July, 2023] Thanks, Caroline! These are for running. Been running longer since our last chat - a great way to destress and clear my mind. [shared an image: a photo of a pair of pink sneakers in a box]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What did Melanie see at the council meeting for adoption?",
+      "gold_answer": null,
+      "generated_answer": "Caroline: [Date: 1:51 pm on 15 July, 2023] That photo is stunning! So glad you bonded over our love of nature. Last Friday I went to a council meeting for adoption. It was inspiring and emotional - so many people wanted to create loving homes for children in need. It made me even more determined to adopt.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What inspired Melanie's painting for the art show?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 10:31 am on 13 October, 2023] Yeah, Here's one I did last week. It's inspired by the sunsets. The colors make me feel calm. What have you been up to lately, artistically? [shared an image: a photo of a painting of a sunset with a pink sky]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What inspired Caroline's sculpture for the art show?",
+      "gold_answer": null,
+      "generated_answer": "Caroline: [Date: 10:31 am on 13 October, 2023] The room was electric with energy and support! The posters were amazing, so much pride and strength! It inspired me to make some art. [shared an image: a photo of a drawing of a woman in a dress]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "How often does Caroline go to the beach with her kids?",
+      "gold_answer": null,
+      "generated_answer": "Not mentioned in the memories.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What did Caroline and her family see during their camping trip last year?",
+      "gold_answer": null,
+      "generated_answer": "Not mentioned in the memories.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "How did Caroline feel while watching the meteor shower?",
+      "gold_answer": null,
+      "generated_answer": "Not mentioned in the memories.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "Why did Caroline choose to use colors and patterns in her pottery project?",
+      "gold_answer": null,
+      "generated_answer": "Caroline: [Date: 10:37 am on 27 June, 2023] Yep, Melanie! I've got some other stuff with sentimental value, like my hand-painted bowl. A friend made it for my 18th birthday ten years ago. The pattern and colors are awesome-- it reminds me of art and self-expression. [Resolved Year: 2013]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "Is Oscar Melanie's pet?",
+      "gold_answer": "No",
+      "generated_answer": "Melanie: [Date: 4:33 pm on 12 July, 2023] We've got a pup and a kitty. That's the dog, and here's our cat! They brighten up our day and always make us smile. [shared an image: a photo of a cat laying on the floor with its head on the floor]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "Where did Oscar hide his bone once?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 3:31 pm on 23 August, 2023] Oliver's hilarious! He hid his bone in my slipper once! Cute, right? Almost as silly as when I got to feed a horse a carrot.  [shared an image: a photo of a person holding a carrot in front of a horse]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What activity did Melanie used to do with her dad?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 7:55 pm on 9 June, 2023] It so fun! We played games, ate good food, and just hung out together. Family moments make life awesome.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What did Melanie make for a local church?",
+      "gold_answer": null,
+      "generated_answer": "Caroline: [Date: 1:33 pm on 25 August, 2023] Thanks! It was made for a local church and shows time changing our lives. I made it to show my own journey as a transgender woman and how we should accept growth and change. [shared an image: a photo of a large stained glass window in a church]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What did Melanie find in her neighborhood during her walk?",
+      "gold_answer": null,
+      "generated_answer": "Caroline: [Date: 1:33 pm on 25 August, 2023] I was out walking in my neighborhood when I came across this cool rainbow sidewalk for Pride Month. It was so vibrant and welcoming, I had to take a picture! It reminds us that love and acceptance are everywhere\u2014even where we least expect it.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "Which song motivates Melanie to be courageous?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 7:55 pm on 9 June, 2023] Yes, Caroline! We can do it. Your courage is inspiring. I want to be couragous for my family- they motivate me and give me love. What motivates you?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What type of instrument does Caroline play?",
+      "gold_answer": null,
+      "generated_answer": "Caroline: [Date: 3:19 pm on 28 August, 2023] I started playing acoustic guitar about five years ago; it's been a great way to express myself and escape into my emotions. [Resolved Year: 2018]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "Which classical musicians does Caroline enjoy listening to?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 3:19 pm on 28 August, 2023] I'm a fan of both classical like Bach and Mozart, as well as modern music like Ed Sheeran's \"Perfect\". [shared an image: a photo of a laptop computer with a graph on it]",
+      "correct": false,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "Who is Caroline a fan of in terms of modern music?",
+      "gold_answer": null,
+      "generated_answer": "Not mentioned in the memories.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What precautionary sign did Caroline see at the caf\u00e9?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 12:09 am on 13 September, 2023] Caroline, it's got to be tough dealing with those changes. Glad you've found people who uplift and accept you! Here's to a good time at the caf\u00e9 last weekend - they even had thoughtful signs like this! It brings me so much happiness. [shared an image: a photo of a sign posted on a door stating that someone is not being able to leave]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What setback did Caroline face recently?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 10:31 am on 13 October, 2023] Thanks for the tip, Caroline. Doing research and readying myself emotionally makes sense. I'll do that. BTW, recently I had a setback. Last month I got hurt and had to take a break from pottery, which I use for self-expression and peace.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What does Caroline do to keep herself busy during her pottery break?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 10:31 am on 13 October, 2023] Thanks for the tip, Caroline. Doing research and readying myself emotionally makes sense. I'll do that. BTW, recently I had a setback. Last month I got hurt and had to take a break from pottery, which I use for self-expression and peace.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What was the poetry reading that Melanie attended about?",
+      "gold_answer": null,
+      "generated_answer": "Caroline: [Date: 10:31 am on 13 October, 2023] It was a transgender poetry reading where transgender people shared their stories through poetry. It was extra special 'cause it was a safe place for self-expression and it was really empowering to hear others share and celebrate their identities. [shared an image: a photography of a sign that says trans lives matter]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What happened to Caroline's son on their road trip?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 6:55 pm on 20 October, 2023] Thanks, Caroline! Yup, we just did it yesterday! The kids loved it and it was a nice way to relax after the road trip.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "How did Caroline's son handle the accident?",
+      "gold_answer": null,
+      "generated_answer": "Caroline: [Date: 6:55 pm on 20 October, 2023] Oops, sorry 'bout the accident! Must have been traumatizing for you guys. Thank goodness your son's okay. Life sure can be a roller coaster.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "How did Caroline feel about her family after the accident?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 6:55 pm on 20 October, 2023] Yeah, you're right, Caroline. Family's super important to me. Especially after the accident, I've thought a lot about how much I need them. They mean the world to me and I'm so thankful to have them. Thankfully, they enjoyed the Grand Canyon a lot! [shared an image: a photo of two children standing on a rocky cliff overlooking a canyon]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "How did Caroline's children handle the accident?",
+      "gold_answer": null,
+      "generated_answer": "Caroline: [Date: 6:55 pm on 20 October, 2023] The kids look so cute, Mel! I bet they bring lots of joy. How did they handle the accident?",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "How did Caroline feel after the accident?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 6:55 pm on 20 October, 2023] Yeah, you're right, Caroline. Family's super important to me. Especially after the accident, I've thought a lot about how much I need them. They mean the world to me and I'm so thankful to have them. Thankfully, they enjoyed the Grand Canyon a lot! [shared an image: a photo of two children standing on a rocky cliff overlooking a canyon]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What was Caroline's reaction to her children enjoying the Grand Canyon?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 6:55 pm on 20 October, 2023] Yeah, you're right, Caroline. Family's super important to me. Especially after the accident, I've thought a lot about how much I need them. They mean the world to me and I'm so thankful to have them. Thankfully, they enjoyed the Grand Canyon a lot! [shared an image: a photo of two children standing on a rocky cliff overlooking a canyon]",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What did Caroline do after the road trip to relax?",
+      "gold_answer": null,
+      "generated_answer": "Melanie: [Date: 6:55 pm on 20 October, 2023] Thanks, Caroline! Yup, we just did it yesterday! The kids loved it and it was a nice way to relax after the road trip.",
+      "correct": true,
+      "num_retrieved": 15
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "adversarial",
+      "question": "What does Caroline love most about camping with her family?",
+      "gold_answer": null,
+      "generated_answer": "Not mentioned in the memories.",
+      "correct": true,
+      "num_retrieved": 15
+    }
+  ]
+}
