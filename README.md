@@ -1,86 +1,162 @@
-# Contexta 🧠
+<p align="center">
+  <img src="assets/logo.png" alt="Contexta Logo" width="620"/>
+</p>
 
-### The Self-Hosted Memory Intelligence Layer for AI Agents
+<h3 align="center">The Open-Source, Long-Term Memory Intelligence Engine for AI Agents</h3>
 
-Contexta is an enterprise-grade, self-hosted memory layer that gives your AI agents persistent, long-term memory across sessions. Stop paying for expensive, third-party closed SaaS solutions. Keep your user data secure, isolated, and running with ultra-low latency on your own infrastructure.
+<p align="center">
+  <strong>Give your LLMs and autonomous agents persistent, human-like memory across sessions.</strong><br/>
+  100% self-hosted • Sovereign & offline-first • Zero third-party SaaS fees • Strict data privacy
+</p>
 
----
-
-## Why Contexta?
-
-As AI agents move from simple chatbots to autonomous assistants, they struggle with two major limitations:
-1. **Token Budgets**: Shoveling entire conversation histories into context windows is expensive and leads to "lost in the middle" attention issues.
-2. **Data Privacy & Cost**: Relying on closed-source memory APIs exposes sensitive user data and creates high recurring API costs.
-
-**Contexta solves this by running a specialized memory pipeline directly on your stack.** It extracts, consolidates, scores, and retrieves memories dynamically based on semantic relevance and relational graphs.
-
----
-
-## 🎯 Target Use Cases
-
-* **Personalized AI Assistants**: Build agents that actually remember user preferences, life facts, and history over months without polluting system prompts.
-* **Multi-Tenant SaaS Applications**: Offer isolated memory partitions for thousands of users or companies, fully compliant with strict data residency requirements.
-* **Customer Support & CRM Bots**: Let your support agents seamlessly continue conversations with full context of past interactions and resolved issues.
-* **Completely Air-Gapped/On-Prem Deployments**: Ideal for healthcare, finance, or defense agents requiring local database vector storage and zero external API dependencies.
+<p align="center">
+  <a href="#-the-problem-why-ai-agents-need-memory">Why Contexta</a> •
+  <a href="#-how-contexta-works">How It Works</a> •
+  <a href="#-key-superpowers">Superpowers</a> •
+  <a href="#-sdk-integration-local-preview">SDKs</a> •
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="docs/">Documentation</a>
+</p>
 
 ---
 
-## 🚀 Key Features
+## 💡 What is Contexta?
 
-* 👤 **Tenant Isolation & Multi-Tenancy**: Complete cryptographic and relational segregation of memory pools by user, session, and organization out of the box.
-* 🔄 **Autonomous Memory Lifecycle ("Dream Cycles")**:
-  * **Continuous Extraction**: Background workers analyze conversations to extract facts, entities, preferences, and relationships.
-  * **Memory Reflection**: Scheduled cron tasks automatically merge duplicate facts and resolve contradictions.
-  * **Importance & Auto-Decay**: Intelligently scores and decays memories over time, ensuring only high-utility context is retrieved.
-* 🔍 **Hybrid Graph & Semantic Retrieval**: Combines high-speed vector embeddings (`pgvector`) with relational graph traversals to build rich, contextual system prompts.
-* ⚡ **High-Performance Polyglot Architecture**:
-  * **Go Microservices** (Gateway & Data-Plane) for <10ms read/write path.
-  * **Python FastAPI & Celery** for heavy-lifting LLM extractions and scheduling.
-* 🔌 **Deterministic Local Mocking**: Develop and test offline without needing OpenAI or DeepSeek API keys.
+**Contexta is a self-hosted memory layer designed specifically for AI agents, chatbots, and autonomous workflows.**
+
+Just like humans remember past conversations, preferences, and important life details, Contexta equips your AI agents with a continuous, long-term memory engine. Instead of treating every conversation as a blank slate, your agents remember who they are talking to, what happened weeks ago, and how facts evolve over time.
+
+Contexta runs entirely on your own infrastructure (Docker, local models, or your cloud of choice). Your sensitive user data never leaves your environment, and you avoid expensive third-party memory API subscriptions.
 
 ---
 
-## 📦 Production-Ready & Ultra-Lightweight
+## 🧩 The Problem: Why AI Agents Need Memory
 
-Contexta is built from the ground up to be resource-efficient and fast to deploy. Our Docker images are optimized for minimal footprints:
+Every modern AI agent faces two critical bottlenecks:
 
-| Service | Docker Image / Base | Build Size | Role |
-| :--- | :--- | :---: | :--- |
-| **Go Gateway** | `gcr.io/distroless/static-debian12` | **~25 MB** | Directs API traffic, handles auth and routing |
-| **Go Data-Plane** | `gcr.io/distroless/static-debian12` | **~28 MB** | Fast vector read/writes, graph querying |
-| **Go Aggregator** | `gcr.io/distroless/static-debian12` | **~22 MB** | Runs offline cleanups and health tasks |
-| **Web Dashboard** | `node:22-alpine` (Next.js Standalone) | **~165 MB** | Sleek management UI, API keys, memory explorer |
-| **Python Backend** | `python:3.12-slim` | **~215 MB** | FastAPI, Celery workers, and LLM orchestration |
+1. **Amnesia & Context Bloat**: When a chat finishes, the agent forgets everything. If you try to fix this by cramming entire conversation histories into the LLM prompt, you burn thousands of dollars in token costs, hit context window limits, and cause the model to suffer from "lost in the middle" hallucinations.
+2. **Privacy Risks & SaaS Lock-in**: Offloading user memory to proprietary, closed-source cloud memory services exposes sensitive user chats, creates vendor lock-in, and introduces recurring per-call pricing.
+
+**Contexta solves both.** It runs directly alongside your application, intelligently filtering and storing only what matters, keeping facts updated, and serving precise, high-salience context in milliseconds.
 
 ---
 
-## 📐 Architecture
+## ⚙️ How Contexta Works
 
-Contexta separates high-throughput retrieval from complex background extraction:
+Contexta operates like a cognitive cycle running silently in the background:
 
-```mermaid
-graph TD
-    Client[Clients / SDKs] -->|HTTP/gRPC :8443| Gateway[Go API Gateway]
-    Gateway -->|Fast Reads/Writes :8080| DP[Go Data-Plane]
-    Gateway -->|AI / Extraction :8000| Backend[FastAPI Backend]
-    Backend -->|Enqueue Jobs| Queue[Redis Broker]
-    Queue -->|Execute Tasks| Worker[Celery Worker]
-    Beat[Celery Beat] -->|Trigger Schedule| Queue
-    Worker -->|Vector & Graph Storage| DB[(Postgres + pgvector)]
-    DP -->|Direct Read/Write| DB
-    DP -->|Cache| RedisCache[Redis Cache]
-    Web[Next.js Dashboard :3000] -->|Manage Keys & Views| Gateway
+```
+┌─────────────────┐       ┌─────────────────────────┐       ┌──────────────────────┐
+│  1. OBSERVE     │ ────> │  2. DREAM & CONSOLIDATE │ ────> │  3. RECALL           │
+│  Conversation   │       │  Extract facts, link    │       │  Precise, budgeted   │
+│  is ingested    │       │  entities & update truth│       │  context in <10ms    │
+└─────────────────┘       └─────────────────────────┘       └──────────────────────┘
+```
+
+1. **Observe (Ingest)**:
+   As your user interacts with your agent, you pass the messages to Contexta via a single SDK call. Contexta automatically sanitizes the text, redacting API keys, passwords, and secrets before anything is saved.
+
+2. **Dream (Consolidate & Truth Maintenance)**:
+   In the background, autonomous workers run "dream cycles":
+   - **Fact Extraction**: Automatically identifies user preferences, facts, and relationships.
+   - **Knowledge Graph Linking**: Connects people, projects, places, and concepts.
+   - **Contradiction Resolution**: If a user says *"I moved from New York to London"*, Contexta invalidates the outdated location and updates the active fact so the agent never gets confused.
+
+3. **Recall (Context Injection)**:
+   When your agent needs to generate a response, Contexta fuses dense vector similarity (`pgvector`), lexical keyword matching, and knowledge graph traversal. It outputs a neat, token-budgeted memory briefing ready to drop right into your system prompt.
+
+---
+
+## ✨ Key Superpowers
+
+- 🛡️ **100% Sovereign & Offline-Ready**:
+  Comes out-of-the-box with local Qwen3 models (`Qwen/Qwen3-Embedding-0.6B` and `Qwen/Qwen3-Reranker-0.6B`). Runs completely offline without external cloud keys or internet access. Online cloud models (OpenAI, DeepSeek, Anthropic) are fully supported whenever you want them.
+
+- ⚡ **Ultra-Low Latency (<10ms Data-Plane)**:
+  Engineered with high-throughput Go microservices for real-time reads and writes, paired with PostgreSQL + pgvector for rock-solid persistence.
+
+- 🧠 **Living Truth Maintenance**:
+  Memories aren't static vectors. Contexta actively tracks memory lineage, supersedes contradicting facts, and decays stale information over time.
+
+- 🏢 **Multi-Tenant by Design**:
+  Isolated memory partitions by organization, user, and session. Complete cryptographic and relational segregation prevents data leaks between users.
+
+- 🖥️ **Interactive Visual Console**:
+  Includes a sleek management dashboard to inspect memories, search entities, visualize relationships in an interactive graph, and test recall queries live.
+
+- 🔌 **Native MCP Server Support**:
+  Plug Contexta directly into **Cursor, Windsurf, and Claude Desktop** via the Model Context Protocol (MCP) to give your favorite AI coding editors persistent memory of your projects.
+
+---
+
+## 📦 SDK Integration
+
+> [!IMPORTANT]
+> **Status: Local Monorepo Preview (Public Registry Release Coming Soon)**  
+> The official Python and TypeScript client SDKs are currently available locally inside this repository under [`clients/python`](clients/python) and [`clients/typescript`](clients/typescript).  
+> They will be published to PyPI (`contexta-client`) and npm (`@contexta/client`) in the upcoming public release. In the meantime, you can install or link them directly from this repository.
+
+### Python SDK (Local Development)
+
+Install locally in editable mode:
+```bash
+pip install -e clients/python
+```
+
+```python
+from contexta_client import contexta
+
+# Automatically connects to CONTEXTA_API_URL and CONTEXTA_API_KEY
+memory = contexta.from_env()
+
+# 1. Observe a conversation
+memory.observe(
+    user_id="user_123",
+    messages=[
+        {"role": "user", "content": "I prefer historic boutique hotels and love drinking matcha tea."},
+        {"role": "assistant", "content": "Got it! I will remember that for your future itineraries."}
+    ],
+)
+
+# 2. Retrieve relevant context for your next prompt
+ctx = memory.context(user_id="user_123", token_budget=1500)
+
+# 3. Inject into your system prompt
+system_prompt = f"You are a helpful travel assistant.\n\n{ctx.to_system_prompt()}"
+```
+
+### TypeScript SDK (Local Development)
+
+Install or link locally:
+```bash
+npm install ./clients/typescript
+```
+
+```typescript
+import { contexta } from "@contexta/client";
+
+const memory = contexta.fromEnv();
+
+// 1. Observe an interaction
+await memory.observe({
+  userId: "user_123",
+  messages: [
+    { role: "user", content: "I prefer historic boutique hotels and love drinking matcha tea." }
+  ]
+});
+
+// 2. Retrieve structured memory context
+const ctx = await memory.context({ userId: "user_123" });
+console.log(ctx.toSystemPrompt());
 ```
 
 ---
 
 ## ⚡ Quick Start
 
-Deploy the entire Contexta stack (Python API + workers, Go data-plane/gateway, Next.js dashboard, Postgres + pgvector, Redis, local Qwen3 model-server) in under a minute.
+Get the entire Contexta stack running locally in under two minutes:
 
-### 1. Start the Stack (Single Command)
-
-Clone the repository and run:
+### 1. Launch the Stack
 
 **macOS & Linux:**
 ```bash
@@ -92,157 +168,32 @@ Clone the repository and run:
 .\start.ps1
 ```
 
-*(Or via Docker Compose directly: `cp .env.example .env && docker compose up --build`)*
+*(Or use Docker directly: `cp .env.example .env && docker compose up -d`)*
 
-*No API keys needed.* Default mode is **offline**: Qwen3-Embedding-0.6B + Qwen3-Reranker-0.6B auto-download to `./models` on first boot, 1024-dim embeddings, zero data egress.
+> **Offline by default**: On first launch, the local embedding & reranker models download automatically to `./models`. Zero cloud API keys required.
 
-Additional Commands:
-```bash
-# View service status / logs
-./entrypoint.sh status
-./entrypoint.sh logs
+### 2. Open the Dashboard
 
-# Cloud models (OpenAI embeddings 1536-dim + BYOK classifier LLM)
-./entrypoint.sh online
-
-# Strict multi-tenant gateway enforcement
-./entrypoint.sh enterprise
-
-# Stop services
-./entrypoint.sh stop
-```
-
-> Switching embedding dimensions (1024 offline ↔ 1536 online) needs a fresh DB volume: `docker compose down -v` first.
-
-### 2. Configure Environment (online mode only)
-
-For cloud models, set in `.env`:
-
-```env
-CONTEXTA_ENGINE_MODE=online
-CONTEXTA_LLM_PROVIDER=openai
-CONTEXTA_LLM_MODEL=gpt-4o-mini
-CONTEXTA_LLM_API_KEY=your-key
-CONTEXTA_EMBEDDING_PROVIDER=openai
-CONTEXTA_EMBEDDING_MODEL=text-embedding-3-small
-CONTEXTA_EMBEDDING_DIMENSIONS=1536
-CONTEXTA_EMBEDDING_API_KEY=your-key
-```
-
-### 3. Access the Management Dashboard
-
-1. Open your browser and navigate to **`http://localhost:3000`**.
-2. Log in with any email and a password of at least 8 characters (development login).
-3. Navigate to **API Keys** and generate a new key.
+Open your browser to **[http://localhost:3000](http://localhost:3000)**:
+- Log in with any email and password (minimum 8 characters in development mode).
+- Head to **API Keys** to generate an API key for your applications.
+- Explore the **Memory Inspector** and **Entity Graph** as you ingest data!
 
 ---
 
-## 🔌 SDK Integration
+## 📚 Where to Go Next
 
-### Python SDK
+To keep this README focused on what Contexta is as a software product, in-depth technical guides, API specs, and architectural deep dives are organized in dedicated resources:
 
-```bash
-pip install contexta-client
-```
-
-```python
-from contexta_client import contexta
-
-# Reads CONTEXTA_API_KEY and CONTEXTA_API_URL from environment
-memory = contexta.from_env()
-
-# 1. Observe a new interaction
-memory.observe(
-    user_id="user_123",
-    messages=[
-        {"role": "user", "content": "I prefer historic boutique hotels and love drinking matcha tea."},
-        {"role": "assistant", "content": "Got it! I will remember that for your future itineraries."}
-    ],
-)
-
-# 2. Retrieve personalized context for your next prompt
-ctx = memory.context(user_id="user_123", token_budget=1500)
-
-# 3. Augment your system prompt
-system_prompt = f"You are a helpful travel assistant.\n\n{ctx.to_system_prompt()}"
-```
-
-### TypeScript SDK
-
-```bash
-npm install @contexta/client
-```
-
-```typescript
-import { contexta } from "@contexta/client";
-
-const memory = contexta.fromEnv();
-
-// 1. Observe a conversation
-await memory.observe({
-  userId: "user_123",
-  messages: [
-    { role: "user", content: "I prefer historic boutique hotels and love drinking matcha tea." }
-  ]
-});
-
-// 2. Retrieve structured context
-const ctx = await memory.context({ userId: "user_123" });
-console.log(ctx.toSystemPrompt());
-```
-
-### MCP Server (Claude Desktop, Cursor, Windsurf)
-
-Stdio (local clients) — needs `CONTEXTA_DATABASE_URL` pointing at the stack's Postgres:
-
-```bash
-python -m contexta.mcp
-```
-
-```json
-{
-  "mcpServers": {
-    "contexta": { "command": "python", "args": ["-m", "contexta.mcp"] }
-  }
-}
-```
-
-Or SSE transport: `python -m contexta.mcp --transport sse --port 8765`, then `"url": "http://localhost:8765/sse"`.
-
-Tools: `contexta_remember`, `contexta_recall`, `contexta_get_context`, `contexta_explore_graph`, `contexta_forget`, `contexta_batch_remember`, `contexta_dream`, `contexta_metrics`.
-
----
-
-## 🛠️ Local Development
-
-### Python Backend & Tests
-```bash
-# Set up virtual environment and install dev dependencies
-pip install -e ".[dev]"
-
-# Run test suite
-pytest
-```
-
-### Next.js Dashboard
-```bash
-cd web
-npm install
-npm run dev
-```
-
----
-
-## 🤝 Contributing
-
-We love our open-source community! Contexta is fully open-source, and we welcome contributions of all kinds. Currently, we are specifically looking for help to:
-1. **Enhance the Dashboard UI**: Improve the Next.js dashboard with better aesthetics, modern components, and improved UX.
-2. **Clean the Codebase**: Refactor legacy code, improve architecture, and help keep the codebase clean and maintainable.
-
-Check out our [CONTRIBUTING.md](CONTRIBUTING.md) for more details on how to get started.
+| Resource | Description |
+| :--- | :--- |
+| 📖 **[Developer Documentation (`docs/`)](docs/)** | Full Nextra documentation portal containing step-by-step quickstarts, integration guides (LangChain, LlamaIndex, OpenAI Assistants, Claude), concept deep-dives (truth maintenance, hybrid retrieval, decay math), and complete API references. |
+| 🤖 **[Contributor Playbook (`AGENTS.md`)](AGENTS.md)** | Architectural invariants, service boundary definitions, testing suites, multi-tenant rules, and coding standards for developers and autonomous agents. |
+| 🔌 **[Model Context Protocol (`contexta/mcp/`)](contexta/mcp/)** | Instructions for setting up Contexta as an MCP server with Cursor, Windsurf, or Claude Desktop. |
+| 🤝 **[Contributing Guidelines (`CONTRIBUTING.md`)](CONTRIBUTING.md)** | Information on community contributions, bug reports, and dashboard feature requests. |
 
 ---
 
 ## 📜 License
 
-Contexta is fully open-source and available under the **Apache 2.0 License**. You are free to use, modify, distribute, and integrate Contexta in both personal and commercial projects.
+Contexta is open-source software licensed under the **Apache 2.0 License**. You are free to use, modify, and distribute it for both personal and commercial projects.
