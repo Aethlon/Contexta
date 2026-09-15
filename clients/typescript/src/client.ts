@@ -245,7 +245,83 @@ export class Asynccontexta {
       idempotent: true,
     });
   }
+
+  async getMany(memoryIds: string[]): Promise<any[]> {
+    const res = await this.http.request<{ count: number; memories: any[] }>(
+      "POST",
+      "/memories/batch-get",
+      { memory_ids: memoryIds }
+    );
+    return res.memories ?? [];
+  }
+
+  async retrieveBatch(queries: any[]): Promise<any[]> {
+    const res = await this.http.request<{ count: number; batch_results: any[] }>(
+      "POST",
+      "/retrieve/batch",
+      { queries }
+    );
+    return res.batch_results ?? [];
+  }
+
+  async feedback(
+    memoryId: string,
+    options: { signal: "positive" | "negative"; userCorrection?: string; penalty?: number }
+  ): Promise<any> {
+    return this.http.request("POST", `/memories/${memoryId}/feedback`, {
+      signal: options.signal,
+      user_correction: options.userCorrection,
+      penalty: options.penalty ?? 0.5,
+    });
+  }
+
+  async addRule(options: {
+    userId: string;
+    rule: string;
+    title?: string;
+    tags?: string[];
+  }): Promise<any> {
+    const tags = [...(options.tags ?? []), "rule", "procedural"];
+    return this.observe({
+      userId: options.userId,
+      messages: [
+        { role: "user", content: `Instruction / Operating Rule: ${options.rule}` },
+        { role: "assistant", content: `Understood. I will strictly follow this rule: ${options.rule}` },
+      ],
+      metadata: { memory_type: "procedural", rule_title: options.title ?? "Behavioral Rule", tags },
+    });
+  }
+
+  async investigate(options: {
+    queryText: string;
+    userId: string;
+    organizationId?: string;
+    maxHops?: number;
+    limit?: number;
+  }): Promise<any> {
+    return this.http.request("POST", "/retrieve/investigate", {
+      query_text: options.queryText,
+      user_id: options.userId,
+      organization_id: options.organizationId,
+      max_hops: options.maxHops ?? 2,
+      limit: options.limit ?? 15,
+    });
+  }
+
+  async reflect(options: {
+    userId: string;
+    applySupersession?: boolean;
+    minOccurrencesForPattern?: number;
+  }): Promise<any> {
+    return this.http.request("POST", "/memories/reflect", {
+      user_id: options.userId,
+      apply_supersession: options.applySupersession ?? true,
+      min_occurrences_for_pattern: options.minOccurrencesForPattern ?? 3,
+    });
+  }
 }
+
+
 
 export class contexta extends Asynccontexta {
   constructor(config: contextaConfig) {

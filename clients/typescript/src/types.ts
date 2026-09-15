@@ -8,8 +8,8 @@ export interface contextaConfig {
 
 export interface ObserveInput {
   userId: string;
-  organizationId: string;
-  sessionId: string;
+  organizationId?: string;
+  sessionId?: string;
   messages: Record<string, unknown>[];
   metadata?: Record<string, unknown>;
   policy?: string;

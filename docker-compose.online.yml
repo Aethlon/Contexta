@@ -1,0 +1,38 @@
+# Online (cloud) profile: BYOK classifier LLM + OpenAI embeddings (1536-dim).
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.online.yml up --build
+#
+# Requires in .env (or environment):
+#   CONTEXTA_ENGINE_MODE=online
+#   CONTEXTA_LLM_PROVIDER=openai          # or deepseek / anthropic (OpenAI-compatible)
+#   CONTEXTA_LLM_MODEL=gpt-4o-mini
+#   CONTEXTA_LLM_API_KEY=sk-...
+#   CONTEXTA_EMBEDDING_PROVIDER=openai
+#   CONTEXTA_EMBEDDING_MODEL=text-embedding-3-small
+#   CONTEXTA_EMBEDDING_DIMENSIONS=1536
+#   CONTEXTA_EMBEDDING_API_KEY=sk-...
+#
+# NOTE: switching dimensions (1024 offline <-> 1536 online) requires a fresh
+# database volume, pgvector HNSW indexes are dimension-bound:
+#   docker compose down -v && docker compose -f docker-compose.yml \
+#     -f docker-compose.online.yml up --build
+
+services:
+  api:
+    environment:
+      CONTEXTA_ENGINE_MODE: ${CONTEXTA_ENGINE_MODE:-online}
+      CONTEXTA_LLM_PROVIDER: ${CONTEXTA_LLM_PROVIDER:-openai}
+      CONTEXTA_LLM_MODEL: ${CONTEXTA_LLM_MODEL:-gpt-4o-mini}
+      CONTEXTA_EMBEDDING_PROVIDER: ${CONTEXTA_EMBEDDING_PROVIDER:-openai}
+      CONTEXTA_EMBEDDING_MODEL: ${CONTEXTA_EMBEDDING_MODEL:-text-embedding-3-small}
+      CONTEXTA_EMBEDDING_DIMENSIONS: ${CONTEXTA_EMBEDDING_DIMENSIONS:-1536}
+
+  worker:
+    environment:
+      CONTEXTA_ENGINE_MODE: ${CONTEXTA_ENGINE_MODE:-online}
+      CONTEXTA_LLM_PROVIDER: ${CONTEXTA_LLM_PROVIDER:-openai}
+      CONTEXTA_LLM_MODEL: ${CONTEXTA_LLM_MODEL:-gpt-4o-mini}
+      CONTEXTA_EMBEDDING_PROVIDER: ${CONTEXTA_EMBEDDING_PROVIDER:-openai}
+      CONTEXTA_EMBEDDING_MODEL: ${CONTEXTA_EMBEDDING_MODEL:-text-embedding-3-small}
+      CONTEXTA_EMBEDDING_DIMENSIONS: ${CONTEXTA_EMBEDDING_DIMENSIONS:-1536}

@@ -37,6 +37,8 @@ class ImportanceFramework:
         MemoryType.RELATIONSHIP: 0.6,
         MemoryType.EVENT: 0.5,
         MemoryType.EPISODIC: 0.4,
+        MemoryType.PROCEDURAL: 0.75,
+        MemoryType.RULE: 0.8,
         MemoryType.PATTERN: 0.6,
         MemoryType.CONTACT: 0.7,
         MemoryType.CUSTOM: 0.5,

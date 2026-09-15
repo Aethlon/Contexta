@@ -4,22 +4,19 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/contexta/data-plane/internal/metering"
 	"github.com/contexta/data-plane/internal/redaction"
 	"github.com/contexta/data-plane/internal/storage"
 )
 
 type Server struct {
-	Store   *storage.Store
-	Filter  *redaction.Filter
-	Emitter *metering.Emitter
+	Store  *storage.Store
+	Filter *redaction.Filter
 }
 
-func New(store *storage.Store, filter *redaction.Filter, emitter *metering.Emitter) *Server {
+func New(store *storage.Store, filter *redaction.Filter) *Server {
 	return &Server{
-		Store:   store,
-		Filter:  filter,
-		Emitter: emitter,
+		Store:  store,
+		Filter: filter,
 	}
 }
 

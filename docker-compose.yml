@@ -68,11 +68,15 @@ services:
       CONTEXTA_CELERY_RESULT_BACKEND: redis://redis:6379/2
       CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
       CONTEXTA_SECRET_KEY: ${CONTEXTA_SECRET_KEY:-change-me-in-production-use-a-long-random-string}
-      CONTEXTA_LLM_PROVIDER: deepseek
-      CONTEXTA_LLM_BASE_URL: https://api.deepseek.com/v1
-      CONTEXTA_LLM_MODEL: deepseek-chat
-      CONTEXTA_LLM_API_KEY: ${DEEPSEEK_API_KEY}
-      CONTEXTA_EMBEDDING_PROVIDER: deterministic
+      CONTEXTA_ENGINE_MODE: ${CONTEXTA_ENGINE_MODE:-offline}
+      CONTEXTA_LLM_PROVIDER: ${CONTEXTA_LLM_PROVIDER:-local}
+      CONTEXTA_LLM_BASE_URL: ${CONTEXTA_LLM_BASE_URL:-}
+      CONTEXTA_LLM_MODEL: ${CONTEXTA_LLM_MODEL:-Qwen/Qwen3-Reranker-0.6B}
+      CONTEXTA_LLM_API_KEY: ${CONTEXTA_LLM_API_KEY:-}
+      CONTEXTA_EMBEDDING_PROVIDER: ${CONTEXTA_EMBEDDING_PROVIDER:-local}
+      CONTEXTA_EMBEDDING_MODEL: ${CONTEXTA_EMBEDDING_MODEL:-Qwen/Qwen3-Embedding-0.6B}
+      CONTEXTA_EMBEDDING_DIMENSIONS: ${CONTEXTA_EMBEDDING_DIMENSIONS:-1024}
+      CONTEXTA_EMBEDDING_API_KEY: ${CONTEXTA_EMBEDDING_API_KEY:-}
       CONTEXTA_LOCAL_MODEL_SERVER_URL: http://model-server:8001
       MODEL_CACHE_DIR: /app/models
     ports:
@@ -91,15 +95,15 @@ services:
     restart: unless-stopped
 
   # ─── Next.js Dashboard ─────────────────────────────
-  web:
+  dashboard:
     build:
       context: .
-      dockerfile: web/Dockerfile
+      dockerfile: dashboard/Dockerfile
     environment:
       CONTEXTA_API_URL: http://api:8000
       AUTH_SECRET: ${AUTH_SECRET:-dev-secret-key-change-in-prod}
     ports:
-      - "3000:3000"
+      - "${DASHBOARD_PORT:-3000}:3000"
     depends_on:
       api:
         condition: service_started
@@ -114,11 +118,15 @@ services:
       CONTEXTA_CELERY_BROKER_URL: redis://redis:6379/1
       CONTEXTA_CELERY_RESULT_BACKEND: redis://redis:6379/2
       CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
-      CONTEXTA_LLM_PROVIDER: deepseek
-      CONTEXTA_LLM_BASE_URL: https://api.deepseek.com/v1
-      CONTEXTA_LLM_MODEL: deepseek-chat
-      CONTEXTA_LLM_API_KEY: ${DEEPSEEK_API_KEY}
-      CONTEXTA_EMBEDDING_PROVIDER: deterministic
+      CONTEXTA_ENGINE_MODE: ${CONTEXTA_ENGINE_MODE:-offline}
+      CONTEXTA_LLM_PROVIDER: ${CONTEXTA_LLM_PROVIDER:-local}
+      CONTEXTA_LLM_BASE_URL: ${CONTEXTA_LLM_BASE_URL:-}
+      CONTEXTA_LLM_MODEL: ${CONTEXTA_LLM_MODEL:-Qwen/Qwen3-Reranker-0.6B}
+      CONTEXTA_LLM_API_KEY: ${CONTEXTA_LLM_API_KEY:-}
+      CONTEXTA_EMBEDDING_PROVIDER: ${CONTEXTA_EMBEDDING_PROVIDER:-local}
+      CONTEXTA_EMBEDDING_MODEL: ${CONTEXTA_EMBEDDING_MODEL:-Qwen/Qwen3-Embedding-0.6B}
+      CONTEXTA_EMBEDDING_DIMENSIONS: ${CONTEXTA_EMBEDDING_DIMENSIONS:-1024}
+      CONTEXTA_EMBEDDING_API_KEY: ${CONTEXTA_EMBEDDING_API_KEY:-}
       CONTEXTA_LOCAL_MODEL_SERVER_URL: http://model-server:8001
       MODEL_CACHE_DIR: /app/models
     volumes:
@@ -138,6 +146,8 @@ services:
     build: .
     environment:
       MODE: beat
+      CONTEXTA_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-contexta}
+      CONTEXTA_REDIS_URL: redis://redis:6379/0
       CONTEXTA_CELERY_BROKER_URL: redis://redis:6379/1
       CONTEXTA_CELERY_RESULT_BACKEND: redis://redis:6379/2
       CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
@@ -158,8 +168,12 @@ services:
       DATA_PLANE_URL: http://data-plane:8080
       PYTHON_API_URL: http://api:8000
       LISTEN_ADDR: :8443
+      TLS_CERT_FILE: /certs/cert.pem
+      TLS_KEY_FILE: /certs/key.pem
     ports:
       - "8443:8443"
+    volumes:
+      - ./certs:/certs:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -167,6 +181,24 @@ services:
         condition: service_healthy
       api:
         condition: service_started
+    restart: unless-stopped
+
+  mcp:
+    build: .
+    environment:
+      MODE: mcp
+      CONTEXTA_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-contexta}
+      CONTEXTA_LOCAL_MODEL_SERVER_URL: http://model-server:8001
+      MODEL_CACHE_DIR: /app/models
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./models:/app/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      model-server:
+        condition: service_healthy
     restart: unless-stopped
 
   data-plane:
@@ -177,18 +209,6 @@ services:
       LISTEN_ADDR: :8080
     ports:
       - "8081:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  aggregator:
-    build: ./services/aggregator
-    environment:
-      REDIS_ADDR: redis:6379
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-contexta}
     depends_on:
       postgres:
         condition: service_healthy

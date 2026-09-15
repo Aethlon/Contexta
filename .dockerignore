@@ -1,13 +1,18 @@
 *
 !contexta/
 !scripts/
-!web/
+!dashboard/
+dashboard/node_modules
+dashboard/.next
+!services/
 !pyproject.toml
 !uv.lock
 !alembic.ini
 !entrypoint.sh
 
 node_modules
+**/node_modules
+**/.next
 __pycache__
 *.pyc
 .pytest_cache

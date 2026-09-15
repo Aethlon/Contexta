@@ -14,8 +14,8 @@ from contexta.api.middleware.auth import AuthenticationMiddleware
 from contexta.api.middleware.logging import RequestLoggingMiddleware
 from contexta.api.middleware.tenant import TenantMiddleware
 from contexta.api.routes.api_keys import router as api_keys_router
+from contexta.api.routes.audit import router as audit_router
 from contexta.api.routes.auth import router as auth_router
-from contexta.api.routes.billing import router as billing_router
 from contexta.api.routes.graph import router as graph_router
 from contexta.api.routes.memories import router as memories_router
 from contexta.api.routes.observations import router as observations_router
@@ -47,52 +47,56 @@ async def lifespan(app: FastAPI):
     """Lifecycle manager for the FastAPI application."""
     import sys
     is_testing = "pytest" in sys.modules
-    if settings.db_boot_check and not is_testing:
+    if not is_testing:
         db_ok = await check_db()
         if not db_ok:
-            raise RuntimeError("Database boot check failed! Could not connect to Postgres database.")
-
-        # Auto-seed default admin account for local development
-        try:
-            from contexta.db import AsyncSessionFactory
-            from contexta.models.account import Account, Organization, OrganizationMember
-            from contexta.repositories.account_repo import AccountRepository, OrganizationRepository
-            from contexta.services.auth import hash_password
             import structlog
+            structlog.get_logger("contexta.engine").warning(
+                "database_offline",
+                msg="Database is not reachable. Operating in standalone mode without active database persistence.",
+            )
+        else:
+            # Auto-seed default admin account for local development
+            try:
+                from contexta.db import AsyncSessionFactory
+                from contexta.models.account import Account, Organization, OrganizationMember
+                from contexta.repositories.account_repo import AccountRepository, OrganizationRepository
+                from contexta.services.auth import hash_password
+                import structlog
 
-            log = structlog.get_logger("contexta.auth")
-            async with AsyncSessionFactory() as session:
-                account_repo = AccountRepository(session)
-                org_repo = OrganizationRepository(session)
-                admin_account = await account_repo.find_by_email("admin@contexta.ai")
-                if not admin_account:
-                    admin_account = Account(
-                        email="admin@contexta.ai",
-                        password_hash=hash_password("password123"),
-                        display_name="Admin",
-                        status="active",
-                    )
-                    admin_account = await account_repo.create(admin_account)
-                    org = await org_repo.find_by_slug("default-org")
-                    if not org:
-                        org = Organization(
-                            name="Default Organization",
-                            slug="default-org",
-                            plan_code="scale",
+                log = structlog.get_logger("contexta.auth")
+                async with AsyncSessionFactory() as session:
+                    account_repo = AccountRepository(session)
+                    org_repo = OrganizationRepository(session)
+                    admin_account = await account_repo.find_by_email("User@aethlon.xyz")
+                    if not admin_account:
+                        admin_account = Account(
+                            email="User@aethlon.xyz",
+                            password_hash=hash_password("password1234"),
+                            display_name="User",
                             status="active",
                         )
-                        org = await org_repo.create(org)
-                    member = OrganizationMember(
-                        organization_id=org.id,
-                        account_id=admin_account.id,
-                        role="owner",
-                    )
-                    session.add(member)
-                    await session.commit()
-                    log.info("default_admin_ready", email="admin@contexta.ai", password="password123")
-        except Exception as seed_err:
-            import structlog
-            structlog.get_logger("contexta.auth").warning("admin_seed_skipped", error=str(seed_err))
+                        admin_account = await account_repo.create(admin_account)
+                        org = await org_repo.find_by_slug("default-org")
+                        if not org:
+                            org = Organization(
+                                name="Personal Memory Vault",
+                                slug="default-org",
+                                plan_code="sovereign",
+                                status="active",
+                            )
+                            org = await org_repo.create(org)
+                        member = OrganizationMember(
+                            organization_id=org.id,
+                            account_id=admin_account.id,
+                            role="owner",
+                        )
+                        session.add(member)
+                        await session.commit()
+                        log.info("default_user_ready", email="User@aethlon.xyz", password="password1234")
+            except Exception as seed_err:
+                import structlog
+                structlog.get_logger("contexta.auth").warning("admin_seed_skipped", error=str(seed_err))
 
     # Validate Online mode requirements: both LLM and Embedding credentials must be present
     if settings.validate_online_providers_at_startup and settings.engine_mode == "online":
@@ -163,6 +167,8 @@ def create_app() -> FastAPI:
     app.include_router(system_router, prefix="/v1")
     app.include_router(system_router)
     app.include_router(api_keys_router)
+    app.include_router(audit_router)
+    app.include_router(audit_router, prefix="/audit", tags=["audit"])
     app.include_router(observations_router, prefix="/v1/observations", tags=["observations"])
     app.include_router(retrieval_router, prefix="/v1", tags=["retrieval"])
     app.include_router(retrieval_router, tags=["retrieval"])
@@ -173,7 +179,6 @@ def create_app() -> FastAPI:
     app.include_router(graph_router, prefix="/graph", tags=["graph"])
     app.include_router(sessions_router, prefix="/v1/sessions", tags=["sessions"])
     app.include_router(auth_router)
-    app.include_router(billing_router)
 
     return app
 

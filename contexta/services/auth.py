@@ -5,6 +5,14 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import bcrypt
+if not hasattr(bcrypt, "__about__"):
+    setattr(
+        bcrypt,
+        "__about__",
+        type("About", (), {"__version__": getattr(bcrypt, "__version__", "4.0.1")})(),
+    )
+
 import jwt
 from passlib.context import CryptContext
 

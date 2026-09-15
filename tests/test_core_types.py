@@ -18,7 +18,7 @@ class TestMemoryType:
         expected = {
             "FACT", "PREFERENCE", "GOAL", "PROJECT", "SKILL",
             "RELATIONSHIP", "EVENT", "EPISODIC", "PATTERN",
-            "CONTACT", "CUSTOM",
+            "CONTACT", "CUSTOM", "PROCEDURAL", "RULE",
         }
         assert {m.name for m in MemoryType} == expected
 
@@ -69,7 +69,7 @@ class TestEntityType:
     def test_has_all_members(self) -> None:
         expected = {
             "PROJECT", "PERSON", "COMPANY", "TECHNOLOGY",
-            "PREFERENCE", "GOAL", "SKILL", "TOPIC",
+            "PREFERENCE", "GOAL", "SKILL", "TOPIC", "CONCEPT",
         }
         assert {m.name for m in EntityType} == expected
 

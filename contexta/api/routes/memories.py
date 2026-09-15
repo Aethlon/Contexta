@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from contexta.core.context.builder import ContextBuilder
+from contexta.core.reflection.engine import ReflectionEngine
 from contexta.core.retrieval.engine import RetrievalEngine
 from contexta.core.schemas import ContextConfig, ContextRequest, RetrievalQuery
 from contexta.db import get_db_session
@@ -166,6 +167,7 @@ async def get_context(
 
     return {
         "user_profile": built.user_profile,
+        "rules": built.rules,
         "active_projects": built.active_projects,
         "preferences": built.preferences,
         "goals": built.goals,
@@ -535,4 +537,127 @@ async def timeline(
         })
 
     return {"user_id": str(user_id), "events": events}
+
+
+class BatchGetMemoriesRequest(BaseModel):
+    memory_ids: list[UUID]
+
+
+@router.post("/batch-get")
+async def batch_get_memories(
+    payload: BatchGetMemoriesRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Concurrently retrieve multiple memory records by ID in a single query."""
+    org_id = UUID(str(getattr(request.state, "organization_id", "00000000-0000-0000-0000-000000000001")))
+    repo = MemoryRepository(session, tenant_id=org_id)
+    memories = await repo.get_many_by_ids(payload.memory_ids)
+    return {
+        "count": len(memories),
+        "memories": [
+            {
+                "id": str(m.id),
+                "user_id": str(m.user_id),
+                "memory_type": m.memory_type,
+                "title": m.title,
+                "content": m.content,
+                "importance": m.importance,
+                "confidence": m.confidence,
+                "utility_score": m.utility_score,
+                "tags": m.tags or [],
+                "memory_state": m.memory_state,
+                "is_pinned": m.is_pinned,
+                "created_at": m.created_at.isoformat() if m.created_at else None,
+            }
+            for m in memories
+        ],
+    }
+
+
+class MemoryFeedbackRequest(BaseModel):
+    signal: str
+    user_correction: str | None = None
+    penalty: float = 0.5
+
+
+@router.post("/{memory_id}/feedback")
+async def memory_feedback(
+    memory_id: UUID,
+    payload: MemoryFeedbackRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Adjust memory utility score and trigger contradiction supersession from explicit feedback."""
+    org_id = UUID(str(getattr(request.state, "organization_id", "00000000-0000-0000-0000-000000000001")))
+    repo = MemoryRepository(session, tenant_id=org_id)
+    updated = await repo.apply_feedback(
+        record_id=memory_id,
+        signal=payload.signal,
+        user_correction=payload.user_correction,
+        penalty=payload.penalty,
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Memory not found.")
+    await session.commit()
+    return {
+        "status": "success",
+        "memory_id": str(memory_id),
+        "utility_score": updated.utility_score,
+        "confidence": updated.confidence,
+        "memory_state": updated.memory_state,
+    }
+
+
+class MemoryReflectionRequest(BaseModel):
+    user_id: UUID
+    apply_supersession: bool = True
+    min_occurrences_for_pattern: int = 3
+
+
+@router.post("/reflect")
+async def reflect_memories(
+    payload: MemoryReflectionRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Execute autonomous memory reflection, contradiction detection, and pattern consolidation."""
+    org_id = UUID(str(getattr(request.state, "organization_id", "00000000-0000-0000-0000-000000000001")))
+    repo = MemoryRepository(session, tenant_id=org_id)
+    memories = await repo.get_by_user(payload.user_id, limit=500)
+
+    reflection_engine = ReflectionEngine()
+    contradictions = reflection_engine.detect_contradictions(memories)
+
+    resolved_count = 0
+    if payload.apply_supersession:
+        for older, newer, reason in contradictions:
+            older.valid_to = newer.created_at or datetime.now(UTC)
+            older.superseded_by = newer.id
+            older.memory_state = "cold"
+            resolved_count += 1
+
+    patterns = reflection_engine.consolidate_patterns(
+        memories,
+        user_id=payload.user_id,
+        organization_id=org_id,
+        min_occurrences=payload.min_occurrences_for_pattern,
+    )
+    for pat in patterns:
+        session.add(pat)
+
+    if resolved_count > 0 or patterns:
+        await session.commit()
+
+    return {
+        "status": "success",
+        "user_id": str(payload.user_id),
+        "contradictions_detected": len(contradictions),
+        "contradictions_resolved": resolved_count,
+        "patterns_consolidated": len(patterns),
+        "consolidated_patterns": [
+            {"title": p.title, "content": p.content, "tags": p.tags}
+            for p in patterns
+        ],
+    }
 

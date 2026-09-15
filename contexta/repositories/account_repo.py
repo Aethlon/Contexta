@@ -50,27 +50,10 @@ class OrganizationRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def find_by_customer_id(self, dodo_customer_id: str) -> Organization | None:
-        stmt = select(Organization).where(
-            Organization.dodo_customer_id == dodo_customer_id
-        )
-        result = await self._session.execute(stmt)
-        return result.scalar_one_or_none()
-
     async def find_by_slug(self, slug: str) -> Organization | None:
         stmt = select(Organization).where(Organization.slug == slug)
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
-
-    async def update_plan(
-        self, org_id: uuid.UUID, plan_code: str, dodo_subscription_id: str | None = None
-    ) -> bool:
-        values: dict[str, Any] = {"plan_code": plan_code}
-        if dodo_subscription_id is not None:
-            values["dodo_subscription_id"] = dodo_subscription_id
-        stmt = update(Organization).where(Organization.id == org_id).values(**values)
-        result = await self._session.execute(stmt)
-        return result.rowcount > 0
 
     async def update(self, org_id: uuid.UUID, values: dict[str, Any]) -> bool:
         stmt = update(Organization).where(Organization.id == org_id).values(**values)

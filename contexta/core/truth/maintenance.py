@@ -167,17 +167,12 @@ class TruthMaintenanceEngine:
         organization_id: uuid.UUID,
         entity_ids: Sequence[uuid.UUID],
     ) -> None:
-        if self._edges is None:
-            return
-        for entity_id in entity_ids:
-            await self._edges.create(
-                EntityEdge(
-                    source_entity_id=entity_id,
-                    target_entity_id=entity_id,
-                    relationship_type=RelationType.SUPERSEDED_BY.value,
-                    organization_id=organization_id,
-                )
-            )
+        # Supersession is a memory->memory relation tracked in MemoryVersion
+        # (superseded_by_id). EntityEdge only links entities, so creating
+        # entity->same-entity SUPERSEDED_BY self-loops was a bug (pollutes
+        # graph traversal with zero-information edges). No entity edge is
+        # emitted here; version + audit records carry the lineage.
+        return
 
     async def _log_supersession(
         self,

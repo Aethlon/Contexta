@@ -114,7 +114,9 @@ async def test_contradiction_supersedes_old_memory_and_preserves_version() -> No
     assert version_repo.records[0].memory_id == old.id
     assert version_repo.records[0].superseded_by_id == new.id
     assert version_repo.records[0].content == "The user prefers JavaScript."
-    assert edge_repo.records[0].relationship_type == "superseded_by"
+    # Lineage lives in MemoryVersion.superseded_by_id; no entity->self
+    # SUPERSEDED_BY self-loop is emitted (it polluted graph traversal).
+    assert edge_repo.records == []
     assert audit_repo.records[0].operation_type == "memory_superseded"
 
 

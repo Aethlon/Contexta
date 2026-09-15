@@ -14,6 +14,8 @@ class MemoryType(str, Enum):
     RELATIONSHIP = "relationship"
     EVENT = "event"
     EPISODIC = "episodic"
+    PROCEDURAL = "procedural"
+    RULE = "rule"
     PATTERN = "pattern"
     CONTACT = "contact"
     CUSTOM = "custom"
@@ -49,6 +51,7 @@ class EntityType(str, Enum):
     GOAL = "goal"
     SKILL = "skill"
     TOPIC = "topic"
+    CONCEPT = "concept"
 
 
 class RelationType(str, Enum):

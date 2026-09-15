@@ -56,10 +56,6 @@ func (s *Server) PinMemory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.Emitter.Emit(r.Context(), "memory:pin", map[string]any{
-		"id": id, "tenant_id": tenantID,
-	})
-
 	slog.Info("memory pinned", "id", id, "tenant_id", tenantID)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "pinned"})
 }
@@ -73,10 +69,6 @@ func (s *Server) UnpinMemory(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "memory not found")
 		return
 	}
-
-	s.Emitter.Emit(r.Context(), "memory:unpin", map[string]any{
-		"id": id, "tenant_id": tenantID,
-	})
 
 	slog.Info("memory unpinned", "id", id, "tenant_id", tenantID)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "unpinned"})
@@ -92,10 +84,6 @@ func (s *Server) ArchiveMemory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.Emitter.Emit(r.Context(), "memory:archive", map[string]any{
-		"id": id, "tenant_id": tenantID,
-	})
-
 	slog.Info("memory archived", "id", id, "tenant_id", tenantID)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "archived"})
 }
@@ -110,10 +98,6 @@ func (s *Server) RestoreMemory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.Emitter.Emit(r.Context(), "memory:restore", map[string]any{
-		"id": id, "tenant_id": tenantID,
-	})
-
 	slog.Info("memory restored", "id", id, "tenant_id", tenantID)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "restored"})
 }
@@ -127,10 +111,6 @@ func (s *Server) DeleteMemory(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "memory not found")
 		return
 	}
-
-	s.Emitter.Emit(r.Context(), "memory:delete", map[string]any{
-		"id": id, "tenant_id": tenantID,
-	})
 
 	slog.Info("memory deleted", "id", id, "tenant_id", tenantID)
 	w.WriteHeader(http.StatusNoContent)

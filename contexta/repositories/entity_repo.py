@@ -83,6 +83,25 @@ class EntityRepository(TenantScopedRepository["Entity"]):
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_names(
+        self,
+        user_id: uuid.UUID,
+        names: Sequence[str],
+    ) -> Sequence[Entity]:
+        """Find entities by names (case-insensitive) for a user within the tenant."""
+        if not names:
+            return []
+        from sqlalchemy import func
+        lower_names = [n.lower() for n in names]
+        stmt = (
+            select(self._model)
+            .where(self._model.user_id == user_id)
+            .where(func.lower(self._model.name).in_(lower_names))
+        )
+        stmt = self._scope_select(stmt)
+        result = await self._session.execute(stmt)
+        return result.scalars().all()
+
 
 class EntityEdgeRepository(TenantScopedRepository["EntityEdge"]):
     """Tenant-scoped repository for EntityEdge (relationship) operations."""
@@ -131,6 +150,36 @@ class EntityEdgeRepository(TenantScopedRepository["EntityEdge"]):
         result = await self._session.execute(stmt)
         return result.scalars().all()
 
+    async def bulk_get_neighbors(
+        self,
+        entity_ids: Sequence[uuid.UUID],
+    ) -> Sequence[EntityEdge]:
+        """Retrieve all edges connected to any entity in entity_ids in a single query."""
+        if not entity_ids:
+            return []
+        stmt = select(self._model).where(
+            (self._model.source_entity_id.in_(entity_ids))
+            | (self._model.target_entity_id.in_(entity_ids))
+        )
+        stmt = self._scope_select(stmt)
+        result = await self._session.execute(stmt)
+        return result.scalars().all()
+
+    async def get_existing_edges(
+        self,
+        entity_ids: Sequence[uuid.UUID],
+    ) -> Sequence[EntityEdge]:
+        """Retrieve existing edges between any pair in the provided entity_ids."""
+        if len(entity_ids) < 2:
+            return []
+        stmt = select(self._model).where(
+            (self._model.source_entity_id.in_(entity_ids))
+            & (self._model.target_entity_id.in_(entity_ids))
+        )
+        stmt = self._scope_select(stmt)
+        result = await self._session.execute(stmt)
+        return result.scalars().all()
+
 
 class MemoryEntityLinkRepository(TenantScopedRepository["MemoryEntityLink"]):
     """Tenant-scoped repository for memory-entity link operations.
@@ -156,8 +205,18 @@ class MemoryEntityLinkRepository(TenantScopedRepository["MemoryEntityLink"]):
     ) -> Sequence[MemoryEntityLink]:
         """Retrieve all entity links for a memory."""
         stmt = select(self._model).where(self._model.memory_id == memory_id)
-        # MemoryEntityLink may not have org_id; use base select without scope
-        # if the model lacks organization_id. For now, assume it has it.
+        stmt = self._scope_select(stmt)
+        result = await self._session.execute(stmt)
+        return result.scalars().all()
+
+    async def bulk_get_entities_for_memories(
+        self,
+        memory_ids: Sequence[uuid.UUID],
+    ) -> Sequence[MemoryEntityLink]:
+        """Retrieve all entity links for multiple memories in a single query."""
+        if not memory_ids:
+            return []
+        stmt = select(self._model).where(self._model.memory_id.in_(memory_ids))
         stmt = self._scope_select(stmt)
         result = await self._session.execute(stmt)
         return result.scalars().all()
@@ -171,3 +230,16 @@ class MemoryEntityLinkRepository(TenantScopedRepository["MemoryEntityLink"]):
         stmt = self._scope_select(stmt)
         result = await self._session.execute(stmt)
         return result.scalars().all()
+
+    async def bulk_get_memories_for_entities(
+        self,
+        entity_ids: Sequence[uuid.UUID],
+    ) -> Sequence[MemoryEntityLink]:
+        """Retrieve all memory links for multiple entities in a single query."""
+        if not entity_ids:
+            return []
+        stmt = select(self._model).where(self._model.entity_id.in_(entity_ids))
+        stmt = self._scope_select(stmt)
+        result = await self._session.execute(stmt)
+        return result.scalars().all()
+

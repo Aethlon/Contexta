@@ -80,3 +80,25 @@ docker-compose.override.yml
 business-plan/
 business_plan/
 
+# Desktop Tauri (Proprietary / Closed Wrapper)
+src-tauri/
+**/src-tauri/
+dashboard/src-tauri/
+
+# Landing Page Showcase
+landingpage/
+landing/
+
+# Offline Model Cache & Weights
+models/
+*.bin
+*.onnx
+*.safetensors
+
+# Local Databases
+*.db
+*.sqlite
+*.sqlite3
+contexta*.db
+
+

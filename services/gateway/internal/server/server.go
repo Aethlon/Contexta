@@ -81,14 +81,14 @@ func (s *Server) RegisterRoutes(r chi.Router) {
 		})
 
 		r.Route("/api/v1", func(r chi.Router) {
-			r.Post("/memories", s.proxy.ReverseProxy(s.PythonAPI))
-			r.Put("/memories/{id}", s.proxy.ReverseProxy(s.PythonAPI))
-			r.Post("/search", s.proxy.ReverseProxy(s.PythonAPI))
-			r.Get("/memories/{id}", s.proxy.ReverseProxy(s.PythonAPI))
-			r.Post("/memories/{id}/explain", s.proxy.ReverseProxy(s.PythonAPI))
-			r.Post("/sessions", s.proxy.ReverseProxy(s.PythonAPI))
-			r.Put("/sessions/{id}", s.proxy.ReverseProxy(s.PythonAPI))
-			r.Get("/sessions/{id}", s.proxy.ReverseProxy(s.PythonAPI))
+			r.Post("/memories", s.proxy.StripPrefixReverseProxy(s.PythonAPI, "/api"))
+			r.Put("/memories/{id}", s.proxy.StripPrefixReverseProxy(s.PythonAPI, "/api"))
+			r.Post("/search", s.proxy.StripPrefixReverseProxy(s.PythonAPI, "/api"))
+			r.Get("/memories/{id}", s.proxy.StripPrefixReverseProxy(s.PythonAPI, "/api"))
+			r.Post("/memories/{id}/explain", s.proxy.StripPrefixReverseProxy(s.PythonAPI, "/api"))
+			r.Post("/sessions", s.proxy.StripPrefixReverseProxy(s.PythonAPI, "/api"))
+			r.Put("/sessions/{id}", s.proxy.StripPrefixReverseProxy(s.PythonAPI, "/api"))
+			r.Get("/sessions/{id}", s.proxy.StripPrefixReverseProxy(s.PythonAPI, "/api"))
 		})
 	})
 }
@@ -105,6 +105,9 @@ func (s *Server) internalHeadersMiddleware(next http.Handler) http.Handler {
 		r.Header.Set("X-Mem-Key-Id", key.KeyID)
 		r.Header.Set("X-Mem-Scopes", key.Scopes)
 		r.Header.Set("X-Mem-Trace-Id", r.Header.Get("X-Request-ID"))
+		// Also set canonical headers so Python API middleware accepts proxied requests.
+		r.Header.Set("x-organization-id", key.TenantID)
+		r.Header.Set("x-user-id", key.ActorID)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -116,7 +119,7 @@ func (s *Server) scopeMiddleware(next http.Handler) http.Handler {
 			writeError(w, http.StatusUnauthorized, "unauthorized")
 			return
 		}
-		if !key.HasScope("read") && !key.HasScope("write") && !key.HasScope("admin") {
+		if !key.HasScope("read") && !key.HasScope("write") && !key.HasScope("admin") && !key.HasScope("observe") && !key.HasScope("retrieve") {
 			writeError(w, http.StatusForbidden, "insufficient scopes")
 			return
 		}

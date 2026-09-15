@@ -9,10 +9,16 @@ Thanks for your interest in Contexta! Contexta is a memory layer for AI agents â
 | `contexta/` | The Python engine and FastAPI backend |
 | `services/` | Go services: gateway, data-plane, aggregator |
 | `clients/` | Official SDKs (e.g. TypeScript) |
-| `web/` | The Next.js dashboard |
-| `web-public/` | The public landing site |
+| `dashboard/` | The Next.js dashboard |
+| `landingpage/` | The public landing site |
 | `docs/` | Documentation site |
 | `tests/` | Backend tests |
+
+## What to contribute
+
+We highly encourage contributions! Right now, our main focus areas are:
+1. **Enhancing the Dashboard UI**: If you are a frontend developer, we'd love your help making the Next.js dashboard more beautiful and intuitive.
+2. **Codebase Cleanup & Refactoring**: Help us keep the code clean, remove unused dependencies, and simplify complex architecture.
 
 ## Local development
 
@@ -55,4 +61,4 @@ For the dashboard(s), run `npm run lint` inside `web/` or `web-public/`.
 
 ## License
 
-Contexta is dual-licensed: Apache 2.0 for personal and self-use. Commercial use requires a paid license â€” contact licensing@contexta.dev for details.
+Contexta is fully open-source and licensed under the Apache 2.0 License. You are free to use it for personal and commercial purposes.

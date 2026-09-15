@@ -345,5 +345,108 @@ class contexta:
         )
         return Session(**data)
 
+    def get_many(self, memory_ids: List[str]) -> List[Dict[str, Any]]:
+        """Concurrently retrieve multiple memory records by ID in a single query."""
+        data = self._http._request(
+            method="POST",
+            endpoint="/memories/batch-get",
+            body={"memory_ids": memory_ids},
+        )
+        return data.get("memories", [])
+
+    def retrieve_batch(self, queries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Concurrently execute multiple memory retrieval queries in parallel."""
+        data = self._http._request(
+            method="POST",
+            endpoint="/retrieve/batch",
+            body={"queries": queries},
+        )
+        return data.get("batch_results", [])
+
+    def feedback(
+        self,
+        memory_id: str,
+        signal: str,
+        user_correction: Optional[str] = None,
+        penalty: float = 0.5,
+    ) -> Dict[str, Any]:
+        """Submit positive or negative feedback for a memory to adjust utility and contradiction scoring."""
+        body: Dict[str, Any] = {"signal": signal, "penalty": penalty}
+        if user_correction:
+            body["user_correction"] = user_correction
+        return self._http._request(
+            method="POST",
+            endpoint=f"/memories/{memory_id}/feedback",
+            body=body,
+            is_write=True,
+        )
+
+    def add_rule(
+        self,
+        *,
+        user_id: str,
+        rule: str,
+        title: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+    ) -> ObserveResponse:
+        """Store a decay-exempt behavioral directive / operating rule for the agent."""
+        rule_tags = (tags or []) + ["rule", "procedural"]
+        return self.observe(
+            user_id=user_id,
+            messages=[
+                {"role": "user", "content": f"Instruction / Operating Rule: {rule}"},
+                {"role": "assistant", "content": f"Understood. I will strictly follow this rule: {rule}"},
+            ],
+            metadata={"memory_type": "procedural", "rule_title": title or "Behavioral Rule", "tags": rule_tags},
+        )
+
+    def investigate(
+        self,
+        query: str,
+        *,
+        user_id: str,
+        organization_id: Optional[str] = None,
+        max_hops: int = 2,
+        limit: int = 15,
+    ) -> Dict[str, Any]:
+        """Execute iterative agentic memory investigation (ASMR-style multi-hop reasoning)."""
+        body: Dict[str, Any] = {
+            "query_text": query,
+            "user_id": user_id,
+            "max_hops": max_hops,
+            "limit": limit,
+        }
+        if organization_id:
+            body["organization_id"] = organization_id
+        return self._http._request(
+            method="POST",
+            endpoint="/retrieve/investigate",
+            body=body,
+        )
+
+    def reflect(
+        self,
+        *,
+        user_id: str,
+        apply_supersession: bool = True,
+        min_occurrences: int = 3,
+    ) -> Dict[str, Any]:
+        """Run autonomous memory reflection to resolve contradictions and consolidate recurring patterns."""
+        return self._http._request(
+            method="POST",
+            endpoint="/memories/reflect",
+            body={
+                "user_id": user_id,
+                "apply_supersession": apply_supersession,
+                "min_occurrences_for_pattern": min_occurrences,
+            },
+            is_write=True,
+        )
+
     def close(self) -> None:
         self._http.close()
+
+
+
+Contexta = contexta
+

@@ -81,16 +81,6 @@ func (s *Server) IngestObservation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.Emitter.Emit(r.Context(), "observation:created", map[string]any{
-		"id":        id,
-		"tenant_id": tenantID,
-		"actor_id":  actorID,
-		"type":      req.Type,
-		"redacted":  changed,
-		"source":    req.Source,
-		"timestamp": time.Now().UTC(),
-	})
-
 	slog.Info("observation ingested",
 		"id", id,
 		"tenant_id", tenantID,
@@ -154,12 +144,6 @@ func (s *Server) IngestBatch(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: time.Now().UTC(),
 		})
 	}
-
-	s.Emitter.Emit(r.Context(), "observation:batch", map[string]any{
-		"count":     len(results),
-		"tenant_id": tenantID,
-		"actor_id":  actorID,
-	})
 
 	writeJSON(w, http.StatusCreated, results)
 }

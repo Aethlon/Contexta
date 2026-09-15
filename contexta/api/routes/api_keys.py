@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +22,7 @@ class ApiKeyCreateRequest(BaseModel):
     name: str = Field(default="Agent key", min_length=1, max_length=120)
     organization_id: UUID
     actor_id: UUID
-    scopes: list[str] = Field(default_factory=lambda: ["observe", "retrieve"])
+    scopes: list[str] = Field(default_factory=lambda: ["read", "write"])
 
 
 class ApiKeyResponse(BaseModel):
@@ -112,3 +112,25 @@ async def create_key(
         token=created.token,
         key=_record_to_response(created.record),
     )
+
+
+@router.delete("/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_key(
+    key_id: UUID,
+    request: Request,
+    organization_id: UUID | None = None,
+    x_organization_id: str | None = Header(default=None),
+    x_org_id: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_db_session),
+) -> Response:
+    """Revoke an API key (used by web dashboard key manager)."""
+    state_org_id = getattr(request.state, "organization_id", None)
+    tenant_id = _resolve_organization_id(organization_id, x_organization_id, x_org_id, state_org_id)
+    repo = ApiKeyRepository(session, tenant_id)
+    revoked = await repo.revoke(key_id)
+    if not revoked:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="API key not found.",
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

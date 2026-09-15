@@ -89,6 +89,12 @@ class RetrievalEngine:
         "sure", "that", "this", "these", "those", "there", "here",
     }
 
+    DISCOURSE_STOPWORDS = {
+        "speaker", "user", "assistant", "system", "date", "year", "time",
+        "day", "yesterday", "today", "tomorrow", "session", "turn", "conversation",
+        "chat", "pm", "am", "clock", "hour", "minute", "month", "week",
+    }
+
     def __init__(
         self,
         memory_repository: RetrievalMemoryRepository,
@@ -116,18 +122,28 @@ class RetrievalEngine:
     ) -> list[RetrievalResult]:
         """Retrieve memories using weighted hybrid scoring."""
         reference = now or datetime.now(UTC)
-        candidates = await self._memories.get_by_user(
-            query.user_id,
-            limit=max(query.limit * 50, 1000),
-        )
+        # Vector-accelerated candidate retrieval directly in PostgreSQL via pgvector
+        if query_embedding is not None and hasattr(self._memories, "get_by_vector_similarity"):
+            candidates = await self._memories.get_by_vector_similarity(
+                query.user_id,
+                query_embedding,
+                limit=max(query.limit * 15, 150),
+            )
+        else:
+            candidates = await self._memories.get_by_user(
+                query.user_id,
+                limit=max(query.limit * 50, 1000),
+            )
 
         # Automatic entity seed resolution for multi-hop graph traversal (word-boundary matched)
         if not seed_entity_ids and self._entities is not None:
             user_entities = await self._entities.get_by_user(query.user_id, limit=500)
+            if not user_entities and hasattr(self._entities, "get_all"):
+                user_entities = await self._entities.get_all(limit=500)
             q_lower = query.query_text.lower()
             seed_entity_ids = [
                 e.id for e in user_entities
-                if len(e.name) > 2 and (
+                if len(e.name) >= 2 and (
                     re.search(r"\b" + re.escape(e.name.lower()) + r"\b", q_lower) is not None
                     or any(
                         re.search(r"\b" + re.escape(alias.lower()) + r"\b", q_lower) is not None
@@ -167,16 +183,35 @@ class RetrievalEngine:
         candidate_map = {m.id: m for m in candidates}
         supplementary: list[RetrievalResult] = []
 
-        # 2. Graph links and edges expansion from top 5 primary candidates
+        # 2. Bulk graph links and edges expansion from top primary candidates
         if self._links is not None and len(results) > 1:
-            for h1 in top_primary[:5]:
-                try:
-                    mem_links = await self._links.get_entities_for_memory(h1.memory.id)
-                    for lk in mem_links:
-                        ent_links = await self._links.get_memories_for_entity(lk.entity_id)
-                        # Non-hub, informative bridge entities only (degree between 2 and 30)
-                        if 1 < len(ent_links) <= 30:
-                            for el in ent_links:
+            top_mem_ids = [h1.memory.id for h1 in top_primary[:5]]
+            try:
+                if hasattr(self._links, "bulk_get_entities_for_memories"):
+                    mem_links = await self._links.bulk_get_entities_for_memories(top_mem_ids)
+                else:
+                    mem_links = []
+                    for mid in top_mem_ids:
+                        mem_links.extend(await self._links.get_entities_for_memory(mid))
+
+                entity_ids = list({lk.entity_id for lk in mem_links})
+
+                if entity_ids:
+                    if hasattr(self._links, "bulk_get_memories_for_entities"):
+                        all_ent_links = await self._links.bulk_get_memories_for_entities(entity_ids)
+                    else:
+                        all_ent_links = []
+                        for eid in entity_ids:
+                            all_ent_links.extend(await self._links.get_memories_for_entity(eid))
+
+                    import collections
+                    ent_to_links = collections.defaultdict(list)
+                    for el in all_ent_links:
+                        ent_to_links[el.entity_id].append(el)
+
+                    for eid, el_list in ent_to_links.items():
+                        if 1 < len(el_list) <= 30:
+                            for el in el_list:
                                 if el.memory_id not in seen_ids and el.memory_id in candidate_map:
                                     seen_ids.add(el.memory_id)
                                     supp_mem = candidate_map[el.memory_id]
@@ -190,42 +225,69 @@ class RetrievalEngine:
                                         )
                                         supplementary.append(supp_res)
 
-                        # Multi-hop via knowledge graph edges: entity_1 -> edge -> entity_2 -> memories
-                        if self._edges is not None and len(supplementary) < 12:
-                            neighbors = await self._edges.get_neighbors(lk.entity_id)
-                            for edge in neighbors[:10]:
-                                n_id = (
-                                    edge.target_entity_id
-                                    if edge.source_entity_id == lk.entity_id
-                                    else edge.source_entity_id
-                                )
-                                n_links = await self._links.get_memories_for_entity(n_id)
-                                if 1 < len(n_links) <= 30:
-                                    for el in n_links:
-                                        if el.memory_id not in seen_ids and el.memory_id in candidate_map:
-                                            seen_ids.add(el.memory_id)
-                                            supp_mem = candidate_map[el.memory_id]
-                                            if self._include_memory(query, supp_mem):
-                                                supp_res = self._score_memory(
-                                                    query,
-                                                    supp_mem,
-                                                    query_embedding=query_embedding,
-                                                    graph_memory_weights=graph_memory_weights,
-                                                    now=reference,
-                                                )
-                                                supplementary.append(supp_res)
-                except Exception:
-                    pass
+                    # Multi-hop via knowledge graph edges using bulk_get_neighbors
+                    if self._edges is not None and len(supplementary) < 12:
+                        if hasattr(self._edges, "bulk_get_neighbors"):
+                            neighbors = await self._edges.bulk_get_neighbors(entity_ids[:10])
+                        else:
+                            neighbors = []
+                            for eid in entity_ids[:10]:
+                                neighbors.extend(await self._edges.get_neighbors(eid))
+
+                        ent_id_set = set(entity_ids)
+                        n_ids = list({
+                            edge.target_entity_id if edge.source_entity_id in ent_id_set else edge.source_entity_id
+                            for edge in neighbors[:20]
+                        })
+                        if n_ids:
+                            if hasattr(self._links, "bulk_get_memories_for_entities"):
+                                n_links = await self._links.bulk_get_memories_for_entities(n_ids)
+                            else:
+                                n_links = []
+                                for nid in n_ids:
+                                    n_links.extend(await self._links.get_memories_for_entity(nid))
+
+                            for el in n_links:
+                                if el.memory_id not in seen_ids and el.memory_id in candidate_map:
+                                    seen_ids.add(el.memory_id)
+                                    supp_mem = candidate_map[el.memory_id]
+                                    if self._include_memory(query, supp_mem):
+                                        supp_res = self._score_memory(
+                                            query,
+                                            supp_mem,
+                                            query_embedding=query_embedding,
+                                            graph_memory_weights=graph_memory_weights,
+                                            now=reference,
+                                        )
+                                        supplementary.append(supp_res)
+            except Exception:
+                pass
 
         # 3. Multi-hop content bridge: search for connected memories across the top candidates
-        generic_terms = {"melanie", "caroline", "speaker", "user", "date", "year", "time", "day", "yesterday", "today", "tomorrow"}
+        # Dynamic corpus specificity: words appearing in >30% of candidates are treated as generic context
+        cand_term_freq: dict[str, int] = {}
+        for c in candidates:
+            for t in self._terms(c.content):
+                cand_term_freq[t] = cand_term_freq.get(t, 0) + 1
+        common_corpus_terms = {
+            t for t, cnt in cand_term_freq.items()
+            if cnt > max(3, int(len(candidates) * 0.30))
+        }
+        bridge_stopwords = self.STOPWORDS | self.DISCOURSE_STOPWORDS | common_corpus_terms
+
+        cand_terms_cache = {
+            c.id: self._terms(c.content) - bridge_stopwords
+            for c in candidates
+            if self._include_memory(query, c)
+        }
+
         for h1_top in top_primary[:5]:
-            h1_terms = self._terms(h1_top.memory.content) - generic_terms
+            h1_terms = self._terms(h1_top.memory.content) - bridge_stopwords
             if h1_terms:
                 term_matches: list[tuple[int, MemoryRecord]] = []
                 for cand in candidates:
-                    if cand.id not in seen_ids and self._include_memory(query, cand):
-                        c_terms = self._terms(cand.content) - generic_terms
+                    if cand.id not in seen_ids and cand.id in cand_terms_cache:
+                        c_terms = cand_terms_cache[cand.id]
                         overlap = len(h1_terms.intersection(c_terms))
                         if overlap >= 1:
                             term_matches.append((overlap, cand))
@@ -267,7 +329,9 @@ class RetrievalEngine:
                 # Give neural reranker the full candidate pool (up to 45 candidates)
                 rerank_candidates = candidate_pool[:45]
                 reranked = await self._reranker.rerank(query, rerank_candidates)
-                return reranked[: query.limit]
+                final = reranked[: query.limit]
+                await self._touch_accessed(final, reference)
+                return final
             except Exception:  # noqa: BLE001 - rerank failure falls back to scored order
                 pass
 
@@ -282,9 +346,24 @@ class RetrievalEngine:
                         results.append(r)
                         if len(results) >= query.limit:
                             break
-            return results[: query.limit]
+            final = results[: query.limit]
+            await self._touch_accessed(final, reference)
+            return final
 
-        return results[: query.limit]
+        final = results[: query.limit]
+        await self._touch_accessed(final, reference)
+        return final
+
+    async def _touch_accessed(self, results: list[RetrievalResult], now: datetime) -> None:
+        """Best-effort update of last_accessed_at so decay uses read-age, not write-age."""
+        touch = getattr(self._memories, "touch_accessed", None)
+        if touch is None:
+            return
+        for r in results:
+            try:
+                await touch(r.memory.id, now.replace(tzinfo=None))
+            except Exception:  # noqa: BLE001 - access tracking never fails retrieval
+                continue
 
 
     def _include_memory(self, query: RetrievalQuery, memory: MemoryRecord) -> bool:
@@ -322,15 +401,21 @@ class RetrievalEngine:
         importance = float(max(0.0, min(1.0, memory.importance)))
         recency = float(self._scoring.compute_freshness(memory.created_at, now=now))
         keyword = float(self._keyword_score(query.query_text, memory))
+        utility = float(max(-1.0, min(1.0, memory.utility_score or 0.0)))
+        confidence = float(max(0.0, min(1.0, memory.confidence or 0.0)))
 
-        # Conversational speaker context boost
+        # Universal conversational speaker context boost:
+        # Dynamically matches extracted speaker names from transcripts (e.g. "[Speaker]:" or "Speaker:")
         speaker_bonus = 0.0
         q_lower = query.query_text.lower()
-        m_content = memory.content.lower()
-        if "melanie" in q_lower and ("melanie:" in m_content or "melanie's" in m_content):
-            speaker_bonus = 0.10
-        elif "caroline" in q_lower and ("caroline:" in m_content or "caroline's" in m_content):
-            speaker_bonus = 0.10
+        m_strip = memory.content.strip()
+        m_content = m_strip.lower()
+        speaker_match = re.match(r"^(?:\[([A-Za-z0-9_-]+)(?:\s+on\s+[^\]]+)?\]|([A-Za-z0-9_-]+):)", m_strip)
+        if speaker_match:
+            speaker_name = (speaker_match.group(1) or speaker_match.group(2)).lower()
+            if speaker_name and len(speaker_name) > 1 and speaker_name not in {"user", "assistant", "system"}:
+                if re.search(r"\b" + re.escape(speaker_name) + r"(?:'s)?\b", q_lower):
+                    speaker_bonus = 0.10
 
         # Exact phrase bonus for salient n-grams
         phrase_bonus = 0.0
@@ -341,24 +426,42 @@ class RetrievalEngine:
                 phrase_bonus = 0.15
                 break
 
+        # Dynamically scale graph weight if caller requested deep graph traversal (graph_depth >= 2)
+        if query.graph_depth >= 2 and graph > 0.0:
+            w_sem = 0.32
+            w_kw = 0.22
+            w_graph = 0.18
+        else:
+            w_sem = 0.34
+            w_kw = 0.24
+            w_graph = 0.12
+        w_imp = 0.08
+        w_rec = 0.10
+        w_util = 0.05
+        w_conf = 0.03
+
         score = (
-            semantic * 0.40
-            + keyword * 0.35
-            + graph * 0.15
-            + importance * 0.05
+            semantic * w_sem
+            + keyword * w_kw
+            + graph * w_graph
+            + importance * w_imp
+            + recency * w_rec
+            + utility * w_util
+            + confidence * w_conf
             + speaker_bonus
             + phrase_bonus
         )
         if memory.memory_state == "cold":
-            score = max(0.0, score - 0.3)
+            score = max(0.0, score * 0.7)
+        clamped_score = min(1.0, max(0.0, score))
         return RetrievalResult(
             memory=memory,
-            score=score,
-            semantic_score=semantic,
-            graph_score=graph,
-            importance_score=importance,
-            recency_score=recency,
-            keyword_score=keyword,
+            score=clamped_score,
+            semantic_score=min(1.0, max(0.0, semantic)),
+            graph_score=min(1.0, max(0.0, graph)),
+            importance_score=min(1.0, max(0.0, importance)),
+            recency_score=min(1.0, max(0.0, recency)),
+            keyword_score=min(1.0, max(0.0, keyword)),
         )
 
     async def _graph_memory_weights(
@@ -409,37 +512,35 @@ class RetrievalEngine:
 
     @staticmethod
     def _normalize_stem(word: str) -> str:
+        """Standard morphological normalization: numbers, common suffixes, and core inflections."""
         w = word.lower().strip(".,;:!?()[]\"'")
         number_map = {
-            "one": "1", "two": "2", "three": "3", "four": "4", "five": "5",
-            "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10",
+            "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+            "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",
+            "ten": "10", "first": "1st", "second": "2nd", "third": "3rd",
         }
         if w in number_map:
             return number_map[w]
-        synonyms = {
-            "adopting": "adopt", "adoption": "adopt", "advice": "adopt", "children": "child",
-            "kids": "child", "kid": "child", "daughter": "child", "daughters": "child",
-            "son": "child", "sons": "child", "counselor": "counsel", "counseling": "counsel",
-            "reading": "book", "books": "book", "bookshelf": "book", "seuss": "book", "library": "book",
-            "classics": "classic", "liberal": "progressive", "hiking": "hike", "hikes": "hike",
-            "religious": "religion", "religions": "religion", "outdoors": "park", "outdoor": "park",
-            "camping": "camp", "camped": "camp", "pets": "pet", "guinea": "pet", "pig": "pet",
-            "pigs": "pet", "oscar": "pet", "paintings": "paint", "painted": "paint", "painting": "paint",
-            "moved": "move", "moving": "move", "shoes": "shoe", "drawings": "draw", "drawing": "draw",
-            "traits": "personality", "trait": "personality", "ally": "support", "supportive": "support",
-            "events": "event", "activities": "activity", "pots": "pottery", "pot": "pottery",
-            "bowls": "bowl", "cups": "cup", "sunsets": "sunset", "songs": "music", "song": "music",
-            "artists": "music", "bands": "music", "band": "music", "musicians": "music",
-            "mozart": "music", "bach": "music", "vivaldi": "music", "classical": "music",
-            "sidewalk": "walk", "sidewalks": "walk", "running": "run",
-            "relationship": "single", "relationships": "single", "status": "single",
-            "breakup": "single", "dating": "single", "married": "single", "boyfriend": "single", "husband": "single",
-            "transgender": "transition", "lgbtq": "transition", "pride": "transition",
+
+        # Core English morphological variants (generic)
+        inflections = {
+            "children": "child", "kids": "child", "kid": "child",
+            "daughters": "daughter", "sons": "son",
+            "hiking": "hike", "hikes": "hike",
+            "walking": "walk", "walks": "walk",
+            "running": "run", "runs": "run",
+            "camping": "camp", "camped": "camp",
+            "paintings": "paint", "painted": "paint",
+            "drawings": "draw", "moving": "move", "moved": "move",
         }
-        if w in synonyms:
-            return synonyms[w]
-        for suffix in ("ing", "tion", "tions", "ies", "es", "ed", "s", "or", "er", "ic", "al"):
+        if w in inflections:
+            return inflections[w]
+
+        # Standard suffix stripping (Porter stemmer principles)
+        for suffix in ("ing", "tion", "tions", "ies", "es", "ed", "ment", "able", "ible", "ity", "ive", "s", "or", "er", "ic", "al"):
             if len(w) > len(suffix) + 3 and w.endswith(suffix):
+                if suffix == "ies":
+                    return w[:-3] + "y"
                 return w[:-len(suffix)]
         return w
 
@@ -453,11 +554,11 @@ class RetrievalEngine:
         if not memory_terms:
             return 0.0
 
-        common_names = {"melanie", "caroline", "speaker", "user"}
         total_w = 0.0
         matched_w = 0.0
         for t in query_terms:
-            w = 0.20 if t in common_names else 1.0
+            # Downweight generic conversational discourse terms
+            w = 0.25 if t in self.DISCOURSE_STOPWORDS else 1.0
             total_w += w
             if t in memory_terms:
                 matched_w += w

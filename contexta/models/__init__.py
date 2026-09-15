@@ -17,7 +17,6 @@ from contexta.models.memory import MemoryRecord
 from contexta.models.policy import MemoryPolicy
 from contexta.models.schema import CustomSchema
 from contexta.models.session import Session
-from contexta.models.usage import UsageDaily, UsageEvent, UsagePeriod
 from contexta.models.version import MemoryVersion
 
 __all__ = [
@@ -43,7 +42,4 @@ __all__ = [
     "Session",
     "TimestampMixin",
     "UUIDPrimaryKeyMixin",
-    "UsageDaily",
-    "UsageEvent",
-    "UsagePeriod",
 ]

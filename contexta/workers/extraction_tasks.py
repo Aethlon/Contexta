@@ -34,112 +34,16 @@ logger = logging.getLogger(__name__)
 
 
 async def _process_observation_async(self, payload: dict[str, Any]) -> dict[str, Any]:
-    """Asynchronously run an observation payload through the intelligence pipeline."""
+    """Asynchronously run an observation payload through the high-speed intelligence pipeline."""
     task_id = self.request.id
     observation = ObservationPayload(**payload)
 
-    org_id = observation.organization_id
-    user_id = observation.user_id
-    session_id = observation.session_id
-
-    # 1. Run extraction worker (uses LLM to extract memory candidates)
-    extracted = await ExtractionWorker().extract(observation)
-
-    processed_details = []
+    from contexta.core.pipeline import FastMemoryOrchestrator
+    orchestrator = FastMemoryOrchestrator()
 
     async with AsyncSessionFactory() as session:
         try:
-            # Initialize tenant-scoped repositories
-            memory_repo = MemoryRepository(session, tenant_id=org_id)
-            entity_repo = EntityRepository(session, tenant_id=org_id)
-            link_repo = MemoryEntityLinkRepository(session, tenant_id=org_id)
-            edge_repo = EntityEdgeRepository(session, tenant_id=org_id)
-            version_repo = MemoryVersionRepository(session)
-            audit_repo = AuditRepository(session, tenant_id=org_id)
-
-            # Initialize core engines
-            deduplicator = MemoryDeduplicator(memory_repo)
-            entity_resolver = EntityResolver(entity_repo, link_repo, edge_repo)
-            truth_engine = TruthMaintenanceEngine(
-                memory_repo,
-                version_repo,
-                edge_repository=edge_repo,
-                audit_repository=audit_repo,
-            )
-            scoring_engine = MemoryScoringEngine()
-
-            for memory in extracted:
-                # 2. Deduplicate memory candidate against existing truths
-                dedup_result = await deduplicator.deduplicate(observation, memory)
-
-                if dedup_result.action == "discard":
-                    logger.info(
-                        "Memory candidate discarded as duplicate: title='%s' existing_id=%s",
-                        memory.title,
-                        dedup_result.existing_id,
-                    )
-                    processed_details.append({
-                        "title": memory.title,
-                        "action": "discard",
-                        "existing_id": str(dedup_result.existing_id),
-                    })
-                    continue
-
-                if dedup_result.action == "merge":
-                    logger.info(
-                        "Memory candidate merged with existing memory: title='%s' existing_id=%s",
-                        memory.title,
-                        dedup_result.existing_id,
-                    )
-                    # Merges alter existing content; re-enqueue embedding generation
-                    enqueue_embedding_generation(str(dedup_result.existing_id))
-                    processed_details.append({
-                        "title": memory.title,
-                        "action": "merge",
-                        "existing_id": str(dedup_result.existing_id),
-                    })
-                    continue
-
-                # 3. Action is "store": persist, resolve entities, maintain truth, embed
-                # Importance scoring
-                score_breakdown = scoring_engine.compute_importance(memory.memory_type, memory.content)
-                confidence = scoring_engine.compute_confidence(memory.source_type)
-
-                # Persist memory record to DB
-                persisted_record = await memory_repo.persist(
-                    user_id=user_id,
-                    organization_id=org_id,
-                    session_id=session_id,
-                    memory=memory,
-                    confidence=confidence,
-                    importance=score_breakdown.final_score,
-                )
-
-                # Resolve entity mentions and map links
-                resolved_entities = await entity_resolver.resolve_memory_entities(
-                    payload=observation,
-                    memory_id=persisted_record.id,
-                    memory=memory,
-                )
-
-                # Contradiction check / historical supersession
-                await truth_engine.apply(
-                    persisted_record,
-                    entity_ids=[re.entity.id for re in resolved_entities],
-                    actor_id=user_id,
-                )
-
-                # Enqueue vector embedding generation
-                enqueue_embedding_generation(str(persisted_record.id))
-
-                processed_details.append({
-                    "title": memory.title,
-                    "action": "store",
-                    "memory_id": str(persisted_record.id),
-                    "importance": score_breakdown.final_score,
-                    "confidence": confidence,
-                })
-
+            res = await orchestrator.orchestrate(observation, session)
             await session.commit()
         except Exception:
             await session.rollback()
@@ -148,11 +52,24 @@ async def _process_observation_async(self, payload: dict[str, Any]) -> dict[str,
     return {
         "task_id": task_id,
         "status": "completed",
-        "user_id": str(user_id),
-        "organization_id": str(org_id),
-        "session_id": str(session_id),
-        "processed_details": processed_details,
+        "user_id": str(observation.user_id),
+        "organization_id": str(observation.organization_id),
+        "session_id": str(observation.session_id),
+        "extracted_count": res.extracted_count,
+        "stored_count": res.stored_count,
+        "new_entities_count": res.new_entities_count,
+        "new_edges_count": res.new_edges_count,
+        "new_links_count": res.new_links_count,
+        "timings": {
+            "extraction_ms": res.timings.extraction_ms,
+            "deduplication_ms": res.timings.deduplication_ms,
+            "entity_graph_ms": res.timings.entity_graph_ms,
+            "persistence_ms": res.timings.persistence_ms,
+            "total_ms": res.timings.total_ms,
+        },
+        "processed_details": res.details,
     }
+
 
 
 @celery_app.task(
@@ -178,3 +95,102 @@ def process_observation(self, payload: dict[str, Any]) -> dict[str, Any]:
     except Exception as exc:
         logger.exception("Observation extraction pipeline failed: task_id=%s", task_id)
         raise self.retry(exc=exc)
+
+
+GO_STAGING_BATCH_LIMIT = 100
+
+
+async def _drain_go_staging_async() -> dict[str, Any]:
+    """Drain Go data-plane `observations` staging rows into the memory pipeline.
+
+    Closes the loop: Go receiver writes raw rows (status='active'), Python
+    converts each to an ObservationPayload, runs the orchestrator, and marks
+    the row status='processed'. Rows with non-UUID tenant/actor ids are marked
+    status='skipped' (never retried).
+    """
+    import uuid as uuid_module
+
+    from sqlalchemy import text
+
+    from contexta.core.pipeline import FastMemoryOrchestrator
+
+    orchestrator = FastMemoryOrchestrator()
+    drained = stored = skipped = 0
+
+    async with AsyncSessionFactory() as session:
+        try:
+            rows = (
+                (
+                    await session.execute(
+                        text(
+                            "SELECT id, tenant_id, actor_id, content, source, type, "
+                            "metadata, tags FROM observations "
+                            "WHERE status = 'active' ORDER BY created_at "
+                            "LIMIT :limit"
+                        ),
+                        {"limit": GO_STAGING_BATCH_LIMIT},
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        except Exception:
+            logger.info("Go staging table unavailable; skipping drain.")
+            return {"status": "skipped", "reason": "no staging table"}
+
+        for row in rows:
+            try:
+                try:
+                    user_id = uuid_module.UUID(str(row["actor_id"]))
+                    org_id = uuid_module.UUID(str(row["tenant_id"]))
+                except (ValueError, AttributeError, TypeError):
+                    await session.execute(
+                        text("UPDATE observations SET status = 'skipped' WHERE id = :id"),
+                        {"id": row["id"]},
+                    )
+                    skipped += 1
+                    continue
+
+                meta = row["metadata"] or {}
+                try:
+                    session_id = uuid_module.UUID(str(meta.get("session_id")))
+                except (ValueError, AttributeError, TypeError):
+                    session_id = uuid_module.uuid4()
+
+                observation = ObservationPayload(
+                    user_id=user_id,
+                    organization_id=org_id,
+                    session_id=session_id,
+                    messages=[{"role": "user", "content": row["content"]}],
+                    metadata={
+                        "source": row["source"],
+                        "go_observation_id": str(row["id"]),
+                        "tags": row["tags"] or [],
+                    },
+                )
+                res = await orchestrator.orchestrate(observation, session)
+                stored += res.stored_count
+                await session.execute(
+                    text("UPDATE observations SET status = 'processed' WHERE id = :id"),
+                    {"id": row["id"]},
+                )
+                drained += 1
+            except Exception:
+                logger.exception("Go staging row failed: id=%s", row["id"])
+                await session.rollback()
+                continue
+
+        await session.commit()
+
+    return {"status": "completed", "drained": drained, "stored": stored, "skipped": skipped}
+
+
+@celery_app.task(name="contexta.workers.extraction_tasks.drain_go_staging")
+def drain_go_staging() -> dict[str, Any]:
+    """Celery task draining Go staging observations every minute via beat."""
+    logger.info("Draining Go staging observations.")
+    try:
+        return asyncio.run(_drain_go_staging_async())
+    except Exception:
+        logger.exception("Go staging drain failed")
+        raise

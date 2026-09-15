@@ -11,7 +11,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/contexta/data-plane/internal/metering"
 	"github.com/contexta/data-plane/internal/redaction"
 	"github.com/contexta/data-plane/internal/server"
 	"github.com/contexta/data-plane/internal/storage"
@@ -43,8 +42,7 @@ func main() {
 
 	store := &storage.Store{Pool: pgPool, Redis: rdb}
 	filter := redaction.NewFilter()
-	emitter := &metering.Emitter{Redis: rdb}
-	srv := server.New(store, filter, emitter)
+	srv := server.New(store, filter)
 
 	r := chi.NewRouter()
 	srv.RegisterRoutes(r)

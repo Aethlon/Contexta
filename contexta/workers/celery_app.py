@@ -54,6 +54,10 @@ def create_celery_app() -> Celery:
         ],
 
         beat_schedule={
+            "go-staging-drain": {
+                "task": "contexta.workers.extraction_tasks.drain_go_staging",
+                "schedule": 60.0,
+            },
             "daily-decay-cycle": {
                 "task": "contexta.workers.decay_tasks.run_decay_cycle",
                 "schedule": 86400.0,

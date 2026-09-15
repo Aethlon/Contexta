@@ -75,6 +75,24 @@ class RerankResponse(BaseModel):
     model: str
 
 
+QWEN_EMBEDDING_ID = "Qwen/Qwen3-Embedding-0.6B"
+QWEN_EMBEDDING_DIR = "qwen3-embedding-0.6b"
+QWEN_RERANKER_ID = "Qwen/Qwen3-Reranker-0.6B"
+QWEN_RERANKER_DIR = "qwen3-reranker-0.6b"
+
+
+def _resolve_local_model_dir(dirname: str) -> str | None:
+    base = os.environ.get("MODEL_CACHE_DIR", os.environ.get("CONTEXTA_MODEL_CACHE_DIR", "models"))
+    p = os.path.join(base, dirname)
+    if os.path.isdir(p) and (
+        any(f.endswith(".safetensors") for f in os.listdir(p))
+        or any(f.endswith(".bin") for f in os.listdir(p))
+        or os.path.exists(os.path.join(p, "config.json"))
+    ):
+        return p
+    return None
+
+
 class DynamicMicroBatcher:
     """Collects individual embedding requests and executes them in batched matrix operations."""
 
@@ -86,12 +104,27 @@ class DynamicMicroBatcher:
         self._running = False
         self.embedding_dimensions = int(os.environ.get("CONTEXTA_EMBEDDING_DIMENSIONS", "1024"))
         self._fastembed_model = None
+        self._st_model = None
+        self._backend = "hash"
+        # 1. Prefer local Qwen3 embedding (auto-downloaded to ./models).
         try:
-            from fastembed import TextEmbedding
-            self._fastembed_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
-            logger.info("FastEmbed dense vector embedding model initialized successfully.")
+            qwen_path = _resolve_local_model_dir(QWEN_EMBEDDING_DIR) or QWEN_EMBEDDING_ID
+            from sentence_transformers import SentenceTransformer
+
+            self._st_model = SentenceTransformer(qwen_path, trust_remote_code=True)
+            self._backend = "qwen3"
+            logger.info("Qwen3 embedding backend ready (%s).", qwen_path)
         except Exception as exc:
-            logger.warning("FastEmbed not available (%s); using fallback.", exc)
+            logger.warning("Qwen3 embedding not available (%s); trying FastEmbed.", exc)
+        # 2. FastEmbed fallback (bge-small).
+        if self._st_model is None:
+            try:
+                from fastembed import TextEmbedding
+                self._fastembed_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+                self._backend = "fastembed"
+                logger.info("FastEmbed dense vector embedding model initialized successfully.")
+            except Exception as exc:
+                logger.warning("FastEmbed not available (%s); using fallback.", exc)
 
     def start(self) -> None:
         self._running = True
@@ -150,6 +183,27 @@ class DynamicMicroBatcher:
     def _compute_batch(self, texts: list[str]) -> list[list[float]]:
         """Vectorized computation for text batch with normalized 1024-dim outputs."""
         dims = self.embedding_dimensions
+        if self._st_model is not None:
+            try:
+                import asyncio as _asyncio
+
+                try:
+                    _asyncio.get_running_loop()
+                    # Called from async batch loop via sync path; encode directly (ST releases GIL in torch).
+                except RuntimeError:
+                    pass
+                vecs = self._st_model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
+                results: list[list[float]] = []
+                for emb in vecs:
+                    vec = [float(v) for v in list(emb)]
+                    if len(vec) < dims:
+                        vec = vec + [0.0] * (dims - len(vec))
+                    elif len(vec) > dims:
+                        vec = vec[:dims]
+                    results.append(vec)
+                return results
+            except Exception as exc:
+                logger.warning("Qwen3 batch computation failed (%s); trying fallback.", exc)
         if self._fastembed_model is not None:
             try:
                 embeddings_gen = list(self._fastembed_model.embed(texts))
@@ -192,12 +246,24 @@ class LocalModelEngine:
         self.embedding_latency_samples: list[float] = []
         self.reranker_latency_samples: list[float] = []
         self._cross_encoder = None
+        self._ce_backend = "none"
         try:
-            from fastembed.rerank.cross_encoder import TextCrossEncoder
-            self._cross_encoder = TextCrossEncoder(model_name="BAAI/bge-reranker-base")
-            logger.info("FastEmbed cross-encoder initialized successfully.")
+            ce_path = _resolve_local_model_dir(QWEN_RERANKER_DIR) or QWEN_RERANKER_ID
+            from sentence_transformers import CrossEncoder
+
+            self._cross_encoder = CrossEncoder(ce_path, trust_remote_code=True)
+            self._ce_backend = "qwen3"
+            logger.info("Qwen3 reranker backend ready (%s).", ce_path)
         except Exception as exc:
-            logger.warning("FastEmbed cross-encoder not available (%s); using semantic fallback.", exc)
+            logger.warning("Qwen3 reranker not available (%s); trying FastEmbed.", exc)
+        if self._cross_encoder is None:
+            try:
+                from fastembed.rerank.cross_encoder import TextCrossEncoder
+                self._cross_encoder = TextCrossEncoder(model_name="BAAI/bge-reranker-base")
+                self._ce_backend = "fastembed"
+                logger.info("FastEmbed cross-encoder initialized successfully.")
+            except Exception as exc:
+                logger.warning("FastEmbed cross-encoder not available (%s); using semantic fallback.", exc)
 
     async def warm_up(self) -> None:
         """Load and warm up model weights in process memory, auto-downloading if missing."""
@@ -234,23 +300,19 @@ class LocalModelEngine:
 
     async def classify(self, texts: list[str], labels: list[str]) -> list[ClassifyResult]:
         start = time.monotonic()
+        # Neural-first: cosine similarity between text embedding and label
+        # prototype embeddings using the active embedding backend.
+        # Falls back to keyword heuristics only when no neural backend exists.
+        neural = await self._classify_neural(texts, labels)
+        if neural is not None:
+            elapsed = (time.monotonic() - start) * 1000
+            self.reranker_latency_samples.append(elapsed)
+            if len(self.reranker_latency_samples) > 100:
+                self.reranker_latency_samples.pop(0)
+            return neural
         results: list[ClassifyResult] = []
-
         for text in texts:
-            t_lower = text.lower()
-            scores: dict[str, float] = {}
-            for label in labels:
-                base_score = 0.2
-                if label == "preference" and any(k in t_lower for k in ["prefer", "like", "love", "favorite", "choice"]):
-                    base_score = 0.88
-                elif label == "fact" and any(k in t_lower for k in ["is", "born", "works", "uses", "built", "located"]):
-                    base_score = 0.82
-                elif label == "goal" and any(k in t_lower for k in ["want", "plan", "goal", "aim", "target"]):
-                    base_score = 0.85
-                elif label == "event" and any(k in t_lower for k in ["yesterday", "tomorrow", "scheduled", "meeting", "happened"]):
-                    base_score = 0.80
-                scores[label] = base_score
-
+            scores = self._keyword_scores(text, labels)
             total = sum(scores.values()) or 1.0
             norm_scores = {k: round(v / total, 4) for k, v in scores.items()}
             best_label = max(norm_scores.items(), key=lambda item: item[1])
@@ -269,6 +331,61 @@ class LocalModelEngine:
             self.reranker_latency_samples.pop(0)
         return results
 
+    _LABEL_PROTOTYPES = {
+        "preference": "preference likes prefers loves favorite choice enjoys wants",
+        "fact": "fact is born works uses built located lives",
+        "goal": "goal want plan aim target launch will achieve",
+        "event": "event yesterday tomorrow scheduled meeting happened occurred",
+    }
+
+    async def _classify_neural(self, texts: list[str], labels: list[str]) -> list[ClassifyResult] | None:
+        if self.batcher._st_model is None and self.batcher._fastembed_model is None:
+            return None
+        try:
+            loop = asyncio.get_running_loop()
+            protos = [self._LABEL_PROTOTYPES.get(lb, lb) for lb in labels]
+            text_vecs = await loop.run_in_executor(None, self.batcher._compute_batch, texts)
+            proto_vecs = await loop.run_in_executor(None, self.batcher._compute_batch, protos)
+            import math
+
+            out: list[ClassifyResult] = []
+            for tv, text in zip(text_vecs, texts):
+                sims: dict[str, float] = {}
+                for lb, pv in zip(labels, proto_vecs):
+                    dot = sum(a * b for a, b in zip(tv, pv))
+                    na = math.sqrt(sum(a * a for a in tv)) or 1.0
+                    nb = math.sqrt(sum(b * b for b in pv)) or 1.0
+                    sims[lb] = max(0.0, dot / (na * nb))
+                # Blend with keyword prior so short/ambiguous texts stay stable.
+                kw = self._keyword_scores(text, labels)
+                kw_total = sum(kw.values()) or 1.0
+                blended = {lb: 0.7 * sims.get(lb, 0.0) + 0.3 * (kw.get(lb, 0.2) / kw_total) for lb in labels}
+                total = sum(blended.values()) or 1.0
+                norm = {k: round(v / total, 4) for k, v in blended.items()}
+                best = max(norm.items(), key=lambda item: item[1])
+                out.append(ClassifyResult(text=text, label=best[0], score=best[1], all_scores=norm))
+            return out
+        except Exception as exc:
+            logger.warning("Neural classify failed (%s); using keyword fallback.", exc)
+            return None
+
+    @staticmethod
+    def _keyword_scores(text: str, labels: list[str]) -> dict[str, float]:
+        t_lower = text.lower()
+        scores: dict[str, float] = {}
+        for label in labels:
+            base_score = 0.2
+            if label == "preference" and any(k in t_lower for k in ["prefer", "like", "love", "favorite", "choice"]):
+                base_score = 0.88
+            elif label == "fact" and any(k in t_lower for k in ["is", "born", "works", "uses", "built", "located"]):
+                base_score = 0.82
+            elif label == "goal" and any(k in t_lower for k in ["want", "plan", "goal", "aim", "target"]):
+                base_score = 0.85
+            elif label == "event" and any(k in t_lower for k in ["yesterday", "tomorrow", "scheduled", "meeting", "happened"]):
+                base_score = 0.80
+            scores[label] = base_score
+        return scores
+
     async def rerank(self, query: str, documents: list[str], top_n: int | None = None) -> list[RerankResult]:
         start = time.monotonic()
         if not documents:
@@ -277,7 +394,11 @@ class LocalModelEngine:
         if self._cross_encoder is not None:
             try:
                 loop = asyncio.get_running_loop()
-                scores = await loop.run_in_executor(None, lambda: list(self._cross_encoder.rerank(query, documents)))
+                if self._ce_backend == "qwen3" and hasattr(self._cross_encoder, "predict"):
+                    pairs = [[query, doc] for doc in documents]
+                    scores = await loop.run_in_executor(None, lambda: list(self._cross_encoder.predict(pairs)))
+                else:
+                    scores = await loop.run_in_executor(None, lambda: list(self._cross_encoder.rerank(query, documents)))
                 scored = [
                     RerankResult(index=idx, document=doc, relevance_score=float(score))
                     for idx, (doc, score) in enumerate(zip(documents, scores))
@@ -355,12 +476,14 @@ async def models_status() -> dict[str, Any]:
         "embedding_model": {
             "name": engine.embedding_model_name,
             "status": "warmed_in_memory",
+            "backend": engine.batcher._backend,
             "dimensions": engine.batcher.embedding_dimensions,
             "avg_latency_ms": avg_embed_lat,
         },
         "reranker_model": {
             "name": engine.reranker_model_name,
             "status": "warmed_in_memory",
+            "backend": engine._ce_backend,
             "avg_latency_ms": avg_rerank_lat,
         },
     }

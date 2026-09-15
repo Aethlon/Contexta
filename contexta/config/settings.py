@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     database_pool_size: int = 20
     database_max_overflow: int = 10
     database_echo: bool = False
-    db_boot_check: bool = True
+    db_boot_check: bool = False
 
     # Sentry DSN
     sentry_dsn: str = ""
@@ -82,16 +82,16 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://localhost:6379/2"
     celery_task_always_eager: bool = True
 
-    # Embedding model
-    embedding_model: str = "text-embedding-3-small"
-    embedding_dimensions: int = 1536
-    embedding_provider: str = "openai"
+    # Embedding model (offline-first OSS defaults: local Qwen3, 1024-dim)
+    embedding_model: str = "Qwen/Qwen3-Embedding-0.6B"
+    embedding_dimensions: int = 1024
+    embedding_provider: str = "local"
     embedding_api_key: str = ""
     embedding_base_url: str = "https://api.openai.com/v1"
 
-    # LLM provider
-    llm_provider: str = "openai"
-    llm_model: str = "gpt-4o-mini"
+    # LLM provider (offline-first: local model-server; set online + keys for cloud)
+    llm_provider: str = "local"
+    llm_model: str = "Qwen/Qwen3-Reranker-0.6B"
     llm_api_key: str = ""
     llm_base_url: str = "https://api.openai.com/v1"
 
@@ -126,11 +126,6 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production-use-a-long-random-string"
     jwt_algorithm: str = "HS256"
     jwt_expire_days: int = 7
-
-    # Dodo Payments
-    dodo_api_key: str = ""
-    dodo_mode: str = "test"
-    dodo_webhook_secret: str = ""
 
     # Server
     host: str = "0.0.0.0"

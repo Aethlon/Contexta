@@ -1,0 +1,38 @@
+# Enterprise profile: strict multi-tenant isolation + gateway-enforced auth.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.enterprise.yml up --build
+#   (combine with docker-compose.online.yml for cloud models)
+#
+# What changes vs default:
+# - SDKs must go through the Go gateway (:8443) which enforces Redis-backed
+#   API-key verification (key_id/tenant_id/scopes) + rate limits per tier.
+# - Python API binds tenant scoping on every query (organization_id); direct
+#   :8000 access should be firewalled off in production.
+# - Celery eager mode is forced off so all extraction runs in workers with
+#   retries and audit trails.
+# - Longer-lived Redis cache TTL for graph adjacency in high-traffic tenants.
+#
+# Required in .env:
+#   CONTEXTA_SECRET_KEY=<long-random-string>   # never ship the default
+#   AUTH_SECRET=<long-random-string>
+
+services:
+  api:
+    environment:
+      CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
+      CONTEXTA_REDIS_CACHE_TTL_SECONDS: ${CONTEXTA_REDIS_CACHE_TTL_SECONDS:-900}
+      CONTEXTA_SECRET_KEY: ${CONTEXTA_SECRET_KEY:?enterprise requires CONTEXTA_SECRET_KEY}
+
+  worker:
+    environment:
+      CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
+
+  gateway:
+    environment:
+      REDIS_ADDR: redis:6379

@@ -139,6 +139,74 @@ class EntityResolver:
 
         return resolved
 
+    async def resolve_and_link(
+        self,
+        *,
+        name: str,
+        user_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        memory_id: uuid.UUID,
+        entity_type: EntityType | str = EntityType.TOPIC,
+        observed_at: datetime | None = None,
+    ) -> Entity:
+        """Resolve a single entity mention, ensure entity persistence, and link it to memory."""
+        clean_name = name.strip()
+        timestamp = observed_at or datetime.now(UTC).replace(tzinfo=None)
+        type_str = entity_type.value if hasattr(entity_type, "value") else str(entity_type).lower()
+
+        # 1. Search existing user entities
+        user_entities = await self._entities.get_by_user(user_id, limit=500)
+
+        # Check exact name match first (case-insensitive)
+        matched_entity: Entity | None = None
+        for ent in user_entities:
+            if ent.name.lower() == clean_name.lower():
+                matched_entity = ent
+                break
+
+        # If not exact match, check fuzzy similarity match
+        if matched_entity is None:
+            match, confidence = await self._best_match(clean_name, user_entities)
+            if match is not None and confidence >= self.MATCH_THRESHOLD:
+                matched_entity = match
+
+        if matched_entity is not None:
+            attrs = dict(matched_entity.aggregated_attributes or {})
+            attrs["mention_count"] = attrs.get("mention_count", 1) + 1
+            await self._entities.update_by_id(
+                matched_entity.id,
+                {"last_updated": timestamp, "aggregated_attributes": attrs},
+            )
+            entity = matched_entity
+        else:
+            attrs = {"mention_count": 1}
+            new_entity = Entity(
+                organization_id=organization_id,
+                user_id=user_id,
+                entity_type=type_str,
+                name=clean_name,
+                summary=None,
+                status="active",
+                aggregated_attributes=attrs,
+                last_updated=timestamp,
+            )
+            entity = await self._entities.create(new_entity)
+
+        # 2. Link entity to memory record if not already linked
+        try:
+            existing_links = await self._links.get_entities_for_memory(memory_id)
+            if not any(lk.entity_id == entity.id for lk in existing_links):
+                link = MemoryEntityLink(
+                    memory_id=memory_id,
+                    entity_id=entity.id,
+                    organization_id=organization_id,
+                )
+                await self._links.create(link)
+        except Exception:
+            pass
+
+        return entity
+
     async def resolve_entity(
         self,
         *,

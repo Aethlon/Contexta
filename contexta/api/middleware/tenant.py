@@ -11,7 +11,12 @@ class TenantMiddleware(BaseHTTPMiddleware):
     """Reject obvious cross-tenant requests when tenant headers and query differ."""
 
     async def dispatch(self, request: Request, call_next):
-        header_org = request.headers.get("x-organization-id")
+        header_org = (
+            request.headers.get("x-organization-id")
+            or request.headers.get("x-org-id")
+            or request.headers.get("X-Mem-Tenant-Id")
+            or request.headers.get("x-mem-tenant-id")
+        )
         query_org = request.query_params.get("organization_id")
         if header_org and query_org and header_org != query_org:
             return JSONResponse(

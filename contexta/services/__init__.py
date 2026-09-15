@@ -1,1 +1,1 @@
-"""Orchestration services (embedding, LLM, auth, billing)."""
+"""Orchestration services (embedding, LLM, auth)."""

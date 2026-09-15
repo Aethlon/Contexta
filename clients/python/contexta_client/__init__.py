@@ -1,4 +1,4 @@
-from contexta_client.client import contexta
+from contexta_client.client import contexta, Contexta
 from contexta_client.async_client import Asynccontexta
 from contexta_client._types import (
     ObserveResponse,

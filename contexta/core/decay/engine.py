@@ -11,7 +11,7 @@ class DecayEngine:
     """Apply memory lifecycle decay transitions."""
 
     def transition_for(self, memory, *, now: datetime | None = None) -> str:
-        if memory.is_pinned:
+        if memory.is_pinned or getattr(memory, "memory_type", None) in {"procedural", "rule"}:
             return memory.memory_state
         reference = now or datetime.now(UTC)
         last_seen = memory.last_accessed_at or memory.updated_at or memory.created_at

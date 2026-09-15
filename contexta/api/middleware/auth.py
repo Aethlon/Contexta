@@ -18,9 +18,11 @@ PUBLIC_PATHS = {
     "/openapi.json",
     "/v1/auth/signup",
     "/v1/auth/signin",
+    "/v1/auth/reset-password",
+    "/v1/auth/emergency-wipe-reset",
+    "/v1/auth/onboarding",
     "/v1/auth/verify-email",
     "/v1/auth/forgot-password",
-    "/v1/webhooks/dodo",
 }
 
 
@@ -39,9 +41,19 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         if path in PUBLIC_PATHS or path.startswith(("/docs", "/openapi.json")):
             return await call_next(request)
 
-        # Retrieve optional fallback headers (used for internal proxy/gateway requests)
-        actor_id = request.headers.get("x-user-id")
-        organization_id = request.headers.get("x-organization-id") or request.headers.get("x-org-id")
+        # Retrieve optional fallback headers (used for internal proxy/gateway requests).
+        # Gateway forwards X-Mem-* headers plus canonical x-organization-id/x-user-id.
+        actor_id = (
+            request.headers.get("x-user-id")
+            or request.headers.get("X-Mem-Actor-Id")
+            or request.headers.get("x-mem-actor-id")
+        )
+        organization_id = (
+            request.headers.get("x-organization-id")
+            or request.headers.get("x-org-id")
+            or request.headers.get("X-Mem-Tenant-Id")
+            or request.headers.get("x-mem-tenant-id")
+        )
 
         request.state.actor_id = actor_id
         request.state.organization_id = organization_id

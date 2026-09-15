@@ -76,32 +76,57 @@ graph TD
 
 ## ⚡ Quick Start
 
-Deploy the entire Contexta stack (FastAPI, Go Services, Next.js Dashboard, Postgres + pgvector, Redis, and Celery Workers) in under a minute.
+Deploy the entire Contexta stack (Python API + workers, Go data-plane/gateway, Next.js dashboard, Postgres + pgvector, Redis, local Qwen3 model-server) in under a minute.
 
-### 1. Start the Stack
+### 1. Start the Stack (Single Command)
 
 Clone the repository and run:
 
+**macOS & Linux:**
 ```bash
-docker compose up --build
-```
-*Note: By default, Contexta uses a local `deterministic` embedding provider, meaning **you do not need a paid OpenAI/DeepSeek key to get started**.*
-
-### 2. Configure Environment
-
-Copy the example environment file and configure your models (e.g., OpenAI or DeepSeek):
-
-```bash
-cp .env.example .env
+./entrypoint.sh
 ```
 
-Edit your `.env` to specify your preferred LLM provider:
+**Windows (PowerShell):**
+```powershell
+.\start.ps1
+```
+
+*(Or via Docker Compose directly: `cp .env.example .env && docker compose up --build`)*
+
+*No API keys needed.* Default mode is **offline**: Qwen3-Embedding-0.6B + Qwen3-Reranker-0.6B auto-download to `./models` on first boot, 1024-dim embeddings, zero data egress.
+
+Additional Commands:
+```bash
+# View service status / logs
+./entrypoint.sh status
+./entrypoint.sh logs
+
+# Cloud models (OpenAI embeddings 1536-dim + BYOK classifier LLM)
+./entrypoint.sh online
+
+# Strict multi-tenant gateway enforcement
+./entrypoint.sh enterprise
+
+# Stop services
+./entrypoint.sh stop
+```
+
+> Switching embedding dimensions (1024 offline ↔ 1536 online) needs a fresh DB volume: `docker compose down -v` first.
+
+### 2. Configure Environment (online mode only)
+
+For cloud models, set in `.env`:
 
 ```env
+CONTEXTA_ENGINE_MODE=online
 CONTEXTA_LLM_PROVIDER=openai
-CONTEXTA_LLM_API_KEY=your-openai-api-key
+CONTEXTA_LLM_MODEL=gpt-4o-mini
+CONTEXTA_LLM_API_KEY=your-key
 CONTEXTA_EMBEDDING_PROVIDER=openai
-CONTEXTA_EMBEDDING_API_KEY=your-openai-api-key
+CONTEXTA_EMBEDDING_MODEL=text-embedding-3-small
+CONTEXTA_EMBEDDING_DIMENSIONS=1536
+CONTEXTA_EMBEDDING_API_KEY=your-key
 ```
 
 ### 3. Access the Management Dashboard
@@ -166,6 +191,26 @@ const ctx = await memory.context({ userId: "user_123" });
 console.log(ctx.toSystemPrompt());
 ```
 
+### MCP Server (Claude Desktop, Cursor, Windsurf)
+
+Stdio (local clients) — needs `CONTEXTA_DATABASE_URL` pointing at the stack's Postgres:
+
+```bash
+python -m contexta.mcp
+```
+
+```json
+{
+  "mcpServers": {
+    "contexta": { "command": "python", "args": ["-m", "contexta.mcp"] }
+  }
+}
+```
+
+Or SSE transport: `python -m contexta.mcp --transport sse --port 8765`, then `"url": "http://localhost:8765/sse"`.
+
+Tools: `contexta_remember`, `contexta_recall`, `contexta_get_context`, `contexta_explore_graph`, `contexta_forget`, `contexta_batch_remember`, `contexta_dream`, `contexta_metrics`.
+
 ---
 
 ## 🛠️ Local Development
@@ -188,11 +233,16 @@ npm run dev
 
 ---
 
-## 📜 License & Pricing Model
+## 🤝 Contributing
 
-Contexta is available under a **dual-licensing model**:
+We love our open-source community! Contexta is fully open-source, and we welcome contributions of all kinds. Currently, we are specifically looking for help to:
+1. **Enhance the Dashboard UI**: Improve the Next.js dashboard with better aesthetics, modern components, and improved UX.
+2. **Clean the Codebase**: Refactor legacy code, improve architecture, and help keep the codebase clean and maintainable.
 
-* **Free & Open for Self-Use (Apache 2.0)**: For individual developers, hobbyists, non-commercial self-hosting, and internal testing or development. You are free to run, modify, and integrate Contexta under the terms of the Apache 2.0 License.
-* **Commercial & Business Use**: If you are a commercial entity, business, or are using this software to power a commercial SaaS, product, or enterprise platform, a paid license is required.
+Check out our [CONTRIBUTING.md](CONTRIBUTING.md) for more details on how to get started.
 
-For commercial license inquiries, dedicated enterprise support, or custom SLAs, please contact [licensing@contexta.dev](mailto:licensing@contexta.dev) or view our [Docs Pricing Section](docs/src/app/pricing/page.mdx).
+---
+
+## 📜 License
+
+Contexta is fully open-source and available under the **Apache 2.0 License**. You are free to use, modify, distribute, and integrate Contexta in both personal and commercial projects.

@@ -1,0 +1,3 @@
+[build]
+target-dir = "C:/Users/jenit/.cargo-target/contexta"
+jobs = 2
