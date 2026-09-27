@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-import os
 import platform
 import random
+import ssl
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Union
 from urllib.parse import urljoin
 
 import httpx
@@ -18,12 +19,12 @@ from contexta_client._types import (
     AuthenticationError,
     AuthorizationError,
     ConflictError,
-    contextaError,
     NotFoundError,
     QuotaExceeded,
     RateLimited,
     ServerError,
     ValidationError,
+    contextaError,
 )
 
 logger = logging.getLogger("contexta.http")
@@ -38,19 +39,49 @@ except ImportError:
 
 
 def _uuid_v7() -> str:
-    timestamp = int(time.time() * 1000)
-    rand_bytes = random.getrandbits(74).to_bytes(10, "big")
-    uuid_bytes = timestamp.to_bytes(6, "big") + b"\x70" + rand_bytes[:1] + b"\x80" + rand_bytes[1:]
-    return str(uuid.UUID(bytes=uuid_bytes, version=7))
+    timestamp = int(time.time() * 1000) & ((1 << 48) - 1)
+    rand_a = random.getrandbits(12)
+    rand_b = random.getrandbits(62)
+    value = (timestamp << 80) | (0x7 << 76) | (rand_a << 64) | (0b10 << 62) | rand_b
+    return str(uuid.UUID(int=value))
 
 
-def _build_telemetry() -> Dict[str, str]:
+def _build_telemetry() -> dict[str, str]:
     return {
         "sdk_version": SDK_VERSION,
         "python_version": platform.python_version(),
         "os": platform.system().lower(),
         "platform": platform.machine(),
     }
+
+
+TLSConfig = Union[bool, str, bytes, "ssl.SSLContext"]
+
+
+def _resolve_verify(
+    verify_tls: bool,
+    ca_bundle: TLSConfig | None,
+    ca_bundle_path: str | None,
+) -> TLSConfig:
+    """Resolve the ``verify`` argument handed to httpx.
+
+    Certificate verification stays on unless the caller explicitly opts out with
+    ``verify_tls=False``. A CA bundle (inline or on disk) takes precedence over the
+    boolean so the self-signed local gateway can be trusted without weakening
+    verification globally.
+    """
+    if ca_bundle is not None and not verify_tls:
+        raise ValueError(
+            "Pass either ca_bundle/ca_bundle_path or verify_tls=False, not both: "
+            "supplying a CA bundle keeps verification enabled."
+        )
+    if ca_bundle is not None:
+        return ca_bundle
+    if ca_bundle_path:
+        if not Path(ca_bundle_path).is_file():
+            raise ValueError(f"CA bundle not found: {ca_bundle_path}")
+        return str(ca_bundle_path)
+    return verify_tls
 
 
 class HTTPClient:
@@ -62,24 +93,44 @@ class HTTPClient:
         max_retries: int = 3,
         telemetry: bool = True,
         enable_buffer: bool = True,
-        buffer_path: Optional[str] = None,
+        buffer_path: str | None = None,
+        verify_tls: bool = True,
+        ca_bundle: TLSConfig | None = None,
+        ca_bundle_path: str | None = None,
     ) -> None:
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries
         self.telemetry_enabled = telemetry
-        self._client = httpx.Client(timeout=httpx.Timeout(timeout))
-        self._async_client: Optional[httpx.AsyncClient] = None
+        self.verify = _resolve_verify(verify_tls, ca_bundle, ca_bundle_path)
+        self._closed = False
+        self._client = httpx.Client(timeout=httpx.Timeout(timeout), verify=self.verify)
+        self._async_client: httpx.AsyncClient | None = None
         self._buffer = DurableBuffer(buffer_path=buffer_path, enabled=enable_buffer)
         self._telemetry_data = _build_telemetry() if telemetry else {}
 
+    @property
+    def organization_url(self) -> str:
+        """Base URL with the trailing API version segment removed.
+
+        Health checks live at the service root rather than under the versioned
+        prefix, so ``ping`` has to escape ``/v1``.
+        """
+        base = self.base_url
+        if base.endswith("/v1"):
+            return base[: -len("/v1")]
+        return base
+
     def _get_async_client(self) -> httpx.AsyncClient:
         if self._async_client is None:
-            self._async_client = httpx.AsyncClient(timeout=httpx.Timeout(self.timeout))
+            self._async_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(self.timeout),
+                verify=self.verify,
+            )
         return self._async_client
 
-    def _headers(self, idempotency_key: Optional[str] = None, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    def _headers(self, idempotency_key: str | None = None, extra: dict[str, str] | None = None) -> dict[str, str]:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -91,23 +142,28 @@ class HTTPClient:
             headers.update(extra)
         return headers
 
+    def _resolve_url(self, endpoint: str, absolute: bool = False) -> str:
+        base = self.organization_url if absolute else self.base_url
+        return urljoin(base + "/", endpoint.lstrip("/"))
+
     def _request(
         self,
         method: str,
         endpoint: str,
-        body: Optional[Dict[str, Any]] = None,
-        params: Optional[Dict[str, Any]] = None,
-        idempotency_key: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
+        body: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+        idempotency_key: str | None = None,
+        headers: dict[str, str] | None = None,
         is_write: bool = False,
-    ) -> Dict[str, Any]:
+        absolute: bool = False,
+    ) -> dict[str, Any]:
         if is_write and not idempotency_key:
             idempotency_key = _uuid_v7()
 
-        url = urljoin(self.base_url + "/", endpoint.lstrip("/"))
+        url = self._resolve_url(endpoint, absolute)
         req_headers = self._headers(idempotency_key, extra=headers)
 
-        last_exception: Optional[Exception] = None
+        last_exception: Exception | None = None
         for attempt in range(self.max_retries + 1):
             try:
                 start = time.monotonic()
@@ -185,20 +241,21 @@ class HTTPClient:
         self,
         method: str,
         endpoint: str,
-        body: Optional[Dict[str, Any]] = None,
-        params: Optional[Dict[str, Any]] = None,
-        idempotency_key: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
+        body: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+        idempotency_key: str | None = None,
+        headers: dict[str, str] | None = None,
         is_write: bool = False,
-    ) -> Dict[str, Any]:
+        absolute: bool = False,
+    ) -> dict[str, Any]:
         if is_write and not idempotency_key:
             idempotency_key = _uuid_v7()
 
         client = self._get_async_client()
-        url = urljoin(self.base_url + "/", endpoint.lstrip("/"))
+        url = self._resolve_url(endpoint, absolute)
         req_headers = self._headers(idempotency_key, extra=headers)
 
-        last_exception: Optional[Exception] = None
+        last_exception: Exception | None = None
         for attempt in range(self.max_retries + 1):
             try:
                 start = time.monotonic()
@@ -272,7 +329,7 @@ class HTTPClient:
             raise ServerError(message=str(last_exception), status_code=0)
         return {}
 
-    def _parse_error(self, response: httpx.Response) -> Dict[str, Any]:
+    def _parse_error(self, response: httpx.Response) -> dict[str, Any]:
         try:
             data = response.json()
             if isinstance(data, dict) and "error" in data:
@@ -281,7 +338,7 @@ class HTTPClient:
         except (json.JSONDecodeError, ValueError):
             return {"message": response.text}
 
-    def _parse_retry_after(self, response: httpx.Response) -> Optional[int]:
+    def _parse_retry_after(self, response: httpx.Response) -> int | None:
         val = response.headers.get("Retry-After")
         if val:
             try:
@@ -303,6 +360,7 @@ class HTTPClient:
         await asyncio.sleep(seconds)
 
     def flush_buffer(self) -> int:
+        """Drain the durable offline queue, returning the number of entries replayed."""
         return self._buffer.flush(self)
 
     async def flush_buffer_async(self) -> int:
@@ -320,15 +378,36 @@ class HTTPClient:
                     headers=entry.get("headers"),
                 )
                 flushed += 1
-            except Exception:
+            except Exception:  # noqa: BLE001 - a dead-letter must never abort the drain
                 self._buffer.dead_letter(entry, "async_flush_failure")
         return flushed
 
     def close(self) -> None:
+        """Release pooled connections. Safe to call more than once.
+
+        When called from inside a running event loop the async pool is left alone;
+        use ``aclose`` (or ``await client.close()`` on ``AsyncContexta``) instead.
+        """
+        if self._closed:
+            return
+        self._closed = True
         self._client.close()
-        if self._async_client:
-            import asyncio
+        if self._async_client is not None:
             try:
-                asyncio.get_event_loop().run_until_complete(self._async_client.aclose())
+                asyncio.get_running_loop()
             except RuntimeError:
-                pass
+                try:
+                    loop = asyncio.new_event_loop()
+                    loop.run_until_complete(self._async_client.aclose())
+                    loop.close()
+                except Exception:
+                    logger.debug("Async transport left for garbage collection", exc_info=True)
+                self._async_client = None
+
+    async def aclose(self) -> None:
+        """Asynchronously release pooled connections. Safe to call more than once."""
+        if self._async_client is not None:
+            client, self._async_client = self._async_client, None
+            await client.aclose()
+        if not self._closed:
+            self.close()

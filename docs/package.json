@@ -1,6 +1,6 @@
 {
   "name": "contexta-docs",
-  "version": "0.1.0",
+  "version": "1.5.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -13,10 +13,10 @@
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "@next/mdx": "^14.2.0",
-    "@mdx-js/loader": "^3.0.0",
-    "@mdx-js/react": "^3.0.0",
-    "rehype-highlight": "^7.0.0",
-    "remark-gfm": "^4.0.0",
+    "@mdx-js/loader": "^2.3.0",
+    "@mdx-js/react": "^2.3.0",
+    "rehype-highlight": "^6.0.0",
+    "remark-gfm": "^3.0.0",
     "nextra": "^2.13.0",
     "nextra-theme-docs": "^2.13.0",
     "lucide-react": "^0.400.0",
@@ -32,3 +32,4 @@
     "autoprefixer": "^10.4.0"
   }
 }
+

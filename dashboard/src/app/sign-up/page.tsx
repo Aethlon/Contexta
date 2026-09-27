@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -39,11 +39,11 @@ export default function SignUpPage() {
         <div>
           {/* Brand Header */}
           <div className="flex items-center gap-2.5 mb-12">
-            <div className="relative flex items-center justify-center w-8 h-8 rounded border border-border/40 bg-secondary/60 text-foreground">
+            <div className="relative flex items-center justify-center w-8 h-8 rounded border border-border bg-secondary/60 text-foreground">
               <ContextaMark className="size-5" />
             </div>
             <span className="text-sm font-mono uppercase tracking-widest text-foreground flex items-center">
-              contexta<span className="text-[10px] text-muted-foreground font-mono ml-1 font-normal">™</span>
+              contexta<span className="text-[10px] text-muted-foreground font-mono ml-1 font-normal">â„¢</span>
             </span>
           </div>
 
@@ -59,7 +59,7 @@ export default function SignUpPage() {
 
           {/* Error Banner */}
           {error && (
-            <div className="mb-6 flex items-start gap-3 rounded border border-red-500/30 bg-red-500/10 p-3.5 text-xs font-mono text-red-400">
+            <div className="mb-6 flex items-start gap-3 rounded border border-red-500/30 bg-red-500/10 p-3.5 text-xs font-mono tone-red">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
@@ -74,7 +74,7 @@ export default function SignUpPage() {
                 type="email"
                 placeholder="Work email address"
                 required
-                className="w-full rounded border border-border/40 bg-card/60 px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+                className="w-full rounded border border-border bg-card px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
               />
             </div>
             <div>
@@ -84,7 +84,7 @@ export default function SignUpPage() {
                 type="password"
                 placeholder="Create password (min. 8 characters)"
                 required
-                className="w-full rounded border border-border/40 bg-card/60 px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+                className="w-full rounded border border-border bg-card px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
               />
             </div>
             <div>
@@ -94,7 +94,7 @@ export default function SignUpPage() {
                 type="password"
                 placeholder="Confirm password"
                 required
-                className="w-full rounded border border-border/40 bg-card/60 px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+                className="w-full rounded border border-border bg-card px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
               />
             </div>
 
@@ -142,7 +142,7 @@ export default function SignUpPage() {
 
       {/* Right Column: Frame with Testimonial */}
       <div className="w-full lg:w-[52%] xl:w-[56%] p-3 sm:p-5 lg:p-6 flex items-center justify-center">
-        <div className="relative w-full h-[520px] lg:h-[calc(100vh-3rem)] rounded-xl overflow-hidden border border-border/40 shadow-2xl flex flex-col items-center justify-center p-6 sm:p-10 bg-card/50">
+        <div className="relative w-full h-[520px] lg:h-[calc(100vh-3rem)] rounded-lg overflow-hidden border border-border shadow-2xl flex flex-col items-center justify-center p-6 sm:p-10 bg-card">
           {/* Background Image with muted dark overlay */}
           <div
             className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 scale-105 opacity-40"
@@ -180,20 +180,20 @@ export default function SignUpPage() {
             </div>
 
             {/* Testimonial Card */}
-            <div className="w-full rounded border border-border/40 bg-card/90 text-foreground backdrop-blur-xl p-6 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.4)] text-left font-mono">
+            <div className="w-full rounded border border-border bg-card text-foreground  p-6 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.4)] text-left font-mono">
               <p className="text-xs sm:text-sm font-normal leading-relaxed text-foreground mb-2.5">
                 &ldquo;We just ditched RAG completely and went memory only through Contexta.&rdquo;
               </p>
               <p className="text-[11px] text-muted-foreground font-normal leading-relaxed mb-5">
-                Reduced avg response time from 40s → 12s. Using about 40–50% fewer tokens.
+                Reduced avg response time from 40s â†’ 12s. Using about 40â€“50% fewer tokens.
               </p>
 
               {/* Author */}
-              <div className="flex items-center gap-3 pt-3 border-t border-border/40">
+              <div className="flex items-center gap-3 pt-3 border-t border-border">
                 <img
                   src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=faces"
                   alt="Armin Daryabegi"
-                  className="w-8 h-8 rounded-full object-cover border border-border/40"
+                  className="w-8 h-8 rounded-full object-cover border border-border"
                 />
                 <div>
                   <h4 className="text-xs font-medium text-foreground leading-tight">
@@ -206,13 +206,13 @@ export default function SignUpPage() {
 
             {/* Floating Metric Pills */}
             <div className="flex flex-wrap items-center justify-center gap-2 pt-1 font-mono">
-              <span className="inline-flex items-center rounded border border-border/40 bg-secondary/60 backdrop-blur-md px-3 py-1 text-[10px] font-normal text-muted-foreground shadow-sm">
+              <span className="inline-flex items-center rounded border border-border bg-secondary/60  px-3 py-1 text-[10px] font-normal text-muted-foreground shadow-sm">
                 100B+ tokens/mo
               </span>
-              <span className="inline-flex items-center rounded border border-border/40 bg-secondary/60 backdrop-blur-md px-3 py-1 text-[10px] font-normal text-muted-foreground shadow-sm">
+              <span className="inline-flex items-center rounded border border-border bg-secondary/60  px-3 py-1 text-[10px] font-normal text-muted-foreground shadow-sm">
                 &lt;300ms p95 recall
               </span>
-              <span className="inline-flex items-center rounded border border-border/40 bg-secondary/60 backdrop-blur-md px-3 py-1 text-[10px] font-normal text-muted-foreground shadow-sm">
+              <span className="inline-flex items-center rounded border border-border bg-secondary/60  px-3 py-1 text-[10px] font-normal text-muted-foreground shadow-sm">
                 Zero hallucination drift
               </span>
             </div>

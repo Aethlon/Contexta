@@ -17,12 +17,18 @@ async def client():
         yield ac
 
 
+def identity(org_id) -> dict[str, str]:
+    """The header pair the auth middleware accepts for a legacy-tenant request.
+
+    It requires the organization and the actor together: one alone is answered
+    with 401 before the route is ever reached.
+    """
+    return {"x-organization-id": str(org_id), "x-user-id": str(uuid4())}
+
+
 async def test_get_audit_empty(client: AsyncClient) -> None:
     org_id = uuid4()
-    response = await client.get(
-        "/v1/audit",
-        headers={"x-organization-id": str(org_id)},
-    )
+    response = await client.get("/v1/audit", headers=identity(org_id))
     assert response.status_code == 200
     assert response.json() == []
 
@@ -46,10 +52,7 @@ async def test_get_audit_returns_entries(client: AsyncClient, override_db_depend
     mock_result.scalars.return_value.all.return_value = [mock_log]
     override_db_dependency.execute.return_value = mock_result
 
-    response = await client.get(
-        "/v1/audit",
-        headers={"x-organization-id": str(org_id)},
-    )
+    response = await client.get("/v1/audit", headers=identity(org_id))
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
@@ -12,7 +12,7 @@ const Checkbox = React.forwardRef<
   <CheckboxPrimitive.Root
     ref={ref}
     className={cn(
-      "grid place-content-center peer h-4 w-4 shrink-0 rounded-[4px] border border-[var(--color-graphite)] bg-[var(--color-ash)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-[var(--color-ghost)] data-[state=checked]:text-[var(--color-abyss)] data-[state=checked]:border-[var(--color-ghost)] transition-colors duration-150 cursor-pointer",
+      "grid place-content-center peer h-4 w-4 shrink-0 rounded-[4px] border border-[var(--border)] bg-[var(--card)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-[var(--foreground)] data-[state=checked]:text-[var(--background)] data-[state=checked]:border-[var(--foreground)] transition-colors duration-150 cursor-pointer",
       className,
     )}
     {...props}

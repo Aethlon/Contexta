@@ -8,25 +8,40 @@ type Theme = "light" | "dark";
 type ThemeContextType = {
   theme: Theme;
   toggleTheme: () => void;
+  setTheme: (theme: Theme) => void;
 };
 
 const ThemeContext = React.createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme] = React.useState<Theme>("dark");
+  const [theme, setThemeState] = React.useState<Theme>("light");
 
   React.useEffect(() => {
-    localStorage.setItem("theme", "dark");
-    document.documentElement.classList.add("dark");
+    const savedTheme = (localStorage.getItem("contexta_theme") as Theme) || "light";
+    setThemeState(savedTheme);
+    document.documentElement.classList.remove("light", "dark");
+    document.documentElement.classList.add(savedTheme);
   }, []);
 
-  const toggleTheme = () => {
-    // Kept for interface compatibility; UI is locked to curated dark mode
-    document.documentElement.classList.add("dark");
-  };
+  const toggleTheme = React.useCallback(() => {
+    setThemeState((prev) => {
+      const next: Theme = prev === "dark" ? "light" : "dark";
+      localStorage.setItem("contexta_theme", next);
+      document.documentElement.classList.remove("light", "dark");
+      document.documentElement.classList.add(next);
+      return next;
+    });
+  }, []);
+
+  const setTheme = React.useCallback((next: Theme) => {
+    setThemeState(next);
+    localStorage.setItem("contexta_theme", next);
+    document.documentElement.classList.remove("light", "dark");
+    document.documentElement.classList.add(next);
+  }, []);
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );
@@ -40,11 +55,15 @@ export function useTheme() {
   return context;
 }
 
-export function Providers({ children }: { children: React.ReactNode }) {
-  return (
-    <SessionProvider>
-      <ThemeProvider>{children}</ThemeProvider>
-    </SessionProvider>
-  );
+export function Providers({
+  children,
+  authEnabled,
+}: {
+  children: React.ReactNode;
+  authEnabled: boolean;
+}) {
+  const tree = <ThemeProvider>{children}</ThemeProvider>;
+  // SessionProvider is only mounted when page auth is enabled, so the default
+  // no-auth console never calls /api/auth/session.
+  return authEnabled ? <SessionProvider>{tree}</SessionProvider> : tree;
 }
-

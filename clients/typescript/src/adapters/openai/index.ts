@@ -1,4 +1,4 @@
-import { contexta, contextaError, type Context } from "@contexta/client";
+import { Contexta, contextaError, type Context } from "@contexta/client";
 import OpenAI from "openai";
 import type {
   Assistant,
@@ -12,6 +12,8 @@ import type {
  * Options for configuring contextaMemory.
  */
 export interface contextaMemoryOptions {
+  userId: string;
+  organizationId?: string;
   tokenBudget?: number;
   autoBatchSize?: number;
 }
@@ -20,12 +22,16 @@ export interface contextaMemoryOptions {
  * Fetches contexta context and formats it for injection into an assistant thread.
  */
 export class contextaMemory {
-  private client: contexta;
+  private client: Contexta;
+  private userId: string;
+  private organizationId: string;
   private tokenBudget?: number;
   private autoBatchSize: number;
 
-  constructor(client: contexta, options: contextaMemoryOptions = {}) {
+  constructor(client: Contexta, options: contextaMemoryOptions) {
     this.client = client;
+    this.userId = options.userId;
+    this.organizationId = options.organizationId ?? client.organizationId ?? "";
     this.tokenBudget = options.tokenBudget;
     this.autoBatchSize = options.autoBatchSize ?? 10;
   }
@@ -33,8 +39,10 @@ export class contextaMemory {
   async buildSystemMessage(sessionId: string): Promise<string> {
     try {
       const ctx = await this.client.context({
-        session_id: sessionId,
-        token_budget: this.tokenBudget,
+        userId: this.userId,
+        organizationId: this.organizationId,
+        sessionId,
+        tokenBudget: this.tokenBudget,
       });
       return this.formatContext(ctx);
     } catch (err) {
@@ -48,7 +56,7 @@ export class contextaMemory {
   async observe(sessionId: string, messages: { role: string; content: string }[]): Promise<void> {
     if (messages.length === 0) return;
     try {
-      await this.client.observe({ session_id: sessionId, messages });
+      await this.client.observe({ userId: this.userId, sessionId, messages });
     } catch (err) {
       console.error(`contexta observe failed for session ${sessionId}`, err);
     }
@@ -59,7 +67,7 @@ export class contextaMemory {
       role: m.role,
       content: m.content
         .filter((b) => b.type === "text")
-        .map((b) => (b as any).text?.value ?? "")
+        .map((b) => ((b as { text?: { value?: string } }).text?.value ?? ""))
         .join("\n"),
     }));
     await this.observe(sessionId, extracted);
@@ -67,20 +75,20 @@ export class contextaMemory {
 
   private formatContext(ctx: Context): string {
     const parts: string[] = [];
-    if (ctx.user_profile?.name) {
-      parts.push(`User Profile: ${ctx.user_profile.name}`);
+    if (ctx.userProfile) {
+      parts.push(`User Profile: ${JSON.stringify(ctx.userProfile)}`);
     }
     for (const pref of ctx.preferences ?? []) {
-      parts.push(`Preference: ${pref.category}=${pref.value}`);
+      parts.push(`Preference: ${JSON.stringify(pref)}`);
     }
     for (const goal of ctx.goals ?? []) {
-      parts.push(`Goal: ${goal.description}`);
+      parts.push(`Goal: ${JSON.stringify(goal)}`);
     }
-    for (const proj of ctx.active_projects ?? []) {
-      parts.push(`Active Project: ${proj.name}`);
+    for (const proj of ctx.activeProjects ?? []) {
+      parts.push(`Active Project: ${JSON.stringify(proj)}`);
     }
-    for (const mem of ctx.relevant_memories ?? []) {
-      parts.push(`[Memory] ${mem.title}: ${mem.content}`);
+    for (const mem of ctx.relevantMemories ?? []) {
+      parts.push(`[Memory] ${mem.memory?.title}: ${mem.memory?.content}`);
     }
     return parts.join("\n");
   }

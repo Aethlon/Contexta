@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -210,33 +210,33 @@ function BenchmarkBar({
         <div className="flex items-center gap-2">
           <span
             className={`font-medium ${
-              isContexta ? "text-[var(--color-ghost)] font-semibold" : "text-[var(--color-smoke)]"
+              isContexta ? "text-[var(--foreground)] font-semibold" : "text-[var(--text-secondary)]"
             }`}
           >
             {label}
           </span>
           {isContexta && (
-            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 border border-emerald-500/30">
+            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium tone-green border border-emerald-500/30">
               SOTA #1
             </span>
           )}
         </div>
         <div className="flex items-baseline gap-2">
           {subtitle && (
-            <span className="text-[11px] text-[var(--color-smoke)]/60 hidden sm:inline font-mono">
+            <span className="text-[11px] text-[var(--text-secondary)]/60 hidden sm:inline font-mono">
               {subtitle}
             </span>
           )}
           <span
             className={`font-mono text-xs ${
-              isContexta ? "text-emerald-400 font-bold" : "text-[var(--color-ghost)]"
+              isContexta ? "tone-green font-bold" : "text-[var(--foreground)]"
             }`}
           >
             {displayValue}
           </span>
         </div>
       </div>
-      <div className="h-2.5 w-full rounded-full bg-[var(--color-charcoal)]/40 overflow-hidden p-0.5 border border-[var(--color-graphite)]/20">
+      <div className="h-2.5 w-full rounded-full bg-[var(--muted)]/40 overflow-hidden p-0.5 border border-[var(--border)]/20">
         <motion.div
           initial={{ width: 0 }}
           whileInView={{ width: `${percentage}%` }}
@@ -245,7 +245,7 @@ function BenchmarkBar({
           className={`h-full rounded-full ${
             isContexta
               ? "bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
-              : "bg-[var(--color-smoke)]/30"
+              : "bg-[var(--text-secondary)]/30"
           }`}
         />
       </div>
@@ -315,12 +315,12 @@ export function Benchmarks() {
     if (val === 0) {
       if (isContexta) {
         return (
-          <span className="text-amber-400/90 font-mono text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 whitespace-nowrap">
+          <span className="tone-amber font-mono text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 whitespace-nowrap">
             Pending Eval
           </span>
         );
       }
-      return <span className="text-[var(--color-smoke)]/40 font-mono text-xs">—</span>;
+      return <span className="text-[var(--text-secondary)]/40 font-mono text-xs">â€”</span>;
     }
     const tops = topScores[field];
     const isFirst = val === tops.first;
@@ -328,18 +328,18 @@ export function Benchmarks() {
     const isThird = val === tops.third;
 
     let badge = null;
-    if (isFirst) badge = <span className="text-amber-400 font-bold ml-1">🥇</span>;
-    else if (isSecond) badge = <span className="text-slate-300 font-bold ml-1">🥈</span>;
-    else if (isThird) badge = <span className="text-amber-600 font-bold ml-1">🥉</span>;
+    if (isFirst) badge = <span className="tone-amber font-bold ml-1">ðŸ¥‡</span>;
+    else if (isSecond) badge = <span className="text-slate-300 font-bold ml-1">ðŸ¥ˆ</span>;
+    else if (isThird) badge = <span className="text-amber-600 font-bold ml-1">ðŸ¥‰</span>;
 
     return (
       <span
         className={`font-mono text-xs ${
           isContexta
-            ? "text-emerald-400 font-bold"
+            ? "tone-green font-bold"
             : isFirst
-            ? "text-[var(--color-ghost)] font-semibold"
-            : "text-[var(--color-smoke)]"
+            ? "text-[var(--foreground)] font-semibold"
+            : "text-[var(--text-secondary)]"
         }`}
       >
         {val.toFixed(2)}
@@ -349,28 +349,28 @@ export function Benchmarks() {
   };
 
   return (
-    <section id="benchmarks" className="scroll-mt-24 border-t border-[var(--color-graphite)]/30 py-24">
+    <section id="benchmarks" className="scroll-mt-24 border-t border-[var(--border)]/30 py-24">
       <div className="space-y-12">
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Badge className="text-xs">SOTA Empirical Benchmark Matrix</Badge>
-              <span className="flex items-center gap-1 text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+              <span className="flex items-center gap-1 text-[11px] font-mono tone-green bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                 <Trophy className="h-3 w-3" />
                 Targeting SOTA #1
               </span>
             </div>
-            <h2 className="text-3xl font-light tracking-tight text-[var(--color-ghost)]">
-              Head-to-head against <span className="text-emerald-400 font-normal">the top memory systems</span>
+            <h2 className="text-3xl font-light tracking-tight text-[var(--foreground)]">
+              Head-to-head against <span className="tone-green font-normal">the top memory systems</span>
             </h2>
-            <p className="text-sm font-light text-[var(--color-smoke)] max-w-2xl leading-relaxed">
+            <p className="text-sm font-light text-[var(--text-secondary)] max-w-2xl leading-relaxed">
               Standardized evaluation from the <strong>OmniMemEval</strong> benchmark paper alongside current published vendor baselines. Tested with real Postgres + pgvector persistence, Qwen3 offline embeddings, neural reranking, and 2-hop spreading activation.
             </p>
           </div>
 
           {/* Tab Selector */}
-          <div className="flex flex-wrap rounded-xl border border-[var(--color-graphite)]/40 bg-[var(--color-ash)] p-1 text-xs">
+          <div className="flex flex-wrap rounded-lg border border-[var(--border)]/40 bg-[var(--card)] p-1 text-xs">
             {(
               [
                 { id: "matrix", label: "Industry SOTA Matrix" },
@@ -384,14 +384,14 @@ export function Benchmarks() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`relative px-4 py-2 rounded-lg font-medium transition-colors select-none ${
                   activeTab === tab.id
-                    ? "text-[var(--color-ghost)] font-semibold"
-                    : "text-[var(--color-smoke)] hover:text-[var(--color-ghost)]"
+                    ? "text-[var(--foreground)] font-semibold"
+                    : "text-[var(--text-secondary)] hover:text-[var(--foreground)]"
                 }`}
               >
                 {activeTab === tab.id && (
                   <motion.div
                     layoutId="benchmarkTabIndicator"
-                    className="absolute inset-0 rounded-lg bg-[var(--color-charcoal)] border border-[var(--color-graphite)]/30"
+                    className="absolute inset-0 rounded-lg bg-[var(--muted)] border border-[var(--border)]/30"
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
                 )}
@@ -414,102 +414,102 @@ export function Benchmarks() {
             >
               {/* Highlight Cards */}
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <Card className="border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-5 space-y-2">
-                  <div className="flex items-center justify-between text-xs text-[var(--color-smoke)]">
+                <Card className="border border-[var(--border)]/30 bg-[var(--card)] p-5 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
                     <span className="font-mono">LOCOMO EMPIRICAL SCORE</span>
-                    <Trophy className="h-4 w-4 text-emerald-400" />
+                    <Trophy className="h-4 w-4 tone-green" />
                   </div>
-                  <div className="text-3xl font-bold text-emerald-400 font-mono">
+                  <div className="text-3xl font-bold tone-green font-mono">
                     92.40%
                   </div>
-                  <p className="text-xs text-[var(--color-smoke)] font-light">
+                  <p className="text-xs text-[var(--text-secondary)] font-light">
                     Tested on 199 questions: ahead of MemOS (88.8%), Cognee (83.5%), EverOS (82.8%), Hindsight (82.0%), and Mem0 (77.7%).
                   </p>
                 </Card>
 
-                <Card className="border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-5 space-y-2">
-                  <div className="flex items-center justify-between text-xs text-[var(--color-smoke)]">
+                <Card className="border border-[var(--border)]/30 bg-[var(--card)] p-5 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
                     <span className="font-mono">LONGMEMEVAL ACCURACY</span>
-                    <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                    <ShieldCheck className="h-4 w-4 tone-green" />
                   </div>
-                  <div className="text-3xl font-bold text-emerald-400 font-mono">
+                  <div className="text-3xl font-bold tone-green font-mono">
                     90.40%
                   </div>
-                  <p className="text-xs text-[var(--color-smoke)] font-light">
+                  <p className="text-xs text-[var(--text-secondary)] font-light">
                     96.4% Recall@15 needle retention and 100% zero-hallucination abstention across 7 categories, surpassing MemOS (89.2%).
                   </p>
                 </Card>
 
-                <Card className="border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-5 space-y-2">
-                  <div className="flex items-center justify-between text-xs text-[var(--color-smoke)]">
+                <Card className="border border-[var(--border)]/30 bg-[var(--card)] p-5 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
                     <span className="font-mono">TEMPORAL REASONING</span>
                     <Zap className="h-4 w-4 text-cyan-400" />
                   </div>
                   <div className="text-2xl font-bold text-cyan-400 font-mono">
                     97.3%
                   </div>
-                  <p className="text-xs text-[var(--color-smoke)] font-light">
+                  <p className="text-xs text-[var(--text-secondary)] font-light">
                     36 of 37 correct. Chronological ordering with relative date anchoring and valid_from datetime ranges.
                   </p>
                 </Card>
 
-                <Card className="border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-5 space-y-2">
-                  <div className="flex items-center justify-between text-xs text-[var(--color-smoke)]">
+                <Card className="border border-[var(--border)]/30 bg-[var(--card)] p-5 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
                     <span className="font-mono">INFERENCE ARCHITECTURE</span>
                     <Activity className="h-4 w-4 text-purple-400" />
                   </div>
                   <div className="text-2xl font-bold text-purple-400 font-mono">
                     100% Offline
                   </div>
-                  <p className="text-xs text-[var(--color-smoke)] font-light">
+                  <p className="text-xs text-[var(--text-secondary)] font-light">
                     Local BGE embedding + cross-encoder reranker running with zero external API calls or latency.
                   </p>
                 </Card>
               </div>
 
               {/* Matrix Table Container */}
-              <Card className="border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] overflow-hidden shadow-2xl">
-                <div className="p-6 border-b border-[var(--color-graphite)]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <Card className="border border-[var(--border)]/30 bg-[var(--card)] overflow-hidden shadow-2xl">
+                <div className="p-6 border-b border-[var(--border)]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
-                    <h3 className="text-lg font-medium text-[var(--color-ghost)] flex items-center gap-2">
+                    <h3 className="text-lg font-medium text-[var(--foreground)] flex items-center gap-2">
                       Comprehensive Agent Memory Benchmark Matrix
-                      <span className="text-xs font-mono font-normal text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                      <span className="text-xs font-mono font-normal tone-green bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                         13 Systems Evaluated
                       </span>
                     </h3>
-                    <p className="text-xs text-[var(--color-smoke)] font-light mt-1">
+                    <p className="text-xs text-[var(--text-secondary)] font-light mt-1">
                       Scores reported as percentage accuracy across standardized evaluation datasets. Click any column header to sort.
                     </p>
                   </div>
 
                   {/* Search Filter */}
                   <div className="relative w-full sm:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--color-smoke)]" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-secondary)]" />
                     <input
                       type="text"
                       placeholder="Filter by system..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-[var(--color-charcoal)] border border-[var(--color-graphite)]/40 text-xs text-[var(--color-ghost)] placeholder:text-[var(--color-smoke)]/50 focus:outline-none focus:border-emerald-500/50"
+                      className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-[var(--muted)] border border-[var(--border)]/40 text-xs text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 focus:outline-none focus:border-emerald-500/50"
                     />
                   </div>
                 </div>
 
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader className="bg-[var(--color-charcoal)]/60">
+                    <TableHeader className="bg-[var(--muted)]/60">
                       <TableRow className="hover:bg-transparent">
                         <TableHead
-                          className="cursor-pointer select-none font-semibold text-[var(--color-ghost)]"
+                          className="cursor-pointer select-none font-semibold text-[var(--foreground)]"
                           onClick={() => handleSort("system")}
                         >
                           <div className="flex items-center gap-1.5">
                             System
                             {sortField === "system" ? (
                               sortOrder === "asc" ? (
-                                <ChevronUp className="h-3.5 w-3.5 text-emerald-400" />
+                                <ChevronUp className="h-3.5 w-3.5 tone-green" />
                               ) : (
-                                <ChevronDown className="h-3.5 w-3.5 text-emerald-400" />
+                                <ChevronDown className="h-3.5 w-3.5 tone-green" />
                               )
                             ) : (
                               <ArrowUpDown className="h-3 w-3 opacity-40" />
@@ -525,9 +525,9 @@ export function Benchmarks() {
                             <span>LoCoMo</span>
                             {sortField === "locomo" ? (
                               sortOrder === "asc" ? (
-                                <ChevronUp className="h-3.5 w-3.5 text-emerald-400" />
+                                <ChevronUp className="h-3.5 w-3.5 tone-green" />
                               ) : (
-                                <ChevronDown className="h-3.5 w-3.5 text-emerald-400" />
+                                <ChevronDown className="h-3.5 w-3.5 tone-green" />
                               )
                             ) : (
                               <ArrowUpDown className="h-3 w-3 opacity-40" />
@@ -543,9 +543,9 @@ export function Benchmarks() {
                             <span>LongMemEval</span>
                             {sortField === "longMemEval" ? (
                               sortOrder === "asc" ? (
-                                <ChevronUp className="h-3.5 w-3.5 text-emerald-400" />
+                                <ChevronUp className="h-3.5 w-3.5 tone-green" />
                               ) : (
-                                <ChevronDown className="h-3.5 w-3.5 text-emerald-400" />
+                                <ChevronDown className="h-3.5 w-3.5 tone-green" />
                               )
                             ) : (
                               <ArrowUpDown className="h-3 w-3 opacity-40" />
@@ -561,9 +561,9 @@ export function Benchmarks() {
                             <span>BEAM 100K</span>
                             {sortField === "beam100k" ? (
                               sortOrder === "asc" ? (
-                                <ChevronUp className="h-3.5 w-3.5 text-emerald-400" />
+                                <ChevronUp className="h-3.5 w-3.5 tone-green" />
                               ) : (
-                                <ChevronDown className="h-3.5 w-3.5 text-emerald-400" />
+                                <ChevronDown className="h-3.5 w-3.5 tone-green" />
                               )
                             ) : (
                               <ArrowUpDown className="h-3 w-3 opacity-40" />
@@ -579,9 +579,9 @@ export function Benchmarks() {
                             <span>BEAM 10M</span>
                             {sortField === "beam10m" ? (
                               sortOrder === "asc" ? (
-                                <ChevronUp className="h-3.5 w-3.5 text-emerald-400" />
+                                <ChevronUp className="h-3.5 w-3.5 tone-green" />
                               ) : (
-                                <ChevronDown className="h-3.5 w-3.5 text-emerald-400" />
+                                <ChevronDown className="h-3.5 w-3.5 tone-green" />
                               )
                             ) : (
                               <ArrowUpDown className="h-3 w-3 opacity-40" />
@@ -597,9 +597,9 @@ export function Benchmarks() {
                             <span>PersonaMem v2</span>
                             {sortField === "personaMem" ? (
                               sortOrder === "asc" ? (
-                                <ChevronUp className="h-3.5 w-3.5 text-emerald-400" />
+                                <ChevronUp className="h-3.5 w-3.5 tone-green" />
                               ) : (
-                                <ChevronDown className="h-3.5 w-3.5 text-emerald-400" />
+                                <ChevronDown className="h-3.5 w-3.5 tone-green" />
                               )
                             ) : (
                               <ArrowUpDown className="h-3 w-3 opacity-40" />
@@ -615,9 +615,9 @@ export function Benchmarks() {
                             <span>HaluMem</span>
                             {sortField === "haluMem" ? (
                               sortOrder === "asc" ? (
-                                <ChevronUp className="h-3.5 w-3.5 text-emerald-400" />
+                                <ChevronUp className="h-3.5 w-3.5 tone-green" />
                               ) : (
-                                <ChevronDown className="h-3.5 w-3.5 text-emerald-400" />
+                                <ChevronDown className="h-3.5 w-3.5 tone-green" />
                               )
                             ) : (
                               <ArrowUpDown className="h-3 w-3 opacity-40" />
@@ -625,7 +625,7 @@ export function Benchmarks() {
                           </div>
                         </TableHead>
 
-                        <TableHead className="text-left font-semibold text-[var(--color-ghost)]">
+                        <TableHead className="text-left font-semibold text-[var(--foreground)]">
                           Architecture
                         </TableHead>
                       </TableRow>
@@ -638,7 +638,7 @@ export function Benchmarks() {
                           className={
                             row.isContexta
                               ? "bg-emerald-500/10 border-y border-emerald-500/30 hover:bg-emerald-500/15"
-                              : "hover:bg-[var(--color-charcoal)]/30"
+                              : "hover:bg-[var(--muted)]/30"
                           }
                         >
                           <TableCell className="font-medium whitespace-nowrap">
@@ -646,13 +646,13 @@ export function Benchmarks() {
                               <span
                                 className={`text-sm ${
                                   row.isContexta
-                                    ? "font-bold text-emerald-400 flex items-center gap-1.5"
-                                    : "text-[var(--color-ghost)]"
+                                    ? "font-bold tone-green flex items-center gap-1.5"
+                                    : "text-[var(--foreground)]"
                                 }`}
                               >
                                 {row.system}
                                 {row.isContexta && (
-                                  <span className="rounded bg-emerald-400/20 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider text-emerald-300 border border-emerald-400/30">
+                                  <span className="rounded dot dot-green/20 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider tone-green border border-emerald-400/30">
                                     Ours
                                   </span>
                                 )}
@@ -692,7 +692,7 @@ export function Benchmarks() {
                             {renderCell(row.haluMem, "haluMem", row.isContexta)}
                           </TableCell>
 
-                          <TableCell className="text-xs text-[var(--color-smoke)] max-w-xs truncate font-light">
+                          <TableCell className="text-xs text-[var(--text-secondary)] max-w-xs truncate font-light">
                             {row.architecture}
                           </TableCell>
                         </TableRow>
@@ -701,13 +701,13 @@ export function Benchmarks() {
                   </Table>
                 </div>
 
-                <div className="p-4 bg-[var(--color-charcoal)]/40 border-t border-[var(--color-graphite)]/30 flex flex-wrap items-center justify-between text-xs text-[var(--color-smoke)] gap-2">
+                <div className="p-4 bg-[var(--muted)]/40 border-t border-[var(--border)]/30 flex flex-wrap items-center justify-between text-xs text-[var(--text-secondary)] gap-2">
                   <div className="flex items-center gap-4">
-                    <span>🥇 #1 Rank</span>
-                    <span>🥈 #2 Rank</span>
-                    <span>🥉 #3 Rank</span>
+                    <span>ðŸ¥‡ #1 Rank</span>
+                    <span>ðŸ¥ˆ #2 Rank</span>
+                    <span>ðŸ¥‰ #3 Rank</span>
                   </div>
-                  <div className="text-[11px] font-mono text-emerald-400/90">
+                  <div className="text-[11px] font-mono tone-green">
                     Contexta scores verified with Postgres + pgvector + Qwen3 offline engine
                   </div>
                 </div>
@@ -715,32 +715,32 @@ export function Benchmarks() {
 
               {/* Benchmark Definitions Grid */}
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pt-4">
-                <div className="p-4 rounded-xl bg-[var(--color-charcoal)]/30 border border-[var(--color-graphite)]/30 space-y-1.5">
-                  <div className="text-xs font-semibold text-[var(--color-ghost)] flex items-center gap-1.5">
-                    <Trophy className="h-3.5 w-3.5 text-amber-400" />
+                <div className="p-4 rounded-lg bg-[var(--muted)]/30 border border-[var(--border)]/30 space-y-1.5">
+                  <div className="text-xs font-semibold text-[var(--foreground)] flex items-center gap-1.5">
+                    <Trophy className="h-3.5 w-3.5 tone-amber" />
                     LoCoMo (Long-Context Memory)
                   </div>
-                  <p className="text-[11px] text-[var(--color-smoke)] leading-relaxed">
+                  <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
                     Standard multi-turn benchmark measuring cross-session recall, temporal alignment, single/multi-hop entity traversal, and adversarial trap defense.
                   </p>
                 </div>
 
-                <div className="p-4 rounded-xl bg-[var(--color-charcoal)]/30 border border-[var(--color-graphite)]/30 space-y-1.5">
-                  <div className="text-xs font-semibold text-[var(--color-ghost)] flex items-center gap-1.5">
+                <div className="p-4 rounded-lg bg-[var(--muted)]/30 border border-[var(--border)]/30 space-y-1.5">
+                  <div className="text-xs font-semibold text-[var(--foreground)] flex items-center gap-1.5">
                     <Database className="h-3.5 w-3.5 text-cyan-400" />
                     LongMemEval & BEAM 100K/10M
                   </div>
-                  <p className="text-[11px] text-[var(--color-smoke)] leading-relaxed">
+                  <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
                     Evaluates needle-in-a-haystack retention and high-throughput retrieval across massive 100,000 to 10,000,000 token context spans.
                   </p>
                 </div>
 
-                <div className="p-4 rounded-xl bg-[var(--color-charcoal)]/30 border border-[var(--color-graphite)]/30 space-y-1.5">
-                  <div className="text-xs font-semibold text-[var(--color-ghost)] flex items-center gap-1.5">
-                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                <div className="p-4 rounded-lg bg-[var(--muted)]/30 border border-[var(--border)]/30 space-y-1.5">
+                  <div className="text-xs font-semibold text-[var(--foreground)] flex items-center gap-1.5">
+                    <ShieldCheck className="h-3.5 w-3.5 tone-green" />
                     HaluMem & PersonaMem v2
                   </div>
-                  <p className="text-[11px] text-[var(--color-smoke)] leading-relaxed">
+                  <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
                     Evaluates agent persona drift and tests immunity against hallucination when ungrounded trap queries and conflicting distractors are injected.
                   </p>
                 </div>
@@ -760,56 +760,56 @@ export function Benchmarks() {
             >
               <div className="grid gap-6 md:grid-cols-3">
                 {/* Metric 1 */}
-                <Card className="border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-6 space-y-3">
+                <Card className="border border-[var(--border)]/30 bg-[var(--card)] p-6 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-[var(--color-smoke)]">OVERALL ACCURACY</span>
-                    <Award className="h-4 w-4 text-emerald-400" />
+                    <span className="text-xs font-mono text-[var(--text-secondary)]">OVERALL ACCURACY</span>
+                    <Award className="h-4 w-4 tone-green" />
                   </div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-bold tracking-tight text-emerald-400 font-mono">92.4%</span>
-                    <span className="text-xs text-[var(--color-smoke)]">vs MemOS 88.8%</span>
+                    <span className="text-4xl font-bold tracking-tight tone-green font-mono">92.4%</span>
+                    <span className="text-xs text-[var(--text-secondary)]">vs MemOS 88.8%</span>
                   </div>
-                  <p className="text-xs text-[var(--color-smoke)] font-light leading-relaxed">
+                  <p className="text-xs text-[var(--text-secondary)] font-light leading-relaxed">
                     Evaluated over 199 comprehensive multi-turn questions spanning temporal reasoning, open-domain facts, and 2-hop entity traversals.
                   </p>
                 </Card>
 
                 {/* Metric 2 */}
-                <Card className="border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-6 space-y-3">
+                <Card className="border border-[var(--border)]/30 bg-[var(--card)] p-6 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-[var(--color-smoke)]">TEMPORAL REASONING</span>
+                    <span className="text-xs font-mono text-[var(--text-secondary)]">TEMPORAL REASONING</span>
                     <Zap className="h-4 w-4 text-cyan-400" />
                   </div>
                   <div className="flex items-baseline gap-2">
                     <span className="text-4xl font-bold tracking-tight text-cyan-400 font-mono">97.3%</span>
-                    <span className="text-xs text-emerald-400 font-semibold font-mono">36/37 Correct</span>
+                    <span className="text-xs tone-green font-semibold font-mono">36/37 Correct</span>
                   </div>
-                  <p className="text-xs text-[var(--color-smoke)] font-light leading-relaxed">
+                  <p className="text-xs text-[var(--text-secondary)] font-light leading-relaxed">
                     Perfect temporal alignment powered by Contexta&apos;s automatic relative date anchoring and valid_from datetime resolution.
                   </p>
                 </Card>
 
                 {/* Metric 3 */}
-                <Card className="border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-6 space-y-3">
+                <Card className="border border-[var(--border)]/30 bg-[var(--card)] p-6 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-[var(--color-smoke)]">ADVERSARIAL RESISTANCE</span>
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                    <span className="text-xs font-mono text-[var(--text-secondary)]">ADVERSARIAL RESISTANCE</span>
+                    <CheckCircle2 className="h-4 w-4 tone-green" />
                   </div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-bold tracking-tight text-emerald-400 font-mono">95.7%</span>
-                    <span className="text-xs text-[var(--color-smoke)]">hallucination immune</span>
+                    <span className="text-4xl font-bold tracking-tight tone-green font-mono">95.7%</span>
+                    <span className="text-xs text-[var(--text-secondary)]">hallucination immune</span>
                   </div>
-                  <p className="text-xs text-[var(--color-smoke)] font-light leading-relaxed">
+                  <p className="text-xs text-[var(--text-secondary)] font-light leading-relaxed">
                     45 of 47 trap questions successfully neutralized by Contexta&apos;s speaker attribution and ungrounded distractor rejection.
                   </p>
                 </Card>
               </div>
 
               {/* Head-to-Head Comparison Card */}
-              <Card className="border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-8 space-y-8">
+              <Card className="border border-[var(--border)]/30 bg-[var(--card)] p-8 space-y-8">
                 <div>
-                  <h3 className="text-base font-medium text-[var(--color-ghost)]">LoCoMo Benchmark Comparison</h3>
-                  <p className="text-xs text-[var(--color-smoke)] font-light mt-1">
+                  <h3 className="text-base font-medium text-[var(--foreground)]">LoCoMo Benchmark Comparison</h3>
+                  <p className="text-xs text-[var(--text-secondary)] font-light mt-1">
                     Normalized accuracy comparison across industry leading autonomous agent memory engines.
                   </p>
                 </div>
@@ -874,53 +874,53 @@ export function Benchmarks() {
               className="space-y-6"
             >
               <div className="grid gap-6 md:grid-cols-3">
-                <Card className="border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-6 space-y-3">
+                <Card className="border border-[var(--border)]/30 bg-[var(--card)] p-6 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-[var(--color-smoke)]">AVG TOKENS / QUERY</span>
-                    <Cpu className="h-4 w-4 text-emerald-400" />
+                    <span className="text-xs font-mono text-[var(--text-secondary)]">AVG TOKENS / QUERY</span>
+                    <Cpu className="h-4 w-4 tone-green" />
                   </div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-bold tracking-tight text-emerald-400 font-mono">911.6</span>
-                    <span className="text-xs text-[var(--color-smoke)]">tokens</span>
+                    <span className="text-4xl font-bold tracking-tight tone-green font-mono">911.6</span>
+                    <span className="text-xs text-[var(--text-secondary)]">tokens</span>
                   </div>
-                  <p className="text-xs text-[var(--color-smoke)] font-light leading-relaxed">
-                    Ultra-dense, synthesized memory context fed to LLM generation — eliminating prompt bloat and runaway latency.
+                  <p className="text-xs text-[var(--text-secondary)] font-light leading-relaxed">
+                    Ultra-dense, synthesized memory context fed to LLM generation â€” eliminating prompt bloat and runaway latency.
                   </p>
                 </Card>
 
-                <Card className="border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-6 space-y-3">
+                <Card className="border border-[var(--border)]/30 bg-[var(--card)] p-6 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-[var(--color-smoke)]">TOKEN REDUCTION</span>
+                    <span className="text-xs font-mono text-[var(--text-secondary)]">TOKEN REDUCTION</span>
                     <TrendingUp className="h-4 w-4 text-cyan-400" />
                   </div>
                   <div className="flex items-baseline gap-2">
                     <span className="text-4xl font-bold tracking-tight text-cyan-400 font-mono">96.4%</span>
-                    <span className="text-xs text-emerald-400 font-mono">vs 25k baseline</span>
+                    <span className="text-xs tone-green font-mono">vs 25k baseline</span>
                   </div>
-                  <p className="text-xs text-[var(--color-smoke)] font-light leading-relaxed">
+                  <p className="text-xs text-[var(--text-secondary)] font-light leading-relaxed">
                     27.4x fewer tokens processed compared to raw context stuffing, slashing API costs directly by over 96%.
                   </p>
                 </Card>
 
-                <Card className="border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-6 space-y-3">
+                <Card className="border border-[var(--border)]/30 bg-[var(--card)] p-6 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-[var(--color-smoke)]">COST REDUCTION / 100K QUERIES</span>
-                    <Sparkles className="h-4 w-4 text-emerald-400" />
+                    <span className="text-xs font-mono text-[var(--text-secondary)]">COST REDUCTION / 100K QUERIES</span>
+                    <Sparkles className="h-4 w-4 tone-green" />
                   </div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-bold tracking-tight text-emerald-400 font-mono">$1.37</span>
-                    <span className="text-xs text-[var(--color-smoke)]">vs $37.50</span>
+                    <span className="text-4xl font-bold tracking-tight tone-green font-mono">$1.37</span>
+                    <span className="text-xs text-[var(--text-secondary)]">vs $37.50</span>
                   </div>
-                  <p className="text-xs text-[var(--color-smoke)] font-light leading-relaxed">
+                  <p className="text-xs text-[var(--text-secondary)] font-light leading-relaxed">
                     Based on standard frontier LLM inference pricing ($1.50/M input tokens). Contexta pays for itself at production scale.
                   </p>
                 </Card>
               </div>
 
-              <Card className="border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-8 space-y-8">
+              <Card className="border border-[var(--border)]/30 bg-[var(--card)] p-8 space-y-8">
                 <div>
-                  <h3 className="text-base font-medium text-[var(--color-ghost)]">Average Prompt Tokens per Conversation Turn</h3>
-                  <p className="text-xs text-[var(--color-smoke)] font-light mt-1">
+                  <h3 className="text-base font-medium text-[var(--foreground)]">Average Prompt Tokens per Conversation Turn</h3>
+                  <p className="text-xs text-[var(--text-secondary)] font-light mt-1">
                     Lower is significantly better: smaller context windows dramatically reduce TTFT (Time To First Token) and billable inference tokens.
                   </p>
                 </div>
@@ -970,83 +970,83 @@ export function Benchmarks() {
               transition={{ duration: 0.3 }}
               className="space-y-6"
             >
-              <Card className="border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-8 space-y-8">
+              <Card className="border border-[var(--border)]/30 bg-[var(--card)] p-8 space-y-8">
                 <div>
-                  <h3 className="text-base font-medium text-[var(--color-ghost)]">Category Breakdown & Traversal Progression</h3>
-                  <p className="text-xs text-[var(--color-smoke)] font-light mt-1">
+                  <h3 className="text-base font-medium text-[var(--foreground)]">Category Breakdown & Traversal Progression</h3>
+                  <p className="text-xs text-[var(--text-secondary)] font-light mt-1">
                     Comparison between Contexta&apos;s previous single-layer retrieval vs. the new 3-Layer Spreading Activation architecture.
                   </p>
                 </div>
 
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
-                  <div className="rounded-xl border border-[var(--color-graphite)]/30 bg-[var(--color-charcoal)]/30 p-4 space-y-2">
-                    <span className="text-[11px] font-mono text-[var(--color-smoke)]">SINGLE-HOP (CAT 1)</span>
-                    <div className="text-2xl font-bold text-emerald-400 font-mono">93.8%</div>
-                    <div className="text-[11px] text-emerald-400 font-mono font-medium">30 of 32 correct</div>
-                    <p className="text-[11px] text-[var(--color-smoke)] font-light">
+                  <div className="rounded-lg border border-[var(--border)]/30 bg-[var(--muted)]/30 p-4 space-y-2">
+                    <span className="text-[11px] font-mono text-[var(--text-secondary)]">SINGLE-HOP (CAT 1)</span>
+                    <div className="text-2xl font-bold tone-green font-mono">93.8%</div>
+                    <div className="text-[11px] tone-green font-mono font-medium">30 of 32 correct</div>
+                    <p className="text-[11px] text-[var(--text-secondary)] font-light">
                       Semantic alignment with entity resolution boosts direct fact retrieval.
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-[var(--color-graphite)]/30 bg-[var(--color-charcoal)]/30 p-4 space-y-2">
-                    <span className="text-[11px] font-mono text-[var(--color-smoke)]">TEMPORAL (CAT 2)</span>
-                    <div className="text-2xl font-bold text-emerald-400 font-mono">97.3%</div>
-                    <div className="text-[11px] text-emerald-400 font-mono font-medium">36 of 37 correct</div>
-                    <p className="text-[11px] text-[var(--color-smoke)] font-light">
+                  <div className="rounded-lg border border-[var(--border)]/30 bg-[var(--muted)]/30 p-4 space-y-2">
+                    <span className="text-[11px] font-mono text-[var(--text-secondary)]">TEMPORAL (CAT 2)</span>
+                    <div className="text-2xl font-bold tone-green font-mono">97.3%</div>
+                    <div className="text-[11px] tone-green font-mono font-medium">36 of 37 correct</div>
+                    <p className="text-[11px] text-[var(--text-secondary)] font-light">
                       Chronological ordering and valid_from datetime anchoring prevent recency confusion.
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
-                    <span className="text-[11px] font-mono text-emerald-400 font-semibold">MULTI-HOP (CAT 3)</span>
-                    <div className="text-2xl font-bold text-emerald-400 font-mono">92.3%</div>
-                    <div className="text-[11px] text-emerald-400 font-mono font-bold">12 of 13 correct</div>
-                    <p className="text-[11px] text-[var(--color-smoke)] font-light">
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
+                    <span className="text-[11px] font-mono tone-green font-semibold">MULTI-HOP (CAT 3)</span>
+                    <div className="text-2xl font-bold tone-green font-mono">92.3%</div>
+                    <div className="text-[11px] tone-green font-mono font-bold">12 of 13 correct</div>
+                    <p className="text-[11px] text-[var(--text-secondary)] font-light">
                       2-hop entity edge graph traversal links indirect cross-session memories seamlessly.
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-[var(--color-graphite)]/30 bg-[var(--color-charcoal)]/30 p-4 space-y-2">
-                    <span className="text-[11px] font-mono text-[var(--color-smoke)]">OPEN-DOMAIN (CAT 4)</span>
-                    <div className="text-2xl font-bold text-emerald-400 font-mono">87.1%</div>
-                    <div className="text-[11px] text-emerald-400 font-mono font-medium">61 of 70 correct</div>
-                    <p className="text-[11px] text-[var(--color-smoke)] font-light">
+                  <div className="rounded-lg border border-[var(--border)]/30 bg-[var(--muted)]/30 p-4 space-y-2">
+                    <span className="text-[11px] font-mono text-[var(--text-secondary)]">OPEN-DOMAIN (CAT 4)</span>
+                    <div className="text-2xl font-bold tone-green font-mono">87.1%</div>
+                    <div className="text-[11px] tone-green font-mono font-medium">61 of 70 correct</div>
+                    <p className="text-[11px] text-[var(--text-secondary)] font-light">
                       Broad semantic query matching across unstructured life events.
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-[var(--color-graphite)]/30 bg-[var(--color-charcoal)]/30 p-4 space-y-2">
-                    <span className="text-[11px] font-mono text-[var(--color-smoke)]">ADVERSARIAL (CAT 5)</span>
-                    <div className="text-2xl font-bold text-emerald-400 font-mono">95.7%</div>
-                    <div className="text-[11px] text-emerald-400 font-mono font-medium">45 of 47 correct</div>
-                    <p className="text-[11px] text-[var(--color-smoke)] font-light">
+                  <div className="rounded-lg border border-[var(--border)]/30 bg-[var(--muted)]/30 p-4 space-y-2">
+                    <span className="text-[11px] font-mono text-[var(--text-secondary)]">ADVERSARIAL (CAT 5)</span>
+                    <div className="text-2xl font-bold tone-green font-mono">95.7%</div>
+                    <div className="text-[11px] tone-green font-mono font-medium">45 of 47 correct</div>
+                    <p className="text-[11px] text-[var(--text-secondary)] font-light">
                       High precision confidence thresholds resist deceptive trap prompts.
                     </p>
                   </div>
                 </div>
 
                 {/* 3-Layer Architecture Highlights */}
-                <div className="rounded-2xl border border-[var(--color-graphite)]/30 bg-[var(--color-charcoal)]/20 p-6 space-y-4">
+                <div className="rounded-lg border border-[var(--border)]/30 bg-[var(--muted)]/20 p-6 space-y-4">
                   <div className="flex items-center gap-2">
-                    <Layers className="h-4 w-4 text-emerald-400" />
-                    <h4 className="text-sm font-medium text-[var(--color-ghost)]">The 3-Layer Memory Storage Architecture</h4>
+                    <Layers className="h-4 w-4 tone-green" />
+                    <h4 className="text-sm font-medium text-[var(--foreground)]">The 3-Layer Memory Storage Architecture</h4>
                   </div>
                   <div className="grid gap-4 md:grid-cols-3 text-xs">
                     <div className="space-y-1">
-                      <div className="font-semibold text-[var(--color-ghost)]">Layer 1: Relational Facts</div>
-                      <div className="text-[var(--color-smoke)] font-light leading-relaxed">
+                      <div className="font-semibold text-[var(--foreground)]">Layer 1: Relational Facts</div>
+                      <div className="text-[var(--text-secondary)] font-light leading-relaxed">
                         Postgres ACID persistence for tenant isolation, user scopes, timestamp validity ranges, and memory deduplication.
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <div className="font-semibold text-[var(--color-ghost)]">Layer 2: Dense Semantic Vectors</div>
-                      <div className="text-[var(--color-smoke)] font-light leading-relaxed">
+                      <div className="font-semibold text-[var(--foreground)]">Layer 2: Dense Semantic Vectors</div>
+                      <div className="text-[var(--text-secondary)] font-light leading-relaxed">
                         pgvector cosine index using local Qwen3/BGE semantic embeddings for lightning-fast similarity candidate generation.
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <div className="font-semibold text-[var(--color-ghost)]">Layer 3: 2-Hop Spreading Activation Graph</div>
-                      <div className="text-[var(--color-smoke)] font-light leading-relaxed">
+                      <div className="font-semibold text-[var(--foreground)]">Layer 3: 2-Hop Spreading Activation Graph</div>
+                      <div className="text-[var(--text-secondary)] font-light leading-relaxed">
                         Entity co-occurrence relations traversed across 2 hops with exponential depth decay (0.5^depth) to uncover hidden multi-hop facts.
                       </div>
                     </div>

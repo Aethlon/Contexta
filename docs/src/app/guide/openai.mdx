@@ -1,93 +1,106 @@
 # OpenAI Assistants Integration
 
-contexta sits alongside the OpenAI Assistants API as the long-term memory layer that survives across threads.
+Contexta sits alongside the OpenAI Assistants API as the long-term memory layer that survives across threads.
 
 ## Installation
 
+The adapter ships **inside** the `contexta-client` package in this repository. There is no separate `contexta-openai` distribution to install.
+
 ```bash
-pip install contexta-client contexta-openai
+pip install -e clients/python
+pip install openai
 ```
 
-## Basic Usage
+```ts
+npm install ./clients/typescript openai
+```
+
+## Python
 
 ```python
 from openai import OpenAI
-from contexta_client import contexta
-from CONTEXTA_openai import contextaMemory
+from contexta_client import Contexta
+from contexta_client.adapters.openai import contextaMemory, contextaAssistantRunner
 
 openai_client = OpenAI()
-contexta = contexta.from_env()
-memory = contextaMemory(contexta, openai_client)
-
-# Before sending user message, fetch context
-user_message = "What database do I prefer?"
-context = memory.context_for(
-    user_id="u_123",
-    query=user_message,
-    token_budget=1500,
-)
-
-# Inject context as additional instructions
-thread = openai_client.beta.threads.create(messages=[
-    {"role": "user", "content": user_message},
-])
-
-run = openai_client.beta.threads.runs.create(
-    thread_id=thread.id,
-    assistant_id=ASSISTANT_ID,
-    additional_instructions=context.to_system_prompt(),
-)
-
-# After run completes, observe the conversation
-messages = openai_client.beta.threads.messages.list(thread_id=thread.id)
-memory.observe_thread(user_id="u_123", session_id=thread.id, messages=messages)
+client = Contexta.from_env()
+memory = contextaMemory(client, user_id=ACTOR_UUID, token_budget=1500)
 ```
 
-## Drop-in Runner
+The constructor is `(client, user_id, token_budget=None, auto_batch_size=10)` — it takes a **`Contexta` instance plus a `user_id`**, not an OpenAI client and not keyword `user_id=`. There is no `from_env()` on the adapter.
 
-For a simpler pattern, use `contextaAssistantRunner`:
+### Fetch context, then run
 
 ```python
-from CONTEXTA_openai import contextaAssistantRunner
+# Returns a {"role": "system", "content": "..."} dict
+system_msg = memory.context_for_session(session_id)
 
-runner = contextaAssistantRunner(
-    openai=openai_client,
-    contexta=contexta,
+run = openai_client.beta.threads.runs.create_and_poll(
+    thread_id=thread_id,
     assistant_id=ASSISTANT_ID,
-    user_id_resolver=lambda thread_id: "u_123",
+    additional_instructions=system_msg["content"],
 )
 
-result = runner.run(thread_id=thread.id, message=user_message)
-# context is auto-injected, observations are auto-emitted
+# After the run, feed the thread back
+messages = openai_client.beta.threads.messages.list(thread_id=thread_id)
+memory.observe_thread(session_id, [{"role": m.role, "content": m.content[0].text.value}
+                                   for m in messages.data])
 ```
+
+Method names are `context_for_session(session_id)` and `observe_thread(session_id, thread_messages)`. There is no `context_for(user_id=..., query=...)` and no `observe_thread(user_id=..., session_id=..., messages=...)`; the adapter is already bound to the `user_id` you constructed it with.
+
+### Drop-in runner
+
+```python
+runner = contextaAssistantRunner(openai_client, memory)
+
+run = runner.run_with_session(
+    assistant_id=ASSISTANT_ID,
+    session_id=session_id,
+    user_message="What do you know about me?",
+)
+```
+
+The runner creates and caches a thread per `session_id`, prepends the Contexta context as a user message prefixed `[contexta Context]`, polls the run, and (with `auto_observe=True`, the default) observes the thread afterwards.
 
 ## TypeScript
 
 ```ts
 import OpenAI from "openai";
-import { contexta } from "@contexta/client";
-import { contextaMemory } from "@contexta/openai";
+import { Contexta } from "@contexta/client";
+import { contextaMemory, contextaAssistantRunner } from "@contexta/client/adapters/openai";
 
 const openai = new OpenAI();
-const contexta = contexta.fromEnv();
-const memory = new contextaMemory(contexta, openai);
+const client = Contexta.fromEnv();
+const memory = new contextaMemory(client, { userId: ACTOR_UUID, tokenBudget: 1500 });
 
-const ctx = await memory.contextFor({
-  userId: "u_123",
-  query: userMessage,
-  tokenBudget: 1500,
+const systemContent = await memory.buildSystemMessage(sessionId);
+
+await openai.beta.threads.messages.create({
+  thread_id: threadId,
+  role: "user",
+  content: userMessage,
 });
 
-const run = await openai.beta.threads.runs.create(thread.id, {
+const run = await openai.beta.threads.runs.createAndPoll(threadId, {
   assistant_id: ASSISTANT_ID,
-  additional_instructions: ctx.toSystemPrompt(),
+  additional_instructions: systemContent,
 });
+
+const messages = await openai.beta.threads.messages.list(threadId);
+await memory.observeThread(sessionId, messages.data);
 ```
 
-## What the Adapter Handles
+TypeScript takes an **options object** (`{ userId, organizationId?, tokenBudget?, autoBatchSize? }`), which differs from the positional Python signature. Method names are `buildSystemMessage` and `observeThread`.
 
-- Translating OpenAI message objects to contexta observation format
-- Token-budget respect when injecting context as system instructions
-- Stable mapping from OpenAI thread ID to contexta session ID
-- Auto-batching observations
-- User ID propagation via a customer-supplied resolver function
+## What the adapter handles
+
+- Translating OpenAI message content blocks into Contexta's `{role, content}` observation format
+- Token-budgeted context injected as `additional_instructions` / a system message
+- Caching the Contexta session id against the OpenAI thread id
+- Batching observations (`auto_batch_size`, default 10)
+- Swallowing and logging Contexta errors rather than failing the user's turn
+
+## Gotcha
+
+Every adapter needs a `user_id`, and **that user id must equal the actor bound to your API key.** `GET /v1/memories/context` is where the mismatch surfaces, as a `403`. The adapter cannot know your key's actor, so you have to pass the same value you minted the key with.

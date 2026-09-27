@@ -1,0 +1,210 @@
+# Quickstart
+
+Contexta is self-hosted. There is no hosted API to sign up for and no `app.contexta.dev` to create a project in — you run it, you own the database, and you mint your own keys.
+
+This takes about ten minutes, most of which is the first-boot model download.
+
+## 1. Bring the stack up
+
+**Prerequisite:** Docker with Compose v2. Nothing else.
+
+**macOS / Linux (or WSL / Git Bash):**
+
+```bash
+git clone <your-fork-or-clone-url> contexta
+cd contexta
+./entrypoint.sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+git clone <your-fork-or-clone-url> contexta
+cd contexta
+.\start.ps1
+```
+
+Either script copies `.env.example` to `.env` on first run, generates a self-signed certificate for the optional gateway, and starts the stack in the background. Add `dev` for foreground streaming logs, `stop` to tear it down, `status` to check health, `logs` to tail, `online` for BYOK cloud mode.
+
+Or drive Compose yourself:
+
+```bash
+cp .env.example .env          # Windows: Copy-Item .env.example .env
+docker compose up --build
+```
+
+| Port | Service |
+| ---: | :--- |
+| 3000 | Operator dashboard (falls back to 3001 if 3000 is taken) |
+| 8000 | Contexta API |
+| 8001 | Local Qwen3 model server |
+| 8002 | Fine-tuned extraction server |
+| 8443 | Go gateway — only with `--profile edge` |
+| 8765 | MCP server (SSE at `/sse`) |
+
+The first boot downloads the Qwen3 weights into `./models`. Pre-fetch them with `./entrypoint.sh models` if you would rather not wait.
+
+Verify before going further — both endpoints are public and need no credentials:
+
+```bash
+curl http://localhost:8000/healthz    # {"status":"ok","version":"0.1.0"}
+curl http://localhost:8000/readyz     # {"db":"ok","redis":"ok"}
+curl http://localhost:8000/v1/system/engine-status
+```
+
+A healthy offline install reports `current_mode: "offline"`, `active_engine: "local_qwen"`, and `local_model_server.status: "healthy"` with both Qwen3 models `"status": "ready"`.
+
+## 2. Create your first API key
+
+`POST /v1/keys` is itself authenticated, so the very first key has to be bootstrapped directly. Generate the values:
+
+```bash
+python -c "import hashlib,secrets,uuid;t='mk_live_'+secrets.token_urlsafe(32);print('TOKEN =',t);print('HASH  =',hashlib.sha256(t.encode()).hexdigest());print('ORG   =',uuid.uuid4());print('ACTOR =',uuid.uuid4())"
+```
+
+Then insert it:
+
+```bash
+docker compose exec -T postgres psql -U postgres -d contexta -c "
+INSERT INTO api_key (id, name, prefix, token_hash, organization_id, actor_id, scopes, created_at)
+VALUES (gen_random_uuid(), 'first-key', 'mk_live_LOCAL0',
+        '<HASH>', '<ORG>', '<ACTOR>', ARRAY['read','write'], now());"
+```
+
+The token is `mk_live_<url-safe>`. The server stores only its SHA-256 hash plus a 16-character display prefix, and this SQL matches `ApiKeyRepository.create_key` exactly.
+
+> **Keep the actor UUID.** It *is* your `user_id`. Every request's `user_id` must equal the authenticated actor, so a mismatch is a `403`, not an empty result. One key = one (organization, actor) pair; to serve more users, mint more keys.
+
+Point the containerised console at that key in `.env`:
+
+```bash
+CONTEXTA_DASHBOARD_AUTH=off
+CONTEXTA_DASHBOARD_API_KEY=mk_live_...
+```
+
+Open [http://localhost:3000](http://localhost:3000). The console resolves its tenant from that key, and **API Keys** in the UI mints further keys for your applications.
+
+> The console ships **without a sign-in** — `CONTEXTA_DASHBOARD_AUTH` defaults to `off`, because Contexta is a self-hosted, single-operator tool. Set it to `on` for the NextAuth v5 credentials flow.
+>
+> **With auth off, do not put the dashboard on an untrusted network.** Anyone who can reach it acts as whatever tenant it resolved.
+
+## 3. Install an SDK
+
+**Python** (from this repository):
+
+```bash
+pip install -e clients/python
+```
+
+**TypeScript** (from this repository):
+
+```bash
+npm install ./clients/typescript
+```
+
+`Contexta` and `AsyncContexta` are the canonical class names. The older lowercase `contexta` / `Asynccontexta` still import and work but emit a deprecation warning.
+
+## 4. Send your first observation
+
+```python
+from contexta_client import Contexta
+
+# Reads CONTEXTA_API_KEY, CONTEXTA_API_URL, CONTEXTA_ORGANIZATION_ID
+with Contexta.from_env() as memory:
+    memory.observe(
+        user_id=ACTOR_UUID,              # the actor your key was minted with
+        session_id="33333333-3333-4333-8333-333333333333",
+        messages=[
+            {"role": "user", "content": "I prefer Postgres over Mongo for relational data."},
+        ],
+    )
+```
+
+```ts
+import { Contexta } from "@contexta/client";
+
+const memory = Contexta.fromEnv();
+await memory.observe({
+  userId: ACTOR_UUID,
+  sessionId: "33333333-3333-4333-8333-333333333333",
+  messages: [
+    { role: "user", content: "I prefer Postgres over Mongo for relational data." },
+  ],
+});
+memory.close();
+```
+
+`observe()` returns `{ job_id, observation_id, status: "accepted" }` with a `202`. Extraction runs in the background. Poll it when you need to know it landed:
+
+```bash
+curl http://localhost:8000/v1/observations/$JOB_ID -H "Authorization: Bearer $CONTEXTA_API_KEY"
+# {"status":"completed","attempt_count":1,"outbox_status":"published", ...}
+```
+
+## 5. Recall it
+
+```python
+ctx = memory.context(
+    user_id=ACTOR_UUID,
+    session_id="33333333-3333-4333-8333-333333333333",
+    token_budget=1500,
+)
+print(ctx.to_system_prompt())
+```
+
+```ts
+const ctx = await memory.context({ userId: ACTOR_UUID, sessionId: SESSION_ID });
+console.log(ctx.toSystemPrompt());
+```
+
+Or work with scored rows instead of a prompt string:
+
+```python
+results = memory.retrieve(
+    user_id=ACTOR_UUID,
+    organization_id=ORG_UUID,
+    query_text="what database does the user prefer?",
+    limit=10,
+)
+```
+
+`context()` and `create_session()` both require an organization id, because the server rejects a mismatch against the organization bound to your key.
+
+## 6. Close the loop
+
+Three SDK calls per turn: `context()`, your LLM, `observe()`.
+
+```python
+from contexta_client import Contexta
+from openai import OpenAI
+
+memory = Contexta.from_env()
+llm = OpenAI()
+
+def chat(user_message: str, session_id: str) -> str:
+    ctx = memory.context(user_id=ACTOR_UUID, session_id=session_id, token_budget=1500)
+
+    reply = llm.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": ctx.to_system_prompt()},
+            {"role": "user", "content": user_message},
+        ],
+    ).choices[0].message.content
+
+    memory.observe(
+        user_id=ACTOR_UUID,
+        session_id=session_id,
+        messages=[
+            {"role": "user", "content": user_message},
+            {"role": "assistant", "content": reply},
+        ],
+    )
+    return reply
+```
+
+## Next
+
+- [Concepts](/concepts) — observations, memories, and how retrieval actually works
+- [API reference](/reference/api) — every endpoint, with the real parameters
+- [Upgrading to v1.5](/reference/upgrade-v1.5) — if you are coming from an older checkout

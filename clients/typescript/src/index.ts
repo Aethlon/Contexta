@@ -1,10 +1,40 @@
-export { Asynccontexta, contexta } from "./client.js";
+export { AsyncContexta, Contexta, Asynccontexta, contexta, withContexta } from "./client.js";
 export { ContextResult } from "./context.js";
 export { HttpClient, configFromEnv } from "./http.js";
 export { DurableBuffer } from "./buffer.js";
 
+export type { QueuedEntry } from "./buffer.js";
+export type { RequestOptions } from "./http.js";
+
 export type {
   contextaConfig,
+  TlsOptions,
+  FetchLike,
+  AddRuleInput,
+  FeedbackInput,
+  InvestigateInput,
+  InvestigateStep,
+  InvestigateResultItem,
+  InvestigateResult,
+  ReflectInput,
+  ReflectResult,
+  FeedbackResult,
+  MemoryBatchEntry,
+  MemoryBatchResponse,
+  BatchRetrievalEntry,
+  VectorSearchResponse,
+  HybridSearchInput,
+  HybridSearchResponse,
+  SearchInput,
+  TraverseInput,
+  TraverseResult,
+  GraphEntity,
+  GraphEdge,
+  ListMemoriesInput,
+  CreateSessionInput,
+  EndSessionResult,
+  MemoryFlag,
+  DeleteResult,
   ObserveInput,
   ObserveResponse,
   BatchObserveResponse,

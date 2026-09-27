@@ -9,9 +9,9 @@ acting as a drop-in replacement for ChatMemoryBuffer.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from contexta_client import contexta
+from contexta_client import Contexta
 
 logger = logging.getLogger(__name__)
 
@@ -32,13 +32,14 @@ class contextaChatMemory(BaseMemory if BaseMemory is not object else object):
     - Honors token_budget for context assembly.
 
     Usage:
-        memory = contextaChatMemory(contexta_client, session_id="...", token_budget=2000)
+        memory = contextaChatMemory(contexta_client, user_id, session_id="...", token_budget=2000)
         chat_engine = index.as_chat_engine(chat_mode="context", memory=memory)
     """
 
     def __init__(
         self,
-        client: contexta,
+        client: Contexta,
+        user_id: str,
         session_id: str,
         token_budget: int | None = None,
         **kwargs: Any,
@@ -49,42 +50,44 @@ class contextaChatMemory(BaseMemory if BaseMemory is not object else object):
             )
         super().__init__(**kwargs)
         self._client = client
+        self._user_id = user_id
         self._session_id = session_id
         self._token_budget = token_budget
-        self._buffer: List[ChatMessage] = []
+        self._buffer: list[ChatMessage] = []
 
-    def get_all(self) -> List[ChatMessage]:
+    def get_all(self) -> list[ChatMessage]:
         context = self._client.context(
+            user_id=self._user_id,
             session_id=self._session_id,
             token_budget=self._token_budget,
         )
-        messages: List[ChatMessage] = []
-        if context.user_profile and context.user_profile.name:
+        messages: list[ChatMessage] = []
+        if context.user_profile:
             messages.append(
                 ChatMessage(
                     role=MessageRole.SYSTEM,
-                    content=f"User: {context.user_profile.name}",
+                    content=f"User: {context.user_profile}",
                 )
             )
         for pref in context.preferences:
             messages.append(
                 ChatMessage(
                     role=MessageRole.SYSTEM,
-                    content=f"Preference: {pref.category} = {pref.value}",
+                    content=f"Preference: {pref}",
                 )
             )
         for goal in context.goals:
             messages.append(
                 ChatMessage(
                     role=MessageRole.SYSTEM,
-                    content=f"Goal: {goal.description}",
+                    content=f"Goal: {goal}",
                 )
             )
         for mem in context.relevant_memories:
             messages.append(
                 ChatMessage(
                     role=MessageRole.ASSISTANT,
-                    content=f"[Memory] {mem.title}: {mem.content}",
+                    content=f"[Memory] {mem}",
                 )
             )
         return messages
@@ -100,7 +103,11 @@ class contextaChatMemory(BaseMemory if BaseMemory is not object else object):
             for m in self._buffer
         ]
         try:
-            self._client.observe(session_id=self._session_id, messages=raw)
+            self._client.observe(
+                user_id=self._user_id,
+                session_id=self._session_id,
+                messages=raw,
+            )
         except Exception:
             logger.exception("Failed to flush observations to contexta")
         self._buffer.clear()
@@ -108,5 +115,5 @@ class contextaChatMemory(BaseMemory if BaseMemory is not object else object):
     def reset(self) -> None:
         self._buffer.clear()
 
-    def set(self, messages: List[ChatMessage]) -> None:
+    def set(self, messages: list[ChatMessage]) -> None:
         self._buffer = list(messages)

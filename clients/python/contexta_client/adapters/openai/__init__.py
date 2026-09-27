@@ -6,10 +6,9 @@ Package: contexta-openai
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
-from uuid import uuid4
+from typing import Any
 
-from contexta_client import contexta, contextaError
+from contexta_client import Contexta, contextaError
 
 logger = logging.getLogger(__name__)
 
@@ -17,13 +16,15 @@ logger = logging.getLogger(__name__)
 class _MemoryInjector:
     """Fetches contexta context and formats it as a system message."""
 
-    def __init__(self, client: contexta, token_budget: int | None = None) -> None:
+    def __init__(self, client: Contexta, user_id: str, token_budget: int | None = None) -> None:
         self._client = client
+        self._user_id = user_id
         self._token_budget = token_budget
 
     def build_system_message(self, session_id: str) -> dict:
         try:
             context = self._client.context(
+                user_id=self._user_id,
                 session_id=session_id,
                 token_budget=self._token_budget,
             )
@@ -33,18 +34,17 @@ class _MemoryInjector:
 
         sections = []
         if context.user_profile:
-            sections.append(f"User Profile: {context.user_profile.name}")
-        if context.preferences:
-            prefs = "; ".join(f"{p.category}={p.value}" for p in context.preferences)
-            sections.append(f"Preferences: {prefs}")
-        if context.goals:
-            goals = "; ".join(g.description for g in context.goals)
-            sections.append(f"Goals: {goals}")
-        if context.active_projects:
-            projects = "; ".join(p.name for p in context.active_projects)
-            sections.append(f"Active Projects: {projects}")
+            sections.append(f"User Profile: {context.user_profile}")
+        for rule in context.rules:
+            sections.append(f"Rule: {rule}")
+        for pref in context.preferences:
+            sections.append(f"Preference: {pref}")
+        for goal in context.goals:
+            sections.append(f"Goal: {goal}")
+        for proj in context.active_projects:
+            sections.append(f"Active Project: {proj}")
         for mem in context.relevant_memories:
-            sections.append(f"[Memory] {mem.title}: {mem.content}")
+            sections.append(f"[Memory] {mem}")
 
         content = "\n".join(sections) if sections else ""
         return {"role": "system", "content": content}
@@ -54,7 +54,7 @@ class contextaMemory:
     """Hooks contexta context retrieval and observation into an OpenAI Assistant run.
 
     Usage:
-        memory = contextaMemory(contexta_client, token_budget=2000)
+        memory = contextaMemory(contexta_client, user_id, token_budget=2000)
         runner = contextaAssistantRunner(client=openai_client, memory=memory)
         result = runner.run_with_session(
             assistant_id="asst_...",
@@ -65,14 +65,16 @@ class contextaMemory:
 
     def __init__(
         self,
-        client: contexta,
+        client: Contexta,
+        user_id: str,
         token_budget: int | None = None,
         auto_batch_size: int = 10,
     ) -> None:
         self._client = client
+        self._user_id = user_id
         self._token_budget = token_budget
         self._auto_batch_size = auto_batch_size
-        self._injector = _MemoryInjector(client, token_budget)
+        self._injector = _MemoryInjector(client, user_id, token_budget)
 
     def context_for_session(self, session_id: str) -> dict:
         return self._injector.build_system_message(session_id)
@@ -80,19 +82,23 @@ class contextaMemory:
     def observe_messages(
         self,
         session_id: str,
-        messages: List[dict],
+        messages: list[dict],
     ) -> None:
         if not messages:
             return
         try:
-            self._client.observe(session_id=session_id, messages=messages)
+            self._client.observe(
+                user_id=self._user_id,
+                session_id=session_id,
+                messages=messages,
+            )
         except contextaError:
             logger.exception("Failed to observe messages for session %s", session_id)
 
     def _extract_thread_messages(
         self,
-        thread_messages: List[dict],
-    ) -> List[dict]:
+        thread_messages: list[dict],
+    ) -> list[dict]:
         extracted = []
         for msg in thread_messages:
             role = msg.get("role", "")
@@ -111,7 +117,7 @@ class contextaMemory:
     def observe_thread(
         self,
         session_id: str,
-        thread_messages: List[dict],
+        thread_messages: list[dict],
     ) -> None:
         obs_messages = self._extract_thread_messages(thread_messages)
         self.observe_messages(session_id, obs_messages)
@@ -139,7 +145,7 @@ class contextaAssistantRunner:
         self._openai = openai_client
         self._memory = memory
         self._auto_observe = auto_observe
-        self._session_thread_map: Dict[str, str] = {}
+        self._session_thread_map: dict[str, str] = {}
 
     def _get_or_create_thread(self, session_id: str) -> str:
         if session_id in self._session_thread_map:
@@ -186,7 +192,7 @@ class contextaAssistantRunner:
 
         return run
 
-    def _flatten_content(self, content_blocks: List[Any]) -> str:
+    def _flatten_content(self, content_blocks: list[Any]) -> str:
         texts = []
         for block in content_blocks:
             if hasattr(block, "text") and block.text:

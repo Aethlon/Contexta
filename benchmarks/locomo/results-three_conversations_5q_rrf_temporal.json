@@ -1,0 +1,206 @@
+{
+  "summary": {
+    "overall": {
+      "n": 15,
+      "accuracy": 0.4666666666666667
+    },
+    "by_category": {
+      "single-hop": {
+        "n": 5,
+        "accuracy": 0.6
+      },
+      "temporal": {
+        "n": 7,
+        "accuracy": 0.5714285714285714
+      },
+      "multi-hop": {
+        "n": 1,
+        "accuracy": 0.0
+      },
+      "open-domain": {
+        "n": 2,
+        "accuracy": 0.0
+      }
+    }
+  },
+  "stats": {
+    "sessions_processed": 70,
+    "memories_extracted": 1451,
+    "memories_stored": 1448,
+    "memories_deduped": 3,
+    "entities_created": 661,
+    "extraction_failures": 0,
+    "dream_cycles_run": 3,
+    "knowledge_gaps_identified": 0
+  },
+  "usage": {
+    "prompt_tokens": 33377,
+    "completion_tokens": 1083,
+    "context_tokens": 33218,
+    "questions_count": 15,
+    "calls": 15,
+    "failures": 0
+  },
+  "elapsed_seconds": 1353.8439999999973,
+  "n_conversations": 3,
+  "retrieval_limit": 20,
+  "output_tag": "three_conversations_5q_rrf_temporal",
+  "generator_provider": "model_server",
+  "generator_model": "model-server",
+  "judge_mode": "strict_rule",
+  "judge_model": "strict_rule",
+  "embedding_backend": "fastembed",
+  "offline": true,
+  "questions": [
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "gold_answer": "7 May 2023",
+      "generated_answer": "Caroline: [Date: 8:56 pm on 20 July, 2023] Thanks, Melanie! It's awesome to have our own platform to be ourselves and support others' rights. Our group, 'Connected LGBTQ Activists', is made of all kinds of people investing in positive changes. We have regular meetings, plan events and campaigns, to get together and support each other.",
+      "correct": false,
+      "num_retrieved": 20,
+      "judge_rationale": "Strict rule evaluation"
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie paint a sunrise?",
+      "gold_answer": 2022,
+      "generated_answer": "Melanie: [Date: 1:56 pm on 8 May, 2023] Yeah, I painted that lake sunrise 2022-01-01 through 2022-12-31! It's special to me.",
+      "correct": true,
+      "num_retrieved": 20,
+      "judge_rationale": "Strict rule evaluation"
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "multi-hop",
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "gold_answer": "Psychology, counseling certification",
+      "generated_answer": "Caroline: [Date: 10:37 am on 27 June, 2023] Lately, I've been looking into counseling and mental health as a career. I want to help people who have gone through the same things as me. [shared an image: a photo of a book shelf with many books on it]",
+      "correct": false,
+      "num_retrieved": 20,
+      "judge_rationale": "Strict rule evaluation"
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What did Caroline research?",
+      "gold_answer": "Adoption agencies",
+      "generated_answer": "Caroline: [Date: 1:14 pm on 25 May, 2023] Researching adoption agencies \u2014 it's been a dream to have a family and give a loving home to kids who need it.",
+      "correct": true,
+      "num_retrieved": 20,
+      "judge_rationale": "Strict rule evaluation"
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What is Caroline's identity?",
+      "gold_answer": "Transgender woman",
+      "generated_answer": "Caroline: [Date: 2:24 pm on 14 August, 2023] Thanks, Melanie. Here's one- 'Embracing Identity' is all about finding comfort and love in being yourself. The woman in the painting stands for the journey of acceptance. My aim was to show warmth, love and self-acceptance. [shared an image: a photo of a painting of a woman with a red shirt]",
+      "correct": true,
+      "num_retrieved": 20,
+      "judge_rationale": "Strict rule evaluation"
+    },
+    {
+      "sample_id": "conv-30",
+      "category": "temporal",
+      "question": "When Jon has lost his job as a banker?",
+      "gold_answer": "19 January, 2023",
+      "generated_answer": "Jon: [Date: 4:04 pm on 20 January, 2023] Hey Gina! Good to see you too. Lost my job as a banker 2023-01-19, so I'm gonna take a shot at starting my own business.",
+      "correct": true,
+      "num_retrieved": 20,
+      "judge_rationale": "Strict rule evaluation"
+    },
+    {
+      "sample_id": "conv-30",
+      "category": "temporal",
+      "question": "When Gina has lost her job at Door Dash?",
+      "gold_answer": "January, 2023",
+      "generated_answer": "Gina: [Date: 2:35 pm on 16 March, 2023] Thanks, Jon! Appreciate your offer. Since I lost my job at Door Dash, things have been tough. But here's some good news - I've got something to share!",
+      "correct": false,
+      "num_retrieved": 20,
+      "judge_rationale": "Strict rule evaluation"
+    },
+    {
+      "sample_id": "conv-30",
+      "category": "open-domain",
+      "question": "How do Jon and Gina both like to destress?",
+      "gold_answer": "by dancing",
+      "generated_answer": "Gina: [Date: 9:32 am on 8 February, 2023] Wow, Jon! You're amazing at juggling both your passions. Finding that happy medium is key - keep going and don't stop dreaming, buddy!",
+      "correct": false,
+      "num_retrieved": 20,
+      "judge_rationale": "Strict rule evaluation"
+    },
+    {
+      "sample_id": "conv-30",
+      "category": "single-hop",
+      "question": "What do Jon and Gina both have in common?",
+      "gold_answer": "They lost their jobs and decided to start their own businesses.",
+      "generated_answer": "Gina: [Date: 1:25 pm on 9 July, 2023] Wow, Jon! That's awesome. Loving what you do and bringing joy to others is so rewarding. You're definitely the perfect mentor & guide. Your positivity and determination will make your dance studio a hit! [shared an image: a photo of a drawing of a couple dancing]",
+      "correct": false,
+      "num_retrieved": 20,
+      "judge_rationale": "Strict rule evaluation"
+    },
+    {
+      "sample_id": "conv-30",
+      "category": "open-domain",
+      "question": "Why did Jon decide to start his dance studio?",
+      "gold_answer": "He lost his job and decided to start his own business to share his passion.",
+      "generated_answer": "Jon: [Date: 10:04 am on 19 June, 2023] Thanks, Gina. Still working on opening a dance studio.",
+      "correct": false,
+      "num_retrieved": 20,
+      "judge_rationale": "Strict rule evaluation"
+    },
+    {
+      "sample_id": "conv-41",
+      "category": "temporal",
+      "question": "Who did Maria have dinner with on May 3, 2023?",
+      "gold_answer": "her mother",
+      "generated_answer": "Maria: [Date: 3:18 pm on 4 May, 2023] Wow, John! It's great when you have that kind of support. My mom and I made some dinner together last night! [shared an image: a photo of a table with a variety of food on it]",
+      "correct": false,
+      "num_retrieved": 20,
+      "judge_rationale": "Strict rule evaluation"
+    },
+    {
+      "sample_id": "conv-41",
+      "category": "temporal",
+      "question": "When did Maria donate her car?",
+      "gold_answer": "21 December 2022",
+      "generated_answer": "Maria: [Date: 6:10 pm on 22 December, 2022] Hey John, been a few days since we chatted. In the meantime, I donated my old car to a homeless shelter I volunteer at 2022-12-21. How's the campaign going? I'm keen to hearabout it.",
+      "correct": true,
+      "num_retrieved": 20,
+      "judge_rationale": "Strict rule evaluation"
+    },
+    {
+      "sample_id": "conv-41",
+      "category": "single-hop",
+      "question": "What martial arts has John done?",
+      "gold_answer": "Kickboxing, Taekwondo",
+      "generated_answer": "John: [Date: 11:01 am on 17 December, 2022] Woah, Maria, that sounds cool! I'm doing kickboxing and it's giving me so much energy.",
+      "correct": true,
+      "num_retrieved": 20,
+      "judge_rationale": "Strict rule evaluation"
+    },
+    {
+      "sample_id": "conv-41",
+      "category": "single-hop",
+      "question": "What type of volunteering have John and Maria both done?",
+      "gold_answer": "Volunteering at a homeless shelter",
+      "generated_answer": "Maria: [Date: 9:36 am on 2 April, 2023] Yes, John, let's keep supporting each other and finding ways to improve the lives of others. Remember when we volunteered together 2022-01-01 through 2022-12-31? It was such a fulfilling experience. [shared an image: a photo of a man and woman shaking hands in front of a food tray]",
+      "correct": false,
+      "num_retrieved": 20,
+      "judge_rationale": "Strict rule evaluation"
+    },
+    {
+      "sample_id": "conv-41",
+      "category": "temporal",
+      "question": "When did John join the online support group?",
+      "gold_answer": "The week before 1 January 2023",
+      "generated_answer": "John: [Date: 8:30 pm on 1 January, 2023] Hey Maria, great to chat again! I joined a service-focused online group 2022-12-19 through 2022-12-25 and it's been an emotional ride. Everyone there is incredible with their own inspiring stories. They've opened my eyes to new perspectives, and I'm feeling a sense of connection and purpose with them. [shared an image: a photo of a man sitting on a bed using a laptop]",
+      "correct": true,
+      "num_retrieved": 20,
+      "judge_rationale": "Strict rule evaluation"
+    }
+  ]
+}

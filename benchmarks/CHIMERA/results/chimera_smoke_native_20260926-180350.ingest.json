@@ -1,0 +1,164 @@
+{
+  "stats": {
+    "sessions": 6,
+    "chunks": 45,
+    "extracted": 6,
+    "stored": 5,
+    "skipped": 0,
+    "discarded": 0,
+    "failures": 3,
+    "total_ms": 412342.61000000004,
+    "max_ms": 156351.75,
+    "embedded": 5,
+    "embed_failed": 0,
+    "embed_errors": []
+  },
+  "per_session": [
+    {
+      "session_key": "commit_be6f5ca3",
+      "session_id": "07bf9eb1-f499-4568-bfc1-b31ebde83caa",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 32394.54,
+      "extracted": 1,
+      "stored": 1,
+      "skipped": 0,
+      "discarded": 0,
+      "timings": {
+        "cortex_ms": 0.12,
+        "extraction_ms": 31993.58,
+        "deduplication_ms": 307.88,
+        "entity_graph_ms": 39.32,
+        "persistence_ms": 44.33,
+        "total_ms": 32388.55,
+        "redaction_ms": 1.95
+      }
+    },
+    {
+      "session_key": "commit_09e01394",
+      "session_id": "2827b3af-1204-4ef0-a8c9-bcedad45b0da",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 33553.16,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ',' delimiter: line 1 column 899 (char 898)"
+    },
+    {
+      "session_key": "s2",
+      "session_id": "a87eac73-306d-4951-99df-b1c0fb925c66",
+      "domain": "conversation",
+      "chunks": 17,
+      "ingest_ms": 50310.07,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting property name enclosed in double quotes: line 1 column 511 (char 510)"
+    },
+    {
+      "session_key": "s3",
+      "session_id": "571dc2a3-3d68-4a21-abf2-193466a84dda",
+      "domain": "record",
+      "chunks": 2,
+      "ingest_ms": 21770.88,
+      "extracted": 2,
+      "stored": 2,
+      "skipped": 0,
+      "discarded": 0,
+      "timings": {
+        "cortex_ms": 0.29,
+        "extraction_ms": 21687.35,
+        "deduplication_ms": 28.54,
+        "entity_graph_ms": 15.51,
+        "persistence_ms": 28.03,
+        "total_ms": 21765.59,
+        "redaction_ms": 3.67
+      }
+    },
+    {
+      "session_key": "s4",
+      "session_id": "4028c082-93b9-47cf-b6b7-35e0205f3ebc",
+      "domain": "conversation",
+      "chunks": 4,
+      "ingest_ms": 117962.21,
+      "extracted": 3,
+      "stored": 2,
+      "skipped": 0,
+      "discarded": 0,
+      "timings": {
+        "cortex_ms": 0.19,
+        "extraction_ms": 117696.02,
+        "deduplication_ms": 191.2,
+        "entity_graph_ms": 22.0,
+        "persistence_ms": 31.5,
+        "total_ms": 117955.78,
+        "redaction_ms": 11.05
+      }
+    },
+    {
+      "session_key": "s5",
+      "session_id": "9dd6f6d3-1b9d-4978-94b6-bd8724872b60",
+      "domain": "record",
+      "chunks": 20,
+      "ingest_ms": 156351.75,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ',' delimiter: line 1 column 5843 (char 5842)"
+    }
+  ],
+  "stored_memories": [
+    {
+      "id": "75c2118b-2834-404a-8f74-7105bd2ebed5",
+      "session_id": "07bf9eb1-f499-4568-bfc1-b31ebde83caa",
+      "type": "fact",
+      "title": "Commit c_be6f5ca3 on function_32 (add):",
+      "content": "Commit c_be6f5ca3 on function_32 (add): def function_32(x): return x * 1.0",
+      "importance": 0.6666666666666667,
+      "confidence": 0.6,
+      "state": "active",
+      "valid_from": "2026-01-09T09:00:00",
+      "valid_to": null
+    },
+    {
+      "id": "206c860d-544a-4272-8ca9-3d89b3dedf15",
+      "session_id": "571dc2a3-3d68-4a21-abf2-193466a84dda",
+      "type": "fact",
+      "title": "Contract record (draft, superseded)",
+      "content": "enc:v1:h7ZVsSk8xEQ2D-wZFprCdwTAnY33ZFpyvDUGYKht_cjfl4RmXBK8NLmyEZh1jPZrblcHI6UAjodCsfhhddlUc1hZB2MOLTRsxQhJltiA2w_NyQNqrU4IsF78zMJXrPsFzDTTuDnKyMeZoxelnhusE8I_mbpy6p_Gz1T0EnvGdI_kC1HaCDHSf1kr8_crdldjONWnamvAyFa2mraGJ7Q9zbO4JWYViLXAQE8r1Wz-zBuvAxQfqTQ=",
+      "importance": 0.6333333333333333,
+      "confidence": 1.0,
+      "state": "active",
+      "valid_from": "2026-01-11T11:00:00",
+      "valid_to": null
+    },
+    {
+      "id": "31436800-351a-43e0-91b3-4b69bb261c74",
+      "session_id": "571dc2a3-3d68-4a21-abf2-193466a84dda",
+      "type": "fact",
+      "title": "[PERSON_2] acknowledged the incident report queue.",
+      "content": "[PERSON_2] acknowledged the incident report queue.",
+      "importance": 0.6333333333333333,
+      "confidence": 0.6,
+      "state": "active",
+      "valid_from": "2026-01-11T12:00:00",
+      "valid_to": null
+    },
+    {
+      "id": "abee46a1-e4e3-41d9-9c6f-1e48cd241621",
+      "session_id": "4028c082-93b9-47cf-b6b7-35e0205f3ebc",
+      "type": "fact",
+      "title": "Unrelated chatter: [PERSON_1] note 0.",
+      "content": "Unrelated chatter: [PERSON_1] note 0.",
+      "importance": 0.6333333333333333,
+      "confidence": 1.0,
+      "state": "active",
+      "valid_from": "2026-01-13T10:00:00",
+      "valid_to": null
+    },
+    {
+      "id": "7aad905b-b192-4963-abd7-0941e4aacc37",
+      "session_id": "4028c082-93b9-47cf-b6b7-35e0205f3ebc",
+      "type": "fact",
+      "title": "Record: [PERSON_2] reported total 158,000 USD.",
+      "content": "Record: [PERSON_2] reported total 158,000 USD.",
+      "importance": 0.6666666666666667,
+      "confidence": 1.0,
+      "state": "active",
+      "valid_from": "2026-01-13T10:00:00",
+      "valid_to": null
+    }
+  ]
+}

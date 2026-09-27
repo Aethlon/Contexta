@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import typer
 
 from contexta_client.cli.commands.login import _get_client
@@ -24,7 +22,7 @@ def list_keys(
 def create_key(
     name: str = typer.Option(..., "--name", help="Key name"),
     scopes: str = typer.Option("observations:write,retrieval:read,memories:read", "--scopes", help="Comma-separated scopes"),
-    project_id: Optional[str] = typer.Option(None, "--project-id", help="Project ID"),
+    project_id: str | None = typer.Option(None, "--project-id", help="Project ID"),
     profile: str = typer.Option("default", "--profile", help="Profile name"),
 ) -> None:
     """Create a new API key."""

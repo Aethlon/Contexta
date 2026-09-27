@@ -1,62 +1,130 @@
 # Changelog
 
-## v0.1.0 — Initial Beta Release
+The marketing version of this changelog lives with the public site at
+`landingpage/src/lib/changelog.ts` (a separate repository). This page carries the
+same substance plus the developer-facing upgrade detail.
 
-**Release date:** 2026-05-01
+---
 
-Initial closed beta release. SDK-first memory layer for AI agents.
+## v1.5 — The indexing and truth-maintenance release
 
-### Features
+**Release date:** September 27, 2026
 
-- **Observations** — submit conversation turns for asynchronous memory extraction
-- **Batch observations** — submit up to 50 observations in a single call
-- **Hybrid retrieval** — semantic (vector) + keyword (full-text) + graph + importance + recency
-- **Context bundle** — token-budgeted, structured context for LLM system prompts
-- **Memory lifecycle** — pin, unpin, archive, restore, delete
-- **Explainability** — per-memory extraction source and scoring breakdown
-- **Timeline** — chronological event log per user
-- **Policies** — custom extraction rules per agent type
-- **Custom schemas** — structured memory schemas for typed data
-- **Tenant isolation** — organization-scoped data separation
-- **Idempotency** — UUID7 idempotency keys on all writes
-- **Truth maintenance** — automatic supersession of contradictory memories
+Point-in-time reads became a real index scan, lexical search became a real GIN
+predicate, graph traversal became a single capped recursive CTE, and extraction
+stopped silently falling back to heuristics. Billing and metering code is gone.
 
-### SDKs
+| | |
+| :--- | ---: |
+| Lexical search | 550ms → 48ms |
+| Graph traversal | 38.5ms → 2.16ms |
+| Extraction success | 17% → 87.5% |
+| Public tables | 57 → 33 |
 
-- **Python SDK** (`contexta-client`) — sync and async clients
-- **TypeScript SDK** (`@contexta/client`) — Node, Edge, Workers, Bun, Deno
-- **CLI** (`contexta`) — authentication, testing, key management, policy sync
+### Added — storage and indexing
 
-### Integrations
+- A durable ingestion outbox with PostgreSQL `SKIP LOCKED` claiming, so concurrent workers never process the same observation twice and a crashed claim is retried rather than dropped.
+- A composite bitemporal index on `memory_record (organization_id, user_id, valid_from, valid_to)`, which makes point-in-time `as_of` reads a real index scan instead of a sequential filter.
+- Case-insensitive uniqueness on `entity (organization_id, user_id, lower(name))` plus entity-name trigram indexes. The migration merged **2,670 pre-existing duplicate entity groups to zero** and deduplicated **2,745 colliding edges**; **869 relationship types** were normalised.
+- A dedicated `TruthSupersessionService` that invalidates a contradicted memory with `valid_to = now()` and records lineage through `memory_version.superseded_by_id`, so stale facts are excluded from active retrieval instead of accumulating as contradictions. Backed by `uq_memory_record_current_fact_slot`, a partial unique index guaranteeing at most one current fact per slot.
+- A closed, validated set of relationship types enforced by a database CHECK constraint, with self-loop rejection at the storage layer.
+- Structural fact keys: a `subject` / `predicate` / `object` triple from the extractor yields an `sfx1:<sha256>` slot key, so a corrected value supersedes the row it replaces instead of duplicating it. Legacy bare-64-hex text-hash keys are still produced and still supported.
+- `api_key.tier` with a CHECK constraint, so rate limiting meters per tier instead of one hard-coded limit.
 
-- OpenAI Assistants (`contexta-openai`)
-- Anthropic Claude (`contexta-anthropic`)
-- LangChain (`contexta-langchain`)
-- LlamaIndex (`contexta-llamaindex`)
+### Added — retrieval
 
-### Engine
+- A **cascade retrieval mode**: lexical and graph evidence are gathered first, and the dense channel is only consulted when that primary evidence is judged insufficient by `assess_primary_sufficiency()`. Opt-in and **off by default** — the only switch is the `RetrievalEngine(enable_dense_escalation=True)` constructor argument. There is no environment variable and no request field.
+- Precision-aware freshness scoring that honours `temporal_precision` and `temporal_basis`, so an explicitly approximate timestamp is not treated as an exact one.
 
-- Extraction pipeline (LLM → dedup → entity resolution → classification → scoring → embedding → storage)
-- pgvector HNSW indexing for vector similarity search
-- Postgres full-text search (tsvector)
-- Entity resolution and knowledge graph
-- Semantic clustering for cluster-first retrieval
-- Importance scoring (emphasis, decision impact, recency, frequency)
-- Decay engine (active → warm → cold)
-- Redaction of sensitive patterns
-- Per-key rate limiting
-- Quota enforcement
+### Added — extraction reliability
 
-### Plans
+- Bounded retries with escalating temperature, plus robust JSON recovery for fenced code blocks, `<think>` reasoning traces, and leading preambles.
+- Tolerant coercion of LLM schema drift: unknown memory types, `travel` mapped to `event`, list-shaped booleans, and empty titles are normalised instead of discarded. Measured session-level extraction success improved from roughly **17% to 87.5%**.
 
-- **Builder** ($29/mo) — 50k active memories, 100k observations/mo, 1M retrievals/mo
-- **Scale** ($99/mo) — 250k active memories, 500k observations/mo, 5M retrievals/mo
-- **Dedicated** ($299+/mo) — custom limits, dedicated infrastructure
+### Changed — security and hygiene
 
-### Known Limitations
+- Secrets redaction now runs as a **fail-closed** stage at the head of the ingestion pipeline, so API keys, JWTs, bearer tokens, OTPs, session cookies, passwords, and card numbers are scrubbed before extraction ever runs. If the gate errors, the observation is rejected rather than forwarded unredacted.
+- Pair-clique edge generation in the knowledge graph was replaced with a bounded approach, removing the O(n²) blow-up as the graph grows.
+- **A cross-tenant read was found and fixed.** `GET /v1/graph/traverse` resolved its root entity with an unscoped `Entity.name.ilike(...)`, so one tenant could read another tenant's entity names, entity summaries, memory titles, and memory body text, and a name shared across tenants returned a `500`. All six unscoped queries in `graph.py` now go through repositories scoped by organization **and** actor. Also fixed: an unscoped `COUNT(*)` in the MCP `get_metrics` tool that leaked every tenant's row counts to every tenant, and a cross-tenant `DELETE` in `contexta/scripts/enrich_graph.py`.
+- **The operator console no longer requires a sign-in.** `CONTEXTA_DASHBOARD_AUTH` defaults to `off`, because Contexta is a self-hosted, single-operator tool. Set it to `on` to restore the NextAuth v5 credentials flow. The tenant resolves from the `contexta_tenant` cookie, then `CONTEXTA_DASHBOARD_ORG_ID` / `CONTEXTA_DASHBOARD_USER_ID`, then `CONTEXTA_DASHBOARD_API_KEY`; the operator can see and change the active tenant in the UI. **With auth off, the console must not be exposed to an untrusted network.**
+- **Authentication is one key, not two headers.** A single API key supplies both the organization and the actor, so identity headers are optional cross-checks rather than the primary proof. A key plus a *differing* org header is `403 organization_mismatch`; a differing actor header is `403 actor_mismatch`; a non-UUID identity header is `400 invalid_identity_header`. Legacy header-only auth requires `CONTEXTA_ALLOW_LEGACY_TENANT_HEADERS`.
 
-- Reflection engine: coming post-PMF
-- Dream cycle: coming post-PMF
-- Memory compression: coming post-PMF
-- US primary region: planned Q4 2026
-- SSO: planned Q4 2026
+### Fixed — indexing
+
+- HNSW retrieval was collapsing on filtered queries and silently returning zero rows. `ef_search` is now tuned and `hnsw.iterative_scan` is enabled, so a filtered vector search no longer drops the tenant constraint to get an answer.
+- Sequential lexical search was replaced with a proper GIN `tsvector` predicate, measured from roughly **550ms to 48ms**.
+- 2,745 colliding knowledge-graph edges were deduplicated and re-normalised.
+
+### Fixed — extraction
+
+- The fine-tuned extractor's context window was raised from **4,096 to 16,384 tokens**. Real extraction prompts were **8,281 tokens** and were being rejected outright, which silently downgraded sessions to a low-quality heuristic fallback. The raise lives in the Ollama model definition; see the [upgrade guide](/reference/upgrade-v1.5) for the compose override you need, because `inference_server.py` sends `num_ctx` per request and a request option beats a model-level parameter.
+- Structured-output enforcement now works. **Ollama's OpenAI-compatible `/v1/chat/completions` endpoint silently drops the `format` field**, so schema constraints were never actually applied. Contexta detects an Ollama endpoint and uses the native Ollama route, constraining generation to a real JSON Schema.
+
+### Performance — measured
+
+| Path | Before | After |
+| :--- | ---: | ---: |
+| Lexical retrieval | ~550ms | ~48ms |
+| `as_of` bitemporal read | ~46ms | ~0.22ms |
+| Multi-hop graph traversal | ~38.5ms | ~2.16ms (~16x) |
+| Session-level extraction success | ~17% | 87.5% |
+| Public table count | 57 | 33 |
+
+### Removed
+
+- All billing, metering, and credit-consumption code. Contexta Core no longer has a metering path to remove or bypass. Revision `020` drops the 18 billing/usage tables and 6 dead domain schemas that were left behind.
+- Semantic clustering and cluster-first retrieval. The `semantic_cluster` and `cluster_membership` schemas and the clustering engine are gone.
+- The memory-policy engine, the custom-schema registry, the retrieval-feedback table, and the memory-compression engine. All four were dead code reachable only from tests.
+- The Go gateway as a second entry point. It duplicated API-key verification (Redis-only, with no Postgres fallback) and forced two ways to reach the same route. The response cache, single-flight, and per-key rate limiting it provided now live in the Python API. It is still buildable and is profile-gated behind `edge` in `docker-compose.yml`; re-enable it with `docker compose --profile edge up gateway`.
+
+### Upgrade notes
+
+1. **Run the migrations against a snapshot.** Revision `018` creates the entity uniqueness constraint case-insensitively on `lower(name)` and will refuse to apply while case-variant duplicates exist. The shipped migration merges them first — that is the step that cleared 2,670 duplicate groups.
+2. **Revision `020` drops 24 tables.** Any dashboard query, report, or export that referenced them has to be removed in the same change. There is no downgrade path; restore from your snapshot if you need them back.
+3. **The relationship-type CHECK is closed.** If you wrote custom relationship types directly against `entity_edge`, map them onto the validated set before upgrading.
+4. **The offline embedding profile is unchanged at 1024 dimensions**, so no vector migration is required. If you had switched the column to the 1536-d online profile, switch it back before re-indexing.
+5. **Ollama endpoints are now detected and routed natively** for structured output. A custom OpenAI-compatible base URL that is not recognisably Ollama will no longer receive a schema constraint — point the endpoint at Ollama directly.
+6. **The outbox uses `SKIP LOCKED` claiming.** Scaling ingestion workers is now safe, but any worker that previously assumed single-writer ordering should tolerate interleaved claims.
+7. **Two graph routes changed status codes on purpose.** A path `user_id` that is not the authenticated actor is now `403`, and another user's entity is now `404` rather than `200`. A graph viewer that walks a list of user ids with one key will start getting `403`; mint one key per actor.
+
+Full detail, including what each of revisions `015` through `020` does and a post-upgrade checklist, is in the [v1.5 upgrade guide](/reference/upgrade-v1.5).
+
+### Known issues carried into v1.5
+
+- **`pyproject.toml` declares `version = "0.1.0"`** and `GET /healthz` reports `"0.1.0"` while the release is v1.5. Do not use the reported version to identify a deployment; use the Alembic head.
+- **`GET /v1/audit` ignores `start`, `end`, and `actor_id`.** The route implements only `limit` and `offset`. Filter client-side.
+- **Revision `020` dropped tables whose ORM models still exist**, so `Base.metadata` describes tables that no longer exist. `alembic revision --autogenerate` and anything calling `create_all()` are wrong until those models are removed.
+- **Some SDK and CLI methods call removed endpoints** and will `404`: policy registration, schema registration, project listing, `keys rotate`, and `usage`.
+- **The Go gateway's rate limiter is not the one in play.** Per-key rate limiting and the response cache are the Python API's `contexta/api/middleware/{ratelimit,response_cache}.py`.
+
+---
+
+## v1 — The first public release
+
+**Release date:** August 8, 2026
+
+Contexta shipped as a self-hosted memory engine: a Python extraction and retrieval core driven by Celery, Python and TypeScript SDKs, a Next.js operator dashboard, and a compose stack that comes up without a paid model key.
+
+### Added — memory engine
+
+- A Python memory engine on FastAPI with Celery workers over Redis, routed across the extraction, embedding, maintenance, outbox, and default queues. `task_acks_late` and `task_reject_on_worker_lost` mean a killed worker requeues its job instead of dropping the observation.
+- The core stages shipped as separate modules under `contexta/core/`: a sensitive filter for redaction, an extraction worker, near-duplicate merging, importance and confidence scoring, entity resolution, contradiction maintenance, a hybrid retrieval engine, read-age decay, and dream-cycle reflection — orchestrated by `contexta/core/pipeline.py`.
+- Multi-tenancy through a single base class. `TenantScopedRepository` in `contexta/repositories/base.py` appends `WHERE organization_id = :tenant_id` to every statement it builds, so isolation is inherited by every repository rather than remembered per call.
+
+### Added — edge and SDKs
+
+- A Go gateway terminating TLS on `:8443` and reverse-proxying to the Python API, with SHA-256-hashed API key verification and a Redis-backed token-bucket rate limiter. It holds no persistent state. *(Retired as a second entry point in v1.5; see Removed above.)*
+- A Python client (`contexta_client`) with sync and async clients exposing `observe()`, `observe_batch()`, and `context()`, and a TypeScript client with the same surface. Adapters shipped for OpenAI, Anthropic, LangChain, and LlamaIndex in Python, and OpenAI, Anthropic, LangChain, and Vercel AI in TypeScript.
+- A CLI covering `init`, `login`, `keys`, `memory`, `observations`, `policy`, `projects`, `schema`, `context`, `test`, and `usage`. *(Several of these target endpoints v1.5 removed.)*
+
+### Added — operator surface
+
+- A Next.js operator dashboard with a memory inspector, per-memory lineage rows, an entity graph viewer, API key issuance and revocation, and a settings surface.
+- `docker compose up --build` brings up PostgreSQL with pgvector, Redis, the FastAPI backend, the Celery workers, the MCP server, and the dashboard behind a single `entrypoint.sh` / `start.ps1`.
+- A deterministic local embedding provider, selected with `CONTEXTA_EMBEDDING_PROVIDER=deterministic`, so the default install needs no cloud key. It is hash-derived rather than semantic, which makes it a bring-up default and **not** a retrieval-quality baseline. No benchmark number in this repository was produced with it.
+
+### Getting started notes
+
+- Clone and `docker compose up --build`. The dashboard is on `:3000`, the API on `:8000`, the model server on `:8001`, the MCP server on `:8765`.
+- Python 3.11 or newer, PostgreSQL with the pgvector extension, and Redis are the only hard prerequisites.
+- Model-backed extraction is configured through `CONTEXTA_LLM_MODEL` and `CONTEXTA_LLM_API_KEY`. The stack boots without them.

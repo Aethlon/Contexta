@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger("contexta.buffer")
 
@@ -16,11 +15,11 @@ FLUSH_BATCH_SIZE = 50
 
 
 class DurableBuffer:
-    def __init__(self, buffer_path: Optional[str] = None, enabled: bool = True) -> None:
+    def __init__(self, buffer_path: str | None = None, enabled: bool = True) -> None:
         self.enabled = enabled
         if not enabled:
-            self.buffer_file: Optional[Path] = None
-            self.dead_letter_file: Optional[Path] = None
+            self.buffer_file: Path | None = None
+            self.dead_letter_file: Path | None = None
             return
         buffer_dir = Path(buffer_path).parent if buffer_path else DEFAULT_BUFFER_DIR
         buffer_dir.mkdir(parents=True, exist_ok=True)
@@ -28,7 +27,7 @@ class DurableBuffer:
         self.buffer_file = Path(self.buffer_file) if not isinstance(self.buffer_file, Path) else self.buffer_file
         self.dead_letter_file = buffer_dir / "dead-letter.jsonl"
 
-    def enqueue(self, endpoint: str, body: Dict[str, Any], idempotency_key: str, headers: Dict[str, str]) -> None:
+    def enqueue(self, endpoint: str, body: dict[str, Any], idempotency_key: str, headers: dict[str, str]) -> None:
         if not self.enabled or not self.buffer_file:
             return
         entry = {
@@ -45,7 +44,7 @@ class DurableBuffer:
         except OSError as e:
             logger.warning("Failed to buffer observation: %s", e)
 
-    def dequeue_all(self) -> List[Dict[str, Any]]:
+    def dequeue_all(self) -> list[dict[str, Any]]:
         if not self.enabled or not self.buffer_file or not self.buffer_file.exists():
             return []
         try:
@@ -57,7 +56,7 @@ class DurableBuffer:
             logger.warning("Failed to read buffer: %s", e)
             return []
 
-    def dead_letter(self, entry: Dict[str, Any], reason: str) -> None:
+    def dead_letter(self, entry: dict[str, Any], reason: str) -> None:
         if not self.enabled or not self.dead_letter_file:
             return
         entry["dead_letter_reason"] = reason
@@ -79,7 +78,7 @@ class DurableBuffer:
             batch = entries[i : i + FLUSH_BATCH_SIZE]
             try:
                 for entry in batch:
-                    resp = http_client._request(
+                    http_client._request(
                         method="POST",
                         endpoint=entry["endpoint"],
                         body=entry["body"],

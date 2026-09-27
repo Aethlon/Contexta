@@ -1,99 +1,91 @@
 # Python SDK Reference
 
-Full API surface for `contexta-client`.
+Full API surface for `contexta-client`, from `clients/python` in this repository.
 
 ## Installation
 
 ```bash
-pip install contexta-client
+pip install -e clients/python
 ```
+
+The package is not on PyPI yet.
 
 ## Classes
 
-### `contexta`
+`Contexta` and `AsyncContexta` are the canonical names. The lowercase `contexta` / `Asynccontexta` still import and work but emit a `DeprecationWarning`.
 
-Sync client.
+### `Contexta`
 
 ```python
-class contexta:
-    @classmethod
-    def from_env(cls) -> contexta: ...
+from contexta_client import Contexta
 
+class Contexta:
     def __init__(
         self,
-        *,
         api_key: str,
-        base_url: str = "https://api.contexta.dev",
+        base_url: str = "https://api.contexta.dev/v1",
         timeout: float = 30.0,
         max_retries: int = 3,
         telemetry: bool = True,
         enable_buffer: bool = True,
+        buffer_path: str | None = None,
+        organization_id: str | None = None,
+        verify_tls: bool = True,
+        ca_bundle: SSLConfig | None = None,
+        ca_bundle_path: str | None = None,
     ): ...
-```
 
-### `Asynccontexta`
-
-Async client. Same constructor and method signatures, but all methods are async.
-
-```python
-class Asynccontexta:
     @classmethod
-    def from_env(cls) -> Asynccontexta: ...
+    def from_env(cls) -> Contexta: ...
 ```
+
+`from_env()` reads `CONTEXTA_API_KEY` (required), `CONTEXTA_API_URL`, `CONTEXTA_TIMEOUT_MS`, `CONTEXTA_MAX_RETRIES`, `CONTEXTA_TELEMETRY`, `CONTEXTA_ORGANIZATION_ID`, `CONTEXTA_VERIFY_TLS`, and `CONTEXTA_CA_BUNDLE`. It raises `ValueError` if `CONTEXTA_API_KEY` is unset.
+
+For a self-hosted install set `CONTEXTA_API_URL=http://localhost:8000/v1`. The `https://api.contexta.dev` default does not resolve to anything — there is no hosted API.
+
+`AsyncContexta` takes the same constructor and method signatures; every method is a coroutine.
 
 ## Methods
 
-### observe
+### Ingestion
 
 ```python
 def observe(
     self,
     *,
-    user_id: UUID | str,
-    session_id: UUID | str | None = None,
-    messages: list[dict],
-    metadata: dict | None = None,
+    user_id: str,
+    session_id: str | None = None,
+    messages: list[dict[str, Any]],
+    metadata: dict[str, Any] | None = None,
     policy: str | None = None,
     idempotency_key: str | None = None,
+    occurred_at: str | None = None,
+    observed_at: str | None = None,
+    source_id: str | None = None,
+    message_id: str | None = None,
+    timezone: str | None = None,
 ) -> ObserveResponse: ...
 ```
 
-Returns: `{"job_id": str, "status": str}`
+Returns `{"job_id": str, "observation_id": str | None, "status": "accepted"}`.
 
-### observe_batch
-
-```python
-def observe_batch(
-    self,
-    observations: list[dict],
-) -> BatchObserveResponse: ...
-```
-
-### context
+`user_id` goes out as the `X-contexta-User-Id` header, not in the body. It must equal the actor bound to your key, or the server returns `403`.
 
 ```python
-def context(
-    self,
-    *,
-    user_id: UUID | str,
-    session_id: UUID | str | None = None,
-    query: str | None = None,
-    token_budget: int = 2000,
-    include_user_model: bool = True,
-    rerank: bool = False,
-) -> Context: ...
+def observe_batch(self, observations: list[dict[str, Any]]) -> BatchObserveResponse: ...
 ```
 
-Returns `Context` with methods: `to_system_prompt()`, `to_messages()`, `to_markdown()`, `to_dict()`.
+Up to 100 per call. Returns `{"jobs": [...], "errors": [...], "status": "accepted"}`.
 
-### retrieve
+### Recall
 
 ```python
 def retrieve(
     self,
     *,
-    user_id: UUID | str,
+    user_id: str,
     query_text: str,
+    session_id: str | None = None,
     memory_types: list[str] | None = None,
     tags: list[str] | None = None,
     limit: int = 20,
@@ -104,82 +96,72 @@ def retrieve(
 ) -> list[ScoredMemory]: ...
 ```
 
-### explain
+> **`rerank` is accepted and transmitted but has no effect.** `POST /v1/retrieve` builds `ScopedRetrievalQuery`, which has no `rerank` field, so the extra key is dropped during validation. The HTTP retrieval path does not run a cross-encoder at all. The parameter is left in the signature for source compatibility; setting it to `True` will not change your results.
+
+`user_id` and `organization_id` are optional in the request body — with a verified API key the server uses the key's own values and cross-checks anything you supply. Send them anyway if you want the mismatch to be caught early.
 
 ```python
-def explain(
-    self,
-    memory_id: UUID | str,
-) -> Explanation: ...
-```
-
-### pin / unpin / archive / restore
-
-```python
-def pin(self, memory_id: UUID | str) -> Memory: ...
-def unpin(self, memory_id: UUID | str) -> Memory: ...
-def archive(self, memory_id: UUID | str) -> Memory: ...
-def restore(self, memory_id: UUID | str) -> Memory: ...
-```
-
-### delete
-
-```python
-def delete(self, memory_id: UUID | str) -> None: ...
-```
-
-### timeline
-
-```python
-def timeline(
-    self,
-    user_id: UUID | str,
-    limit: int = 50,
-) -> list[TimelineEvent]: ...
-```
-
-### register_policy
-
-```python
-def register_policy(
+def context(
     self,
     *,
-    name: str,
-    store_rules: list[dict] | None = None,
-    ignore_rules: list[dict] | None = None,
-    priority_weights: dict[str, float] | None = None,
-) -> Policy: ...
+    user_id: str,
+    session_id: str,
+    organization_id: str | None = None,
+    token_budget: int | None = 2000,
+    include_user_model: bool = True,
+    num_recent_messages: int = 10,
+    num_relevant_memories: int = 20,
+    graph_depth: int = 2,
+) -> Context: ...
 ```
 
-### register_schema
+`user_id`, `session_id`, and `organization_id` are **all required** here — `GET /v1/memories/context` has no defaults for them, and `organization_id` defaults to `self.organization_id` (i.e. `CONTEXTA_ORGANIZATION_ID`) when not passed, raising `ValueError` if neither is set. There is no `query` parameter; the endpoint does not take one.
+
+Also available: `retrieve_batch(queries)`, `investigate(query, *, user_id, organization_id=None, max_hops=2, limit=15)`, `search(query, *, user_id=None, limit=20, threshold=0.65, memory_type=None)`, `hybrid(query, *, user_id=None, limit=20, max_hops=2, vector_weight=0.40, graph_weight=0.25, include_cold=False)`, and `traverse(source, *, hops=2, relationship_types=None, direction="both")`.
+
+### Memory lifecycle
 
 ```python
-def register_schema(
-    self,
-    *,
-    name: str,
-    fields: list[dict],
-) -> Schema: ...
+def get_memory(self, memory_id: str) -> Memory: ...
+def get_many(self, memory_ids: list[str]) -> list[dict[str, Any]]: ...
+def list_memories(self, ...) -> list[MemoryListEntry]: ...
+def pin(self, memory_id: str) -> MemoryFlag: ...
+def unpin(self, memory_id: str) -> MemoryFlag: ...
+def archive(self, memory_id: str) -> MemoryFlag: ...
+def restore(self, memory_id: str) -> MemoryFlag: ...
+def delete(self, memory_id: str) -> DeleteResult: ...
+def explain(self, memory_id: str) -> Explanation: ...
+def feedback(self, memory_id: str, ...) -> FeedbackResult: ...
+def timeline(self, user_id: str, ...) -> list[TimelineEvent]: ...
+def add_rule(self, ...) -> ...: ...      # built on observe()
+def reflect(self, ...) -> ReflectResult: ...
 ```
 
-### list_policies
+### Sessions and health
 
 ```python
-def list_policies(self) -> list[Policy]: ...
+def create_session(self, ...) -> ...: ...
+def get_session(self, session_id: str) -> Session: ...
+def end_session(self, session_id: str) -> Session: ...
+def ping(self) -> dict[str, Any]: ...
 ```
 
-### ping
+### Removed endpoints — these raise at the server
 
 ```python
-def ping(self) -> dict: ...
+def list_policies(self) -> list[Policy]: ...        # GET /v1/policies   -> 404
+def register_policy(self, ...) -> Policy: ...        # POST /v1/policies  -> 404
+def register_schema(self, ...) -> Schema: ...        # POST /v1/schemas   -> 404
 ```
 
-## Data Types
+They are still in the client for source compatibility. Calling them against a v1.5 server raises `NotFoundError`.
+
+## Data types
 
 ```python
-@dataclass
-class Context:
+class Context(ContextModel):
     user_profile: UserProfile | None
+    rules: list
     active_projects: list[Project]
     preferences: list[Preference]
     goals: list[Goal]
@@ -189,55 +171,91 @@ class Context:
     cache_hit: bool
     request_id: str
 
-    def to_system_prompt(self, *, template: str | None = None) -> str: ...
-    def to_messages(self) -> list[dict]: ...
+    def to_system_prompt(self, template: str | None = None) -> str: ...
+    def to_messages(self) -> list[dict[str, str]]: ...
     def to_markdown(self) -> str: ...
-    def to_dict(self) -> dict: ...
+    def to_dict(self) -> dict[str, Any]: ...
+```
 
-@dataclass
-class ScoredMemory:
-    memory_id: str
-    memory_type: str
-    title: str
-    content: str
+`to_system_prompt()` accepts an optional template string.
+
+```python
+class ScoredMemory(ContextModel):
+    memory: Memory          # the record is nested under `memory`
     score: float
-    score_breakdown: dict
-    tags: list[str]
-    created_at: str
+    semantic_score: float
+    graph_score: float
+    importance_score: float
+    recency_score: float
+    keyword_score: float
 
-@dataclass
-class Explanation:
-    memory: Memory
-    extraction_source: list[dict]
-    scoring_breakdown: dict
-    supersession_history: list[dict]
-
-@dataclass
-class Memory:
+class Memory(ContextModel):
     id: str
+    user_id: str
+    organization_id: str
     memory_type: str
     title: str
     content: str
-    confidence: float
-    importance: float
+    structured_data: dict
     tags: list[str]
-    memory_state: str
     is_pinned: bool
     is_archived: bool
+    memory_state: str
     created_at: str
-    last_accessed_at: str | None
+
+class Explanation(ContextModel):
+    memory_id: str
+    source: dict
+    classification: dict
+    scoring: dict
+    supersession_history: list[dict]
 ```
+
+Note the shape change: retrieval results nest the record under `memory` and expose the score breakdown as **flat sibling fields**, not a nested `score_breakdown` object. `GET /v1/memories/hybrid` still uses the older flat `memory_id` + nested `score_breakdown` shape.
 
 ## Exceptions
 
 ```python
-contextaError(Exception)          # Base
-AuthenticationError(contextaError) # 401
-AuthorizationError(contextaError)  # 403
-NotFoundError(contextaError)       # 404
-ValidationError(contextaError)     # 422
-QuotaExceeded(contextaError)       # 429
-RateLimited(contextaError):        # 429
-    retry_after: int
-ServerError(contextaError)         # 500
+contextaError(Exception)             # base
+├── AuthenticationError              # 401
+├── AuthorizationError               # 403
+├── ValidationError                  # 422
+├── QuotaExceeded                    # 429 — never raised in v1.5, no quotas exist
+├── RateLimited                      # 429, carries .retry_after
+├── ServerError                      # 5xx
+├── NotFoundError                    # 404
+└── ConflictError                    # 409
 ```
+
+## Retries, buffering, TLS
+
+Every write carries an `Idempotency-Key`. `429`, `5xx`, and network failures retry with backoff of `retry_after or 2 ** attempt`, honouring the `Retry-After` header. When the network is down, writes queue to `~/.contexta/buffer.jsonl`.
+
+```python
+m.flush()   # drain the queue; returns entries replayed
+m.close()   # release connections; safe to call twice
+```
+
+Use the client as a context manager to get both automatically.
+
+Certificate verification is on by default. To trust the optional self-signed gateway:
+
+```python
+m = Contexta(api_key="…", ca_bundle_path="./certs/cert.pem")
+```
+
+Disabling verification is an explicit opt-in and never implicit:
+
+```python
+m = Contexta(api_key="…", verify_tls=False)
+```
+
+Passing both `ca_bundle_path` and `verify_tls=False` raises `ValueError` rather than silently weakening verification.
+
+## CLI
+
+Installing the package also installs a `contexta` Typer CLI. See the [CLI reference](/reference/cli) — and note that several of its subcommands target endpoints v1.5 removed.
+
+## License
+
+MIT (the SDK package). The Contexta engine itself is dual-licensed; see [Licensing](/licensing).

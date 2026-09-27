@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -72,7 +72,7 @@ export function ResetPasswordForm({ defaultEmail }: { defaultEmail: string }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-3.5 font-mono">
       {error && (
-        <div className="flex items-start gap-3 rounded border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
+        <div className="flex items-start gap-3 rounded border border-red-500/30 bg-red-500/10 p-3 text-xs tone-red">
           <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>
@@ -87,7 +87,7 @@ export function ResetPasswordForm({ defaultEmail }: { defaultEmail: string }) {
           type="email"
           value={email}
           readOnly
-          className="w-full rounded border border-border/40 bg-card/50 px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none cursor-default opacity-80"
+          className="w-full rounded border border-border bg-card px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none cursor-default opacity-80"
         />
       </div>
 
@@ -103,7 +103,7 @@ export function ResetPasswordForm({ defaultEmail }: { defaultEmail: string }) {
           required
           placeholder="e.g. password1234"
           disabled={isPending}
-          className="w-full rounded border border-border/40 bg-card/60 px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+          className="w-full rounded border border-border bg-card px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
         />
       </div>
 
@@ -138,7 +138,7 @@ export function ResetPasswordForm({ defaultEmail }: { defaultEmail: string }) {
           required
           placeholder="Enter new master password"
           disabled={isPending}
-          className="w-full rounded border border-border/40 bg-card/60 px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+          className="w-full rounded border border-border bg-card px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
         />
       </div>
 
@@ -154,7 +154,7 @@ export function ResetPasswordForm({ defaultEmail }: { defaultEmail: string }) {
           required
           placeholder="Re-enter new master password"
           disabled={isPending}
-          className="w-full rounded border border-border/40 bg-card/60 px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+          className="w-full rounded border border-border bg-card px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
         />
       </div>
 

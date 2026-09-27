@@ -16,21 +16,25 @@ pip install contexta-anthropic contexta-client anthropic
 
 export CONTEXTA_API_KEY="your-contexta-api-key"
 export CONTEXTA_BASE_URL="https://api.contexta.ai/v1"
+export CONTEXTA_ORGANIZATION_ID="your-organization-id"
 export ANTHROPIC_API_KEY="your-anthropic-api-key"
 ```
 
 ```python
 import os
-from contexta_client import contexta
-from contexta_client.adapters.anthropic import contextaMemory, contextaChat
+from uuid import uuid4
+
 from anthropic import Anthropic
+from contexta_client import Contexta
+from contexta_client.adapters.anthropic import contextaChat, contextaMemory
 
-contexta = contexta(api_key=os.environ["CONTEXTA_API_KEY"])
+client = Contexta(api_key=os.environ["CONTEXTA_API_KEY"])
 anthropic = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-session_id = "crm-demo-acme-corp"
+user_id = "crm-demo-acme-corp"
+session_id = str(uuid4())
 
-memory = contextaMemory(contexta, token_budget=2000)
-chat = contextaChat(contexta, session_id=session_id, memory=memory)
+memory = contextaMemory(client, user_id, token_budget=2000)
+chat = contextaChat(client, user_id, session_id=session_id, memory=memory)
 
 # Fetch context before the conversation
 ctx = chat.get_context()
@@ -45,6 +49,7 @@ response = anthropic.messages.create(
 
 chat.turn("user", "Summarize our dealings with Acme Corp.")
 chat.turn("assistant", response.content[0].text)
+client.close()
 ```
 
 Claude now remembers everything about Acme Corp across sessions.

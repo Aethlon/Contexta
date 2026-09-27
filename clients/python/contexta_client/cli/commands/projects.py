@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import typer
 
-from contexta_client.cli.commands.login import _get_client, _load_config, _save_config, CONFIG_DIR, CONFIG_FILE
+from contexta_client.cli.commands.login import _get_client, _load_config, _save_config
 
 
 def list_projects(
@@ -22,7 +20,7 @@ def list_projects(
 
 def create_project(
     name: str = typer.Option(..., "--name", help="Project name"),
-    description: Optional[str] = typer.Option(None, "--description", help="Project description"),
+    description: str | None = typer.Option(None, "--description", help="Project description"),
     profile: str = typer.Option("default", "--profile", help="Profile name"),
 ) -> None:
     """Create a new project."""

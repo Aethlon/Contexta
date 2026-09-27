@@ -1,0 +1,164 @@
+{
+  "stats": {
+    "sessions": 10,
+    "chunks": 53,
+    "extracted": 3,
+    "stored": 3,
+    "skipped": 0,
+    "discarded": 0,
+    "failures": 8,
+    "total_ms": 82289.09000000001,
+    "max_ms": 21444.28,
+    "embedded": 0,
+    "embed_failed": 3,
+    "embed_errors": [
+      "525d6d0a-bfea-4d76-947f-4978eba7f008: provider returned failure",
+      "5793ea0e-7436-428c-b34c-af2c331b46f0: provider returned failure",
+      "9c00e2ff-a3f2-41d2-9c32-236c0c0f92cb: provider returned failure"
+    ]
+  },
+  "per_session": [
+    {
+      "session_key": "s2",
+      "session_id": "91287795-b4b1-447a-ab9d-cc05d22808c3",
+      "domain": "conversation",
+      "chunks": 17,
+      "ingest_ms": 9350.08,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "session_key": "commit_be6f5ca3",
+      "session_id": "73ec479d-f8f1-42fd-9f37-749ac7559580",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 21444.28,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ',' delimiter: line 1 column 1358 (char 1357)"
+    },
+    {
+      "session_key": "commit_09e01394",
+      "session_id": "7d8ef05c-c950-4187-8c4a-18e97745e340",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 13420.84,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Invalid \\escape: line 1 column 451 (char 450)"
+    },
+    {
+      "session_key": "s3",
+      "session_id": "b91c6067-ff27-4aa7-af17-f0c481130e65",
+      "domain": "record",
+      "chunks": 2,
+      "ingest_ms": 4328.24,
+      "extracted": 2,
+      "stored": 2,
+      "skipped": 0,
+      "discarded": 0,
+      "timings": {
+        "cortex_ms": 0.11,
+        "extraction_ms": 4098.36,
+        "deduplication_ms": 198.18,
+        "entity_graph_ms": 0.67,
+        "persistence_ms": 21.93,
+        "total_ms": 4324.87,
+        "redaction_ms": 3.97
+      }
+    },
+    {
+      "session_key": "s5",
+      "session_id": "dc026eed-faf4-4990-872d-37504aba7359",
+      "domain": "record",
+      "chunks": 20,
+      "ingest_ms": 2570.11,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "session_key": "s4",
+      "session_id": "fc95f34c-3f58-48cb-b70b-3a62f8cae23b",
+      "domain": "conversation",
+      "chunks": 4,
+      "ingest_ms": 8181.04,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Extra data: line 1 column 1640 (char 1639)"
+    },
+    {
+      "session_key": "commit_f0919ab8",
+      "session_id": "3c823bbc-4f19-4252-86c7-8f89376f48b0",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 5527.05,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Invalid \\escape: line 1 column 175 (char 174)"
+    },
+    {
+      "session_key": "commit_43bba6d5",
+      "session_id": "8fcd775b-65d7-44e1-8c7b-b40593309ffc",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 6435.18,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Extra data: line 1 column 1073 (char 1072)"
+    },
+    {
+      "session_key": "s6",
+      "session_id": "22252a26-8c36-4c39-8fee-ed44a433d5a9",
+      "domain": "record",
+      "chunks": 5,
+      "ingest_ms": 3846.02,
+      "extracted": 1,
+      "stored": 1,
+      "skipped": 0,
+      "discarded": 0,
+      "timings": {
+        "cortex_ms": 0.14,
+        "extraction_ms": 3814.89,
+        "deduplication_ms": 6.16,
+        "entity_graph_ms": 0.35,
+        "persistence_ms": 8.79,
+        "total_ms": 3841.15,
+        "redaction_ms": 7.47
+      }
+    },
+    {
+      "session_key": "commit_85f67925",
+      "session_id": "b35d82a2-caa0-4779-b20a-816b81f32694",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 7186.25,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ',' delimiter: line 1 column 1484 (char 1483)"
+    }
+  ],
+  "stored_memories": [
+    {
+      "id": "5793ea0e-7436-428c-b34c-af2c331b46f0",
+      "session_id": "b91c6067-ff27-4aa7-af17-f0c481130e65",
+      "type": "event",
+      "title": "User acknowledges the event report queue.",
+      "content": "The user acknowledges the event report queue.",
+      "importance": 0.5,
+      "confidence": 1.0,
+      "state": "active",
+      "valid_from": "2026-01-11T12:00:00",
+      "valid_to": null
+    },
+    {
+      "id": "525d6d0a-bfea-4d76-947f-4978eba7f008",
+      "session_id": "b91c6067-ff27-4aa7-af17-f0c481130e65",
+      "type": "fact",
+      "title": "User reports a specific incident.",
+      "content": "The user reports a specific incident.",
+      "importance": 0.45,
+      "confidence": 1.0,
+      "state": "active",
+      "valid_from": "2026-01-11T12:00:00",
+      "valid_to": null
+    },
+    {
+      "id": "9c00e2ff-a3f2-41d2-9c32-236c0c0f92cb",
+      "session_id": "22252a26-8c36-4c39-8fee-ed44a433d5a9",
+      "type": "fact",
+      "title": "Contract record (draft, superseded): [PERSON_3] value 52,000 USD.",
+      "content": "Contract record (draft, superseded): [PERSON_3] value 52,000 USD.",
+      "importance": 0.45,
+      "confidence": 1.0,
+      "state": "active",
+      "valid_from": "2026-01-17T13:00:00",
+      "valid_to": null
+    }
+  ]
+}

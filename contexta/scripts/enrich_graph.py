@@ -39,7 +39,9 @@ async def enrich():
 
         # 1. Prune noise entities
         logger.info("Scanning for noise entities to clean up...")
-        all_entities = (await session.execute(select(Entity))).scalars().all()
+        all_entities = (
+            await session.execute(select(Entity).where(Entity.organization_id == org_id))
+        ).scalars().all()
         noise_ids = []
         for e in all_entities:
             name_lower = e.name.strip().lower()
@@ -48,13 +50,25 @@ async def enrich():
 
         if noise_ids:
             logger.info(f"Removing {len(noise_ids)} noise entities and their links...")
-            await session.execute(delete(MemoryEntityLink).where(MemoryEntityLink.entity_id.in_(noise_ids)))
             await session.execute(
-                delete(EntityEdge).where(
-                    EntityEdge.source_entity_id.in_(noise_ids) | EntityEdge.target_entity_id.in_(noise_ids)
+                delete(MemoryEntityLink).where(
+                    MemoryEntityLink.organization_id == org_id,
+                    MemoryEntityLink.entity_id.in_(noise_ids),
                 )
             )
-            await session.execute(delete(Entity).where(Entity.id.in_(noise_ids)))
+            await session.execute(
+                delete(EntityEdge).where(
+                    EntityEdge.organization_id == org_id,
+                    (EntityEdge.source_entity_id.in_(noise_ids))
+                    | (EntityEdge.target_entity_id.in_(noise_ids)),
+                )
+            )
+            await session.execute(
+                delete(Entity).where(
+                    Entity.organization_id == org_id,
+                    Entity.id.in_(noise_ids),
+                )
+            )
             await session.commit()
             logger.info("Noise entity cleanup completed.")
 

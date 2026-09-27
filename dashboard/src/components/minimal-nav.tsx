@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
@@ -16,15 +16,15 @@ interface CommandItem {
 }
 
 const COMMAND_ITEMS: CommandItem[] = [
-  { id: "github", label: "GitHub Repository", description: "View source code & contribute", shortcut: "⌘G", section: "Resources", action: () => window.open(GITHUB_REPO, "_blank") },
-  { id: "docs", label: "Documentation", description: "API reference & guides", shortcut: "⌘D", section: "Resources", action: () => window.open("/docs", "_blank") },
-  { id: "discord", label: "Discord Community", description: "Join 2,400+ developers", shortcut: "⌘K", section: "Resources", action: () => window.open("https://discord.gg/contexta", "_blank") },
+  { id: "github", label: "GitHub Repository", description: "View source code & contribute", shortcut: "âŒ˜G", section: "Resources", action: () => window.open(GITHUB_REPO, "_blank") },
+  { id: "docs", label: "Documentation", description: "API reference & guides", shortcut: "âŒ˜D", section: "Resources", action: () => window.open("/docs", "_blank") },
+  { id: "discord", label: "Discord Community", description: "Join 2,400+ developers", shortcut: "âŒ˜K", section: "Resources", action: () => window.open("https://discord.gg/contexta", "_blank") },
   { id: "pricing", label: "Pricing", description: "Self-hosted & cloud plans", section: "Resources", action: () => window.open("/pricing", "_blank") },
   { id: "changelog", label: "Changelog", description: "Recent updates & fixes", section: "Resources", action: () => window.open("/changelog", "_blank") },
   { id: "architecture", label: "Architecture Deep Dive", description: "Technical architecture overview", section: "Navigate", action: () => document.getElementById("architecture")?.scrollIntoView({ behavior: "smooth" }) },
   { id: "benchmarks", label: "50K Benchmarks", description: "Performance data & comparisons", section: "Navigate", action: () => document.getElementById("benchmarks")?.scrollIntoView({ behavior: "smooth" }) },
   { id: "playground", label: "Live Playground", description: "Test extraction engine", section: "Navigate", action: () => document.getElementById("playground")?.scrollIntoView({ behavior: "smooth" }) },
-  { id: "console", label: "Open Console", description: "Sign in to your enclave", shortcut: "⌘E", section: "Navigate", action: () => window.location.href = "/sign-in" },
+  { id: "console", label: "Open Console", description: "Sign in to your enclave", shortcut: "âŒ˜E", section: "Navigate", action: () => window.location.href = "/sign-in" },
 ];
 
 export function MinimalNav() {
@@ -100,15 +100,15 @@ export function MinimalNav() {
           {/* Brand */}
           <Link href="/" className="flex items-center gap-2.5 group pointer-events-auto" aria-label="Contexta Home">
             <motion.div
-              className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/[0.04] group-hover:bg-white/[0.08] transition-colors"
+              className="flex items-center justify-center w-7 h-7 rounded-lg bg-accent group-hover:bg-accent transition-colors"
               whileHover={{ scale: 1.1, rotate: 12 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
             >
               <ContextaGlyph className="h-4 w-4 text-blue-400" />
             </motion.div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold tracking-tight text-white">Contexta</span>
-              <span className="hidden md:inline-flex px-2 py-0.5 rounded-full bg-white/[0.04] text-[10px] font-mono text-[#6B7280]">
+              <span className="text-sm font-semibold tracking-tight text-foreground">Contexta</span>
+              <span className="hidden md:inline-flex px-2 py-0.5 rounded-full bg-accent text-[10px] font-mono text-[#6B7280]">
                 v0.2.0-beta
               </span>
             </div>
@@ -124,7 +124,7 @@ export function MinimalNav() {
               <a
                 key={item.href}
                 href={item.href}
-                className="relative px-3 py-1.5 text-xs font-mono uppercase tracking-wider text-[#6B7280] hover:text-white transition-colors after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-0 after:h-0.5 after:bg-blue-400 after:transition-all hover:after:w-3/4"
+                className="relative px-3 py-1.5 text-xs font-mono uppercase tracking-wider text-[#6B7280] hover:text-foreground transition-colors after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-0 after:h-0.5 after:bg-blue-400 after:transition-all hover:after:w-3/4"
               >
                 {item.label}
               </a>
@@ -136,29 +136,29 @@ export function MinimalNav() {
             {/* Command Palette Trigger */}
             <button
               onClick={() => { setShowCommandPalette(true); setCommandQuery(""); setSelectedIndex(0); }}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.03] hover:bg-white/[0.06] text-xs font-mono text-[#6B7280] hover:text-white transition-all"
-              aria-label="Open command palette (⌘K)"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent hover:bg-accent text-xs font-mono text-[#6B7280] hover:text-foreground transition-all"
+              aria-label="Open command palette (âŒ˜K)"
             >
-              <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] text-[10px] font-mono text-[#6B7280]">⌘K</kbd>
+              <kbd className="px-1.5 py-0.5 rounded bg-accent text-[10px] font-mono text-[#6B7280]">âŒ˜K</kbd>
             </button>
 
             <Link
               href="/sign-in"
-              className="hidden sm:block px-3 py-1.5 text-xs font-mono text-[#6B7280] hover:text-white transition-colors"
+              className="hidden sm:block px-3 py-1.5 text-xs font-mono text-[#6B7280] hover:text-foreground transition-colors"
             >
               Sign In
             </Link>
 
             <Link
               href="/sign-up"
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-xs font-medium text-white shadow-lg shadow-blue-600/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-xs font-medium text-foreground shadow-lg shadow-blue-600/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               <span>Console</span>
               <motion.span
                 whileHover={{ x: 4 }}
                 transition={{ type: "spring", stiffness: 400, damping: 20 }}
               >
-                →
+                â†’
               </motion.span>
             </Link>
           </div>
@@ -181,8 +181,8 @@ export function MinimalNav() {
             <motion.div className="cmdk-window" initial={{ opacity: 0, scale: 0.96, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: -20 }} transition={{ type: "spring", stiffness: 300, damping: 25 }} onClick={(e) => e.stopPropagation()}>
               <div className="relative">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-micro text-[#3D4450] pointer-events-none">
-                  <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06]">⌘</kbd>
-                  <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06]">K</kbd>
+                  <kbd className="px-1.5 py-0.5 rounded bg-accent">âŒ˜</kbd>
+                  <kbd className="px-1.5 py-0.5 rounded bg-accent">K</kbd>
                 </div>
                 <input
                   ref={inputRef}
@@ -211,7 +211,7 @@ export function MinimalNav() {
                           key={item.id}
                           role="option"
                           aria-selected={isSelected}
-                          className={`cmdk-item ${isSelected ? "bg-white/[0.08] text-white" : ""}`}
+                          className={`cmdk-item ${isSelected ? "bg-accent text-foreground" : ""}`}
                           onClick={() => handleSelect(item)}
                           onMouseEnter={() => setSelectedIndex(filteredItems.indexOf(item))}
                           initial={{ opacity: 0, x: -10 }}
@@ -236,9 +236,9 @@ export function MinimalNav() {
                 )}
               </div>
 
-              <div className="px-4 py-3 border-t border-white/[0.04] text-micro text-[#3D4450] flex items-center justify-between">
+              <div className="px-4 py-3 border-t border-border text-micro text-[#3D4450] flex items-center justify-between">
                 <span>Contexta v0.2.0-beta</span>
-                <span>⌘K to close</span>
+                <span>âŒ˜K to close</span>
               </div>
             </motion.div>
           </motion.div>

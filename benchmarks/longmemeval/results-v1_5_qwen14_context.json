@@ -1,0 +1,105 @@
+{
+  "summary": {
+    "overall": {
+      "n": 3,
+      "correct": 2,
+      "accuracy": 0.6666666666666666
+    },
+    "by_type": {
+      "single-session-assistant": {
+        "n": 1,
+        "correct": 0,
+        "accuracy": 0.0
+      },
+      "single-session-user": {
+        "n": 1,
+        "correct": 1,
+        "accuracy": 1.0
+      },
+      "temporal-reasoning": {
+        "n": 1,
+        "correct": 1,
+        "accuracy": 1.0
+      }
+    }
+  },
+  "elapsed_seconds": 155.79700000000594,
+  "instances_evaluated": 3,
+  "generator_model": "qwen3:14b",
+  "output_tag": "v1_5_qwen14_context",
+  "embedding_backend": "fastembed",
+  "production_ingestion": true,
+  "instances": [
+    {
+      "question_id": "e47becba",
+      "question_type": "single-session-user",
+      "question": "What degree did I graduate with?",
+      "gold_answer": "Business Administration",
+      "generated_answer": "Business Administration",
+      "correct": true,
+      "num_retrieved": 12,
+      "is_abstention": false,
+      "retrieved_memory_ids": [
+        "918ca2d1-ab32-4208-b09b-ec6965ae4a7c",
+        "27f7003a-90cd-4041-97e3-40979a1d4d05",
+        "b41ce071-6f69-461e-8040-fe0df30d9621",
+        "49c57a98-e98f-46d3-baff-daaba5259ed5",
+        "48f3993d-908e-4e57-abce-658185cd9b69",
+        "2154018e-2a49-4310-97b3-034f1bd3967c",
+        "ec08efda-dd14-4e02-8e2e-867df4bccd98",
+        "23171d97-a23d-4b75-8406-759e0594a455",
+        "4fcf02b5-ea6f-4308-8c50-73fd1b032fc3",
+        "9f61312a-ade4-4ebd-a7cb-6ad8be1b1336",
+        "fe9a2146-eeff-4fcd-bf46-155effed42b2",
+        "ff15b874-0abf-4f21-bdde-4bd0edf6b599"
+      ]
+    },
+    {
+      "question_id": "7161e7e2",
+      "question_type": "single-session-assistant",
+      "question": "I'm checking our previous chat about the shift rotation sheet for GM social media agents. Can you remind me what was the rotation for Admon on a Sunday?",
+      "gold_answer": "Admon was assigned to the 8 am - 4 pm (Day Shift) on Sundays.",
+      "generated_answer": "Admon was on the night shift on Sunday, 2023-05-28.",
+      "correct": false,
+      "num_retrieved": 8,
+      "is_abstention": false,
+      "retrieved_memory_ids": [
+        "11da55ba-e834-48cb-bea8-5aa98e266f81",
+        "b579e3d0-c8cb-4503-bbcf-571810301f92",
+        "8dd4b402-22bc-4458-b52b-7d39dc8125ae",
+        "3143c7c7-7dfc-46ba-a774-c80eecc8e137",
+        "cb69352f-fe19-4c0b-989a-9d47abe8c808",
+        "71b7afed-f6f9-4470-8613-9a596634f9be",
+        "663359ff-548b-45d5-9fed-529a413e8edb",
+        "84251ff6-4101-4406-94ee-0f153c8e1a75"
+      ]
+    },
+    {
+      "question_id": "gpt4_2655b836",
+      "question_type": "temporal-reasoning",
+      "question": "What was the first issue I had with my new car after its first service?",
+      "gold_answer": "GPS system not functioning correctly",
+      "generated_answer": "The first issue you had with your new car after its first service was a problem with the GPS system.",
+      "correct": true,
+      "num_retrieved": 15,
+      "is_abstention": false,
+      "retrieved_memory_ids": [
+        "4adfe875-d0d7-4ffd-88f5-4e95508d41d7",
+        "16c49a9b-15e4-49ba-a158-96719abeee37",
+        "eb7232b5-d97a-47b5-b0ab-fbba8f9df360",
+        "8e6df6be-388d-4bae-8986-7d25d570b42c",
+        "6b93cce7-8985-4970-82f1-eb2eb9b72dd2",
+        "69b34645-e66b-4686-b94b-6f249b3234d7",
+        "66a833ae-66dd-4307-a81a-8ddc4fa93f2c",
+        "3c50afbf-ac72-4796-9c47-b4b4ae26e5aa",
+        "6cf4313e-5856-4249-bb02-c4c7dcc4076d",
+        "a881ac40-b093-451a-9ecb-1062ff888052",
+        "cb06a575-5569-48fe-8fac-f454f53bbecf",
+        "51f4479a-9814-442c-b0ed-da232107980b",
+        "5c47af52-783f-4507-9296-9bcd3dfc729e",
+        "cd93a0f6-33a8-469c-a4fa-9c3b39bcc554",
+        "c2cf1652-35ee-48eb-a710-0ba2b0ec9f92"
+      ]
+    }
+  ]
+}

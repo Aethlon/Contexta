@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import { Maximize2, Minimize2, X, Table2, Share2 } from "lucide-react";
@@ -46,7 +46,7 @@ function GraphSVG({
   const maxMem = Math.max(...nodes.map((n) => n.memory_count || 1), 1);
 
   return (
-    <svg viewBox={viewBox} className="w-full h-full rounded-2xl bg-[var(--color-abyss)]" onDoubleClick={onDoubleClick}
+    <svg viewBox={viewBox} className="w-full h-full rounded-lg bg-[var(--background)]" onDoubleClick={onDoubleClick}
       style={{ minHeight: 360 }}
     >
       {/* Edges */}
@@ -98,38 +98,38 @@ function EntityTable({ nodes, selected, setSelected }: {
   nodes: Node[]; selected: Node | null; setSelected: (v: Node | null) => void;
 }) {
   return (
-    <div className="w-full rounded-2xl border border-[var(--color-graphite)]/30 bg-[var(--color-abyss)] overflow-hidden"
+    <div className="w-full rounded-lg border border-[var(--border)]/30 bg-[var(--background)] overflow-hidden"
       style={{ minHeight: 360 }}>
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-[var(--color-graphite)]/20 text-left">
-            <th className="p-3 text-[10px] font-mono tracking-widest text-[var(--color-smoke)] uppercase font-light">Name</th>
-            <th className="p-3 text-[10px] font-mono tracking-widest text-[var(--color-smoke)] uppercase font-light">Type</th>
-            <th className="p-3 text-[10px] font-mono tracking-widest text-[var(--color-smoke)] uppercase font-light">Memories</th>
-            <th className="p-3 text-[10px] font-mono tracking-widest text-[var(--color-smoke)] uppercase font-light">Summary</th>
+          <tr className="border-b border-[var(--border)]/20 text-left">
+            <th className="p-3 text-[10px] font-mono tracking-widest text-[var(--text-secondary)] uppercase font-light">Name</th>
+            <th className="p-3 text-[10px] font-mono tracking-widest text-[var(--text-secondary)] uppercase font-light">Type</th>
+            <th className="p-3 text-[10px] font-mono tracking-widest text-[var(--text-secondary)] uppercase font-light">Memories</th>
+            <th className="p-3 text-[10px] font-mono tracking-widest text-[var(--text-secondary)] uppercase font-light">Summary</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[var(--color-graphite)]/10">
+        <tbody className="divide-y divide-[var(--border)]/10">
           {nodes.map((n) => {
             const isSelected = selected?.id === n.id;
             return (
               <tr key={n.id}
                 onClick={() => setSelected(isSelected ? null : n)}
-                className={`cursor-pointer transition-colors ${isSelected ? "bg-[var(--color-charcoal)]/40" : "hover:bg-[var(--color-charcoal)]/20"}`}
+                className={`cursor-pointer transition-colors ${isSelected ? "bg-[var(--muted)]/40" : "hover:bg-[var(--muted)]/20"}`}
               >
                 <td className="p-3">
                   <div className="flex items-center gap-2">
                     <span className="inline-block h-2 w-2 rounded-full shrink-0" style={{ background: COLORS[n.entity_type] || "#6b7280" }} />
-                    <span className="text-[var(--color-ghost)] font-normal">{n.name}</span>
+                    <span className="text-[var(--foreground)] font-normal">{n.name}</span>
                   </div>
                 </td>
                 <td className="p-3">
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[var(--color-graphite)]/20 text-[var(--color-smoke)]">
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[var(--border)]/20 text-[var(--text-secondary)]">
                     {n.entity_type}
                   </span>
                 </td>
-                <td className="p-3 font-mono text-xs text-[var(--color-smoke)] tabular-nums">{n.memory_count}</td>
-                <td className="p-3 text-xs text-[var(--color-smoke)] font-light max-w-[200px] truncate">{n.summary || "\u2014"}</td>
+                <td className="p-3 font-mono text-xs text-[var(--text-secondary)] tabular-nums">{n.memory_count}</td>
+                <td className="p-3 text-xs text-[var(--text-secondary)] font-light max-w-[200px] truncate">{n.summary || "\u2014"}</td>
               </tr>
             );
           })}
@@ -161,23 +161,23 @@ export function EntityGraphView({ nodes, edges }: { nodes: Node[]; edges: Edge[]
 
   // Shared detail panel
   const detailPanel = selected && (
-    <div className="rounded-xl border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-4">
+    <div className="rounded-lg border border-[var(--border)]/30 bg-[var(--card)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1.5 min-w-0">
           <div className="flex items-center gap-2">
             <span className="inline-block h-2.5 w-2.5 rounded-full shrink-0" style={{ background: COLORS[selected.entity_type] || "#6b7280" }} />
-            <h4 className="text-sm font-medium text-[var(--color-ghost)] truncate">{selected.name}</h4>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[var(--color-graphite)]/30 text-[var(--color-smoke)]">{selected.entity_type}</span>
+            <h4 className="text-sm font-medium text-[var(--foreground)] truncate">{selected.name}</h4>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[var(--border)]/30 text-[var(--text-secondary)]">{selected.entity_type}</span>
           </div>
           {selected.summary && (
-            <p className="text-xs font-light text-[var(--color-smoke)] leading-relaxed">{selected.summary}</p>
+            <p className="text-xs font-light text-[var(--text-secondary)] leading-relaxed">{selected.summary}</p>
           )}
-          <p className="text-[10px] font-mono text-[var(--color-smoke)]">
+          <p className="text-[10px] font-mono text-[var(--text-secondary)]">
             {selected.memory_count} linked {selected.memory_count === 1 ? "memory" : "memories"}
           </p>
         </div>
-        <button onClick={() => setSelected(null)} className="p-1 rounded-md hover:bg-[var(--color-charcoal)] transition-colors">
-          <X className="h-3.5 w-3.5 text-[var(--color-smoke)]" strokeWidth={1.2} />
+        <button onClick={() => setSelected(null)} className="p-1 rounded-md hover:bg-[var(--muted)] transition-colors">
+          <X className="h-3.5 w-3.5 text-[var(--text-secondary)]" strokeWidth={1.2} />
         </button>
       </div>
     </div>
@@ -185,7 +185,7 @@ export function EntityGraphView({ nodes, edges }: { nodes: Node[]; edges: Edge[]
 
   if (!nodes.length) {
     return (
-      <div className="flex h-48 items-center justify-center rounded-xl border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] text-sm text-[var(--color-smoke)] font-light">
+      <div className="flex h-48 items-center justify-center rounded-lg border border-[var(--border)]/30 bg-[var(--card)] text-sm text-[var(--text-secondary)] font-light">
         No entities extracted yet
       </div>
     );
@@ -196,13 +196,13 @@ export function EntityGraphView({ nodes, edges }: { nodes: Node[]; edges: Edge[]
       {/* Toolbar */}
       <div className="flex items-center gap-2">
         {/* View toggle */}
-        <div className="flex rounded-lg border border-[var(--color-graphite)]/30 overflow-hidden">
+        <div className="flex rounded-lg border border-[var(--border)]/30 overflow-hidden">
           <button onClick={() => setView("graph")}
-            className={`px-3 py-1.5 text-xs font-mono transition-colors ${view === "graph" ? "bg-[var(--color-ghost)] text-[var(--color-abyss)]" : "bg-transparent text-[var(--color-smoke)] hover:text-[var(--color-ghost)]"}`}>
+            className={`px-3 py-1.5 text-xs font-mono transition-colors ${view === "graph" ? "bg-[var(--foreground)] text-[var(--background)]" : "bg-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]"}`}>
             Graph
           </button>
           <button onClick={() => setView("table")}
-            className={`px-3 py-1.5 text-xs font-mono transition-colors ${view === "table" ? "bg-[var(--color-ghost)] text-[var(--color-abyss)]" : "bg-transparent text-[var(--color-smoke)] hover:text-[var(--color-ghost)]"}`}>
+            className={`px-3 py-1.5 text-xs font-mono transition-colors ${view === "table" ? "bg-[var(--foreground)] text-[var(--background)]" : "bg-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]"}`}>
             Table
           </button>
         </div>
@@ -210,19 +210,19 @@ export function EntityGraphView({ nodes, edges }: { nodes: Node[]; edges: Edge[]
         {/* Graph-only controls */}
         {view === "graph" && (
           <>
-            <button onClick={handleZoomOut} className="h-7 w-7 flex items-center justify-center rounded-md border border-[var(--color-graphite)]/30 text-[var(--color-smoke)] hover:text-[var(--color-ghost)] transition-colors text-sm">−</button>
-            <button onClick={handleZoomIn} className="h-7 w-7 flex items-center justify-center rounded-md border border-[var(--color-graphite)]/30 text-[var(--color-smoke)] hover:text-[var(--color-ghost)] transition-colors text-sm">+</button>
-            <button onClick={handleReset} className="h-7 px-2 flex items-center justify-center rounded-md border border-[var(--color-graphite)]/30 text-[var(--color-smoke)] hover:text-[var(--color-ghost)] transition-colors text-[10px] font-mono">Reset</button>
+            <button onClick={handleZoomOut} className="h-7 w-7 flex items-center justify-center rounded-md border border-[var(--border)]/30 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors text-sm">âˆ’</button>
+            <button onClick={handleZoomIn} className="h-7 w-7 flex items-center justify-center rounded-md border border-[var(--border)]/30 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors text-sm">+</button>
+            <button onClick={handleReset} className="h-7 px-2 flex items-center justify-center rounded-md border border-[var(--border)]/30 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors text-[10px] font-mono">Reset</button>
           </>
         )}
 
-        <span className="ml-auto text-[10px] font-mono text-[var(--color-smoke)]">
+        <span className="ml-auto text-[10px] font-mono text-[var(--text-secondary)]">
           {nodes.length} {nodes.length === 1 ? "entity" : "entities"}
         </span>
 
         {/* Expand */}
         <button onClick={() => setExpanded(!expanded)}
-          className="h-7 w-7 flex items-center justify-center rounded-md border border-[var(--color-graphite)]/30 text-[var(--color-smoke)] hover:text-[var(--color-ghost)] transition-colors">
+          className="h-7 w-7 flex items-center justify-center rounded-md border border-[var(--border)]/30 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors">
           {expanded ? <Minimize2 className="h-3.5 w-3.5" strokeWidth={1.2} /> : <Maximize2 className="h-3.5 w-3.5" strokeWidth={1.2} />}
         </button>
       </div>
@@ -235,8 +235,8 @@ export function EntityGraphView({ nodes, edges }: { nodes: Node[]; edges: Edge[]
             selected={selected} setSelected={setSelected}
             viewBox={viewBox} onDoubleClick={handleReset} />
         ) : (
-          <div className="flex items-center justify-center h-[360px] rounded-2xl border border-[var(--color-graphite)]/30 bg-[var(--color-abyss)] text-sm text-[var(--color-smoke)] font-light">
-            Loading graph…
+          <div className="flex items-center justify-center h-[360px] rounded-lg border border-[var(--border)]/30 bg-[var(--background)] text-sm text-[var(--text-secondary)] font-light">
+            Loading graphâ€¦
           </div>
         )
       ) : (
@@ -245,7 +245,7 @@ export function EntityGraphView({ nodes, edges }: { nodes: Node[]; edges: Edge[]
 
       {/* Legend (graph only) */}
       {view === "graph" && (
-        <div className="flex flex-wrap gap-3 text-xs text-[var(--color-smoke)]">
+        <div className="flex flex-wrap gap-3 text-xs text-[var(--text-secondary)]">
           {COLOR_LIST.map(([type, color]) => (
             <span key={type} className="flex items-center gap-1.5 font-light">
               <span className="inline-block h-2 w-2 rounded-full" style={{ background: color }} />
@@ -267,9 +267,9 @@ export function EntityGraphView({ nodes, edges }: { nodes: Node[]; edges: Edge[]
         {/* Inline content */}
         {content}
         {/* Overlay */}
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-6"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60  p-6"
           onClick={() => setExpanded(false)}>
-          <div className="w-full max-w-5xl max-h-[90vh] overflow-auto rounded-2xl border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-6 shadow-2xl"
+          <div className="w-full max-w-5xl max-h-[90vh] overflow-auto rounded-lg border border-[var(--border)]/30 bg-[var(--card)] p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}>
             {content}
           </div>

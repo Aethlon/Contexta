@@ -4,23 +4,28 @@ Exposes Contexta 3-Layer persistent memory engine tools to any AI agent
 (Cursor, Claude Desktop, Antigravity, AutoGen, CrewAI, LangChain, etc.).
 """
 
-from __future__ import annotations
-
 import logging
+import os
 from typing import Any
 
-from mcp.server.mcpserver import MCPServer
+from pydantic import create_model as _pydantic_create_model
+
 from contexta.mcp.service import ContextaMCPService
 
-import mcp.server.mcpserver.utilities.func_metadata as _mcp_func_meta
-from pydantic import create_model as _pydantic_create_model
+try:
+    import mcp.server.mcpserver.utilities.func_metadata as _mcp_func_meta
+    from mcp.server.mcpserver import MCPServer
+except ModuleNotFoundError:
+    from mcp.server.fastmcp import FastMCP as MCPServer
+    _mcp_func_meta = None
 
 # Compatibility patch for MCP 2.2.0 with Pydantic 2.10+
 def _compat_create_wrapped_model(func_name: str, annotation: Any):
     model_name = f"{func_name}Output"
     return _pydantic_create_model(model_name, result=(annotation, ...))
 
-_mcp_func_meta._create_wrapped_model = _compat_create_wrapped_model
+if _mcp_func_meta is not None:
+    _mcp_func_meta._create_wrapped_model = _compat_create_wrapped_model
 
 logger = logging.getLogger("contexta.mcp")
 
@@ -28,11 +33,97 @@ logger = logging.getLogger("contexta.mcp")
 def create_mcp_server(
     db_url: str | None = None,
     model_server_url: str = "http://localhost:8001",
+    organization_id: str | None = None,
+    api_key: str | None = None,
 ) -> MCPServer:
-    """Create and configure the Contexta MCP Server with all agent memory tools."""
+    """Create and configure the Contexta MCP Server with all agent memory tools.
+
+    Blocking entrypoint. It resolves the caller's API key against the key store,
+    refuses to start without one unless ``CONTEXTA_MCP_ALLOW_ANONYMOUS=true`` is
+    set explicitly, and applies a per-key rate limit to every tool. Previously it
+    accepted any caller and wrote into a single hard-coded tenant.
+
+    Safe to call from inside a running event loop; use
+    :func:`create_mcp_server_async` there to skip the worker-thread bridge.
+    """
+    from contexta.mcp.security import run_coroutine_blocking
+
+    return run_coroutine_blocking(
+        create_mcp_server_async(
+            db_url=db_url,
+            model_server_url=model_server_url,
+            organization_id=organization_id,
+            api_key=api_key,
+        )
+    )
+
+
+async def create_mcp_server_async(
+    db_url: str | None = None,
+    model_server_url: str = "http://localhost:8001",
+    organization_id: str | None = None,
+    api_key: str | None = None,
+) -> MCPServer:
+    """Async core of :func:`create_mcp_server`."""
+    from contexta.mcp.security import (
+        McpRateLimiter,
+        McpSecurityError,
+        resolve_tenant_async,
+    )
+
+    raw_key = api_key or os.environ.get("CONTEXTA_MCP_API_KEY", "").strip()
+    allow_anonymous = os.environ.get("CONTEXTA_MCP_ALLOW_ANONYMOUS", "").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+
+    tenant = None
+    if raw_key:
+        tenant = await resolve_tenant_async(raw_key)
+        if tenant is None:
+            raise McpSecurityError(
+                "The configured CONTEXTA_MCP_API_KEY is unknown or revoked."
+            )
+        logger.info(
+            "MCP authenticated: org=%s actor=%s scopes=%s",
+            tenant.organization_id,
+            tenant.actor_id,
+            ",".join(tenant.scopes),
+        )
+    elif not allow_anonymous:
+        raise McpSecurityError(
+            "MCP requires authentication. Set CONTEXTA_MCP_API_KEY to a Contexta "
+            "API key, or set CONTEXTA_MCP_ALLOW_ANONYMOUS=true for a local "
+            "single-tenant experiment."
+        )
+    else:
+        logger.warning(
+            "MCP running WITHOUT authentication (CONTEXTA_MCP_ALLOW_ANONYMOUS). "
+            "Every caller shares one tenant; do not expose this."
+        )
+
     server = MCPServer("contexta-memory-engine")
-    service = ContextaMCPService(db_url=db_url, model_server_url=model_server_url)
+    service = ContextaMCPService(
+        db_url=db_url,
+        model_server_url=model_server_url,
+        organization_id=organization_id or (tenant.organization_id if tenant else None),
+    )
+    limiter = McpRateLimiter(
+        rate_per_second=float(os.environ.get("CONTEXTA_MCP_RATE_PER_SECOND", "20")),
+        burst=float(os.environ.get("CONTEXTA_MCP_RATE_BURST", "40")),
+    )
+    identity = f"key:{tenant.key_id}" if tenant else "anonymous"
+
+    async def _guard(tool: str) -> None:
+        if not await limiter.allow(identity):
+            raise McpSecurityError(
+                f"MCP rate limit exceeded on {tool}; slow down and retry shortly."
+            )
+
     server.contexta_service = service
+    server.contexta_tenant = tenant
+    server.contexta_guard = _guard
 
     @server.tool()
     async def contexta_remember(
@@ -53,6 +144,7 @@ def create_mcp_server(
             tags: Optional category tags (e.g. ['preference', 'tech-stack', 'dietary']).
             importance: Subjective importance rating from 0.0 to 1.0 (default: 0.5).
         """
+        await _guard("contexta_remember")
         return await service.remember(
             content=content,
             user_id=user_id,
@@ -170,6 +262,7 @@ def create_mcp_server(
             batch_size: Chunk size for embedding and database operations (default: 50).
             async_processing: If True, queues the job and processes gradually in the background without blocking the MCP connection.
         """
+        await _guard("contexta_batch_remember")
         return await service.batch_remember(
             memories=memories,
             file_path=file_path,
@@ -273,10 +366,11 @@ def create_unified_app(
     - '/messages': SSE incoming client message mount
     - '/api/ingest-file' & '/upload': Direct HTTP file upload endpoint for containerized agents
     """
+    import inspect
     import json
+
     from mcp.server.sse import SseServerTransport
     from mcp.server.transport_security import TransportSecuritySettings
-    from starlette.applications import Starlette
     from starlette.requests import Request
     from starlette.responses import Response
     from starlette.routing import Mount, Route
@@ -286,11 +380,24 @@ def create_unified_app(
     )
 
     # 1. Base Streamable HTTP ASGI app
-    http_app = server.streamable_http_app(
-        streamable_http_path="/",
-        transport_security=security,
+    streamable_kwargs: dict[str, Any] = {}
+    try:
+        streamable_parameters = inspect.signature(server.streamable_http_app).parameters
+    except (TypeError, ValueError):
+        streamable_parameters = {}
+    if "streamable_http_path" in streamable_parameters:
+        streamable_kwargs["streamable_http_path"] = "/"
+    if "transport_security" in streamable_parameters:
+        streamable_kwargs["transport_security"] = security
+    http_app = server.streamable_http_app(**streamable_kwargs)
+    streamable_endpoint = next(
+        (
+            route.endpoint
+            for route in http_app.routes
+            if getattr(route, "path", None) in {"/", "/mcp"}
+        ),
+        http_app.routes[0].endpoint,
     )
-    streamable_endpoint = http_app.routes[0].endpoint
 
     # 2. SSE Transport for legacy SSE connections
     sse = SseServerTransport("/messages/", security_settings=security)
@@ -409,8 +516,11 @@ def create_unified_app(
             return Response(json.dumps({"error": str(exc)}), status_code=500, media_type="application/json")
 
     # 3. Unified routing table
-    http_app.routes.append(Route("/mcp", endpoint=streamable_endpoint))
-    http_app.routes.append(Route("/sse", endpoint=streamable_endpoint, methods=["POST"]))
+    existing_paths = {getattr(route, "path", None) for route in http_app.routes}
+    if "/mcp" not in existing_paths:
+        http_app.routes.append(Route("/mcp", endpoint=streamable_endpoint))
+    if "/sse" not in existing_paths:
+        http_app.routes.append(Route("/sse", endpoint=streamable_endpoint, methods=["POST"]))
     http_app.routes.append(Route("/sse", endpoint=sse_endpoint, methods=["GET"]))
     http_app.routes.append(Mount("/messages", app=sse.handle_post_message))
     http_app.routes.append(Route("/api/ingest-file", endpoint=upload_ingest_endpoint, methods=["POST"]))

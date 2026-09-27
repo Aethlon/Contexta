@@ -1,5 +1,5 @@
 services:
-  # ─── Infra ──────────────────────────────────────────
+  # â”€â”€â”€ Infra â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   postgres:
     image: pgvector/pgvector:pg16
     environment:
@@ -28,7 +28,7 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ─── Python Backend ─────────────────────────────────
+  # â”€â”€â”€ Python Backend â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   migration:
     build: .
     environment:
@@ -40,11 +40,17 @@ services:
     restart: "no"
 
   model-server:
-    build: .
+    build:
+      context: .
+      target: model-server
     environment:
       MODE: model-server
       MODEL_SERVER_PORT: 8001
       MODEL_CACHE_DIR: /app/models
+      HF_HOME: /app/models/.cache
+      CONTEXTA_EMBEDDING_PROFILE: ${CONTEXTA_MODEL_SERVER_EMBEDDING_PROFILE:-offline-qwen3-1024}
+      CONTEXTA_EMBEDDING_MODEL: ${CONTEXTA_MODEL_SERVER_EMBEDDING_MODEL:-Qwen/Qwen3-Embedding-0.6B}
+      CONTEXTA_EMBEDDING_DIMENSIONS: 1024
     ports:
       - "8001:8001"
     volumes:
@@ -57,8 +63,26 @@ services:
       start_period: 300s
     restart: unless-stopped
 
+  inference-server:
+    build: .
+    # Not profile-gated: this serves the fine-tuned extractor, which is the
+    # default extraction path. The worker degrades to a low-quality regex
+    # assembler if it is down, so it is a normal dependency rather than a
+    # hard one.
+    environment:
+      MODE: inference-server
+      CONTEXTA_INFERENCE_OLLAMA_URL: http://host.docker.internal:11434
+      CONTEXTA_INFERENCE_MODEL: ${CONTEXTA_INFERENCE_MODEL:-contexta-lfm-extract}
+      CONTEXTA_INFERENCE_NUM_CTX: ${CONTEXTA_INFERENCE_NUM_CTX:-16384}
+      CONTEXTA_INFERENCE_NUM_PREDICT: ${CONTEXTA_INFERENCE_NUM_PREDICT:-4096}
+    ports:
+      - "${CONTEXTA_INFERENCE_PORT:-8002}:8002"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
 
   api:
+
     build: .
     environment:
       MODE: api
@@ -68,21 +92,27 @@ services:
       CONTEXTA_CELERY_RESULT_BACKEND: redis://redis:6379/2
       CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
       CONTEXTA_SECRET_KEY: ${CONTEXTA_SECRET_KEY:-change-me-in-production-use-a-long-random-string}
-      CONTEXTA_ENGINE_MODE: ${CONTEXTA_ENGINE_MODE:-offline}
-      CONTEXTA_LLM_PROVIDER: ${CONTEXTA_LLM_PROVIDER:-local}
-      CONTEXTA_LLM_BASE_URL: ${CONTEXTA_LLM_BASE_URL:-}
-      CONTEXTA_LLM_MODEL: ${CONTEXTA_LLM_MODEL:-Qwen/Qwen3-Reranker-0.6B}
-      CONTEXTA_LLM_API_KEY: ${CONTEXTA_LLM_API_KEY:-}
-      CONTEXTA_EMBEDDING_PROVIDER: ${CONTEXTA_EMBEDDING_PROVIDER:-local}
-      CONTEXTA_EMBEDDING_MODEL: ${CONTEXTA_EMBEDDING_MODEL:-Qwen/Qwen3-Embedding-0.6B}
-      CONTEXTA_EMBEDDING_DIMENSIONS: ${CONTEXTA_EMBEDDING_DIMENSIONS:-1024}
-      CONTEXTA_EMBEDDING_API_KEY: ${CONTEXTA_EMBEDDING_API_KEY:-}
+      CONTEXTA_ENGINE_MODE: offline
+      CONTEXTA_LLM_PROVIDER: local
+      CONTEXTA_LLM_BASE_URL: ""
+      CONTEXTA_LLM_MODEL: ${CONTEXTA_LLM_MODEL:-contexta-lfm-extract}
+      CONTEXTA_INFERENCE_SERVER_URL: http://inference-server:8002
+      CONTEXTA_LLM_API_KEY: ""
+      CONTEXTA_EMBEDDING_PROFILE: ${CONTEXTA_EMBEDDING_PROFILE:-offline-qwen3-1024}
+      CONTEXTA_EMBEDDING_PROVIDER: local
+      CONTEXTA_EMBEDDING_MODEL: Qwen/Qwen3-Embedding-0.6B
+      CONTEXTA_EMBEDDING_VERSION: qwen3-embedding-0.6b-v1
+      CONTEXTA_EMBEDDING_DIMENSIONS: 1024
+      CONTEXTA_EMBEDDING_API_KEY: ""
       CONTEXTA_LOCAL_MODEL_SERVER_URL: http://model-server:8001
       MODEL_CACHE_DIR: /app/models
+      CONTEXTA_ARTIFACT_STORAGE_BACKEND: local
+      CONTEXTA_ARTIFACT_STORAGE_PATH: /app/data/artifacts
     ports:
       - "8000:8000"
     volumes:
       - ./models:/app/models
+      - artifact-data:/app/data/artifacts
     depends_on:
       postgres:
         condition: service_healthy
@@ -94,7 +124,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # ─── Next.js Dashboard ─────────────────────────────
+  # â”€â”€â”€ Next.js Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   dashboard:
     build:
       context: .
@@ -102,6 +132,8 @@ services:
     environment:
       CONTEXTA_API_URL: http://api:8000
       AUTH_SECRET: ${AUTH_SECRET:-dev-secret-key-change-in-prod}
+      CONTEXTA_DASHBOARD_AUTH: ${CONTEXTA_DASHBOARD_AUTH:-off}
+      CONTEXTA_DASHBOARD_API_KEY: ${CONTEXTA_DASHBOARD_API_KEY:-}
     ports:
       - "${DASHBOARD_PORT:-3000}:3000"
     depends_on:
@@ -118,19 +150,25 @@ services:
       CONTEXTA_CELERY_BROKER_URL: redis://redis:6379/1
       CONTEXTA_CELERY_RESULT_BACKEND: redis://redis:6379/2
       CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
-      CONTEXTA_ENGINE_MODE: ${CONTEXTA_ENGINE_MODE:-offline}
-      CONTEXTA_LLM_PROVIDER: ${CONTEXTA_LLM_PROVIDER:-local}
-      CONTEXTA_LLM_BASE_URL: ${CONTEXTA_LLM_BASE_URL:-}
-      CONTEXTA_LLM_MODEL: ${CONTEXTA_LLM_MODEL:-Qwen/Qwen3-Reranker-0.6B}
-      CONTEXTA_LLM_API_KEY: ${CONTEXTA_LLM_API_KEY:-}
-      CONTEXTA_EMBEDDING_PROVIDER: ${CONTEXTA_EMBEDDING_PROVIDER:-local}
-      CONTEXTA_EMBEDDING_MODEL: ${CONTEXTA_EMBEDDING_MODEL:-Qwen/Qwen3-Embedding-0.6B}
-      CONTEXTA_EMBEDDING_DIMENSIONS: ${CONTEXTA_EMBEDDING_DIMENSIONS:-1024}
-      CONTEXTA_EMBEDDING_API_KEY: ${CONTEXTA_EMBEDDING_API_KEY:-}
+      CONTEXTA_ENGINE_MODE: offline
+      CONTEXTA_LLM_PROVIDER: local
+      CONTEXTA_LLM_BASE_URL: ""
+      CONTEXTA_LLM_MODEL: ${CONTEXTA_LLM_MODEL:-contexta-lfm-extract}
+      CONTEXTA_INFERENCE_SERVER_URL: http://inference-server:8002
+      CONTEXTA_LLM_API_KEY: ""
+      CONTEXTA_EMBEDDING_PROFILE: ${CONTEXTA_EMBEDDING_PROFILE:-offline-qwen3-1024}
+      CONTEXTA_EMBEDDING_PROVIDER: local
+      CONTEXTA_EMBEDDING_MODEL: Qwen/Qwen3-Embedding-0.6B
+      CONTEXTA_EMBEDDING_VERSION: qwen3-embedding-0.6b-v1
+      CONTEXTA_EMBEDDING_DIMENSIONS: 1024
+      CONTEXTA_EMBEDDING_API_KEY: ""
       CONTEXTA_LOCAL_MODEL_SERVER_URL: http://model-server:8001
       MODEL_CACHE_DIR: /app/models
+      CONTEXTA_ARTIFACT_STORAGE_BACKEND: local
+      CONTEXTA_ARTIFACT_STORAGE_PATH: /app/data/artifacts
     volumes:
       - ./models:/app/models
+      - artifact-data:/app/data/artifacts
     depends_on:
       postgres:
         condition: service_healthy
@@ -151,6 +189,13 @@ services:
       CONTEXTA_CELERY_BROKER_URL: redis://redis:6379/1
       CONTEXTA_CELERY_RESULT_BACKEND: redis://redis:6379/2
       CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
+      CONTEXTA_EMBEDDING_PROFILE: ${CONTEXTA_EMBEDDING_PROFILE:-offline-qwen3-1024}
+      CONTEXTA_EMBEDDING_PROVIDER: local
+      CONTEXTA_EMBEDDING_MODEL: Qwen/Qwen3-Embedding-0.6B
+      CONTEXTA_EMBEDDING_VERSION: qwen3-embedding-0.6b-v1
+      CONTEXTA_EMBEDDING_DIMENSIONS: 1024
+      CONTEXTA_EMBEDDING_API_KEY: ""
+      CONTEXTA_LOCAL_MODEL_SERVER_URL: http://model-server:8001
     depends_on:
       postgres:
         condition: service_healthy
@@ -160,12 +205,20 @@ services:
         condition: service_started
     restart: unless-stopped
 
-  # ─── Go Services ────────────────────────────────────
+  # â”€â”€â”€ Go Services â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  # The Go gateway is retired as a second entry point. It duplicated API-key
+  # verification (Redis-only, with no Postgres fallback) and forced two ways to
+  # reach the same route. TLS termination belongs on the load balancer or reverse
+  # proxy in front of the API. The edge capabilities it provided - response cache,
+  # single-flight, per-key rate limiting - now live in the Python API as
+  # contexta/api/middleware/{response_cache,ratelimit}.py.
+  #
+  # To re-enable it: `docker compose --profile edge up gateway`
   gateway:
     build: ./services/gateway
+    profiles: ["edge"]
     environment:
       REDIS_ADDR: redis:6379
-      DATA_PLANE_URL: http://data-plane:8080
       PYTHON_API_URL: http://api:8000
       LISTEN_ADDR: :8443
       TLS_CERT_FILE: /certs/cert.pem
@@ -188,7 +241,25 @@ services:
     environment:
       MODE: mcp
       CONTEXTA_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-contexta}
+      CONTEXTA_EMBEDDING_PROFILE: ${CONTEXTA_EMBEDDING_PROFILE:-offline-qwen3-1024}
+      CONTEXTA_EMBEDDING_PROVIDER: local
+      CONTEXTA_EMBEDDING_MODEL: Qwen/Qwen3-Embedding-0.6B
+      CONTEXTA_EMBEDDING_VERSION: qwen3-embedding-0.6b-v1
+      CONTEXTA_EMBEDDING_DIMENSIONS: 1024
+      CONTEXTA_EMBEDDING_API_KEY: ""
       CONTEXTA_LOCAL_MODEL_SERVER_URL: http://model-server:8001
+      # MCP authenticates every caller with a Contexta API key and scopes writes to
+      # that key's tenant. Set CONTEXTA_MCP_ALLOW_ANONYMOUS=true only for a local
+      # single-tenant experiment - never for a shared or exposed deployment.
+      CONTEXTA_MCP_API_KEY: ${CONTEXTA_MCP_API_KEY:-}
+      CONTEXTA_MCP_ALLOW_ANONYMOUS: ${CONTEXTA_MCP_ALLOW_ANONYMOUS:-false}
+      CONTEXTA_MCP_RATE_PER_SECOND: ${CONTEXTA_MCP_RATE_PER_SECOND:-20}
+      CONTEXTA_MCP_RATE_BURST: ${CONTEXTA_MCP_RATE_BURST:-40}
+      # Bulk import guards. Leave CONTEXTA_MCP_ALLOWED_ROOTS unset to confine
+      # file_path to the working directory; set CONTEXTA_MCP_ALLOWED_FETCH_HOSTS to a
+      # comma-separated allowlist to permit file_url at all.
+      CONTEXTA_MCP_ALLOWED_ROOTS: ${CONTEXTA_MCP_ALLOWED_ROOTS:-}
+      CONTEXTA_MCP_ALLOWED_FETCH_HOSTS: ${CONTEXTA_MCP_ALLOWED_FETCH_HOSTS:-}
       MODEL_CACHE_DIR: /app/models
     ports:
       - "8765:8765"
@@ -201,21 +272,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  data-plane:
-    build: ./services/data-plane
-    environment:
-      REDIS_ADDR: redis:6379
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-contexta}
-      LISTEN_ADDR: :8080
-    ports:
-      - "8081:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
 volumes:
   postgres-data:
   model-cache:
+  artifact-data:

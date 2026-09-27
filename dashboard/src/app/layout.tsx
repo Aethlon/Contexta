@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { isAuthRequired } from "@/lib/dashboard-identity";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -43,7 +44,7 @@ export default function RootLayout({
       >
         <div className="relative z-10 min-h-screen flex flex-col font-sans">
           <TitleBar />
-          <Providers>{children}</Providers>
+          <Providers authEnabled={isAuthRequired()}>{children}</Providers>
         </div>
       </body>
     </html>

@@ -91,6 +91,8 @@ landing/
 
 # Offline Model Cache & Weights
 models/
+!contexta/models/
+!contexta/models/*.py
 *.bin
 *.onnx
 *.safetensors
@@ -101,4 +103,33 @@ models/
 *.sqlite3
 contexta*.db
 
+# Fine-tuned model weights and training artefacts
+# These are multi-gigabyte binaries; fetch them with the SFT build script
+# instead of committing them.
+*.gguf
+*.ggml
+benchmarks/extraction/sft/hf-cache/
+benchmarks/extraction/sft/output/merged/
+benchmarks/extraction/sft/output/*.json
+benchmarks/extraction/sft/checkpoints/
+benchmarks/extraction/sft/**/checkpoint-*/
+
+# Runtime state and user-uploaded data
+data/
+models/
+!contexta/models/
+!contexta/models/*.py
+
+# Generated benchmark reports. These echo the redaction corpus, so committing
+# them would reintroduce every fake credential the corpus deliberately avoids
+# storing in source.
+benchmarks/**/reports/
+
+# TLS material. The gateway generates these at runtime; a private key in git is
+# a key compromise, and a revoked one is the only safe kind.
+certs/
+*.pem
+*.key
+*.p12
+*.pfx
 

@@ -1,0 +1,24 @@
+# Lint configuration for the published `contexta-client` SDK.
+#
+# Scoped separately from the repository root so the SDK can be linted, built and
+# published on its own. Typer's `Option`/`Argument` are dependency-injection
+# calls in argument defaults, the same pattern the root config whitelists for
+# FastAPI.
+
+line-length = 120
+
+[lint]
+# RUF012: pydantic mutable defaults are the project convention.
+ignore = ["DTZ003", "DTZ011", "RUF012"]
+
+[lint.flake8-bugbear]
+extend-immutable-calls = [
+  "typer.Argument",
+  "typer.Option",
+]
+
+[lint.per-file-ignores]
+# The durable offline queue and the `contexta test` diagnostic command must
+# never propagate an unexpected error while draining / probing.
+"contexta_client/_buffer.py" = ["BLE001"]
+"contexta_client/cli/commands/test.py" = ["BLE001"]

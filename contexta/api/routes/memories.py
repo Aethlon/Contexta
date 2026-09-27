@@ -1,6 +1,7 @@
 """Memory context, lifecycle, and explainability routes."""
 
 import math
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -14,14 +15,14 @@ from contexta.core.retrieval.engine import RetrievalEngine
 from contexta.core.schemas import ContextConfig, ContextRequest, RetrievalQuery
 from contexta.db import get_db_session
 from contexta.models.memory import MemoryRecord
-from contexta.models.version import MemoryVersion
 from contexta.repositories.entity_repo import (
     EntityEdgeRepository,
     EntityRepository,
     MemoryEntityLinkRepository,
 )
 from contexta.repositories.memory_repo import MemoryRepository
-from contexta.services.embedding import EmbeddingService
+from contexta.repositories.version_repo import MemoryVersionRepository
+from contexta.services.embedding import EmbeddingError, EmbeddingService
 
 router = APIRouter()
 
@@ -59,6 +60,7 @@ class MemoryDetailResponse(BaseModel):
     is_archived: bool
     valid_from: str | None
     valid_to: str | None
+    fact_key: str | None = None
     created_at: str | None
     updated_at: str | None
     last_accessed_at: str | None
@@ -191,48 +193,62 @@ async def search_memories(
 ) -> dict:
     """Execute pure vector similarity search using dense embeddings."""
     org_id = UUID(str(getattr(request.state, "organization_id", "00000000-0000-0000-0000-000000000001")))
-    embed_service = EmbeddingService()
     try:
+        embed_service = EmbeddingService()
         query_embedding = await embed_service.embed_text(query)
-    except Exception:
-        query_embedding = None
+    except (EmbeddingError, OSError, RuntimeError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Vector search is unavailable: {exc}",
+        ) from exc
 
     repo = MemoryRepository(session, tenant_id=org_id)
-    stmt = select(MemoryRecord).where(MemoryRecord.is_archived.is_(False))
-    if user_id:
-        stmt = stmt.where(MemoryRecord.user_id == user_id)
-    if memory_type:
-        stmt = stmt.where(MemoryRecord.memory_type == memory_type)
-    stmt = repo._scope_select(stmt)
-    res = await session.execute(stmt)
-    memories = res.scalars().all()
+    profile = embed_service.profile
+    try:
+        memories = await repo.get_by_vector_similarity(
+            user_id,
+            query_embedding,
+            limit=limit,
+            include_archived=False,
+            memory_types=(memory_type,) if memory_type else (),
+            profile=profile,
+            include_legacy=False,
+        )
+    except EmbeddingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Vector search could not use the configured embedding profile: {exc}",
+        ) from exc
 
+    dimensions = len(query_embedding)
+    norm_q = math.sqrt(math.fsum(value * value for value in query_embedding)) or 1.0
+    other_column = "embedding" if profile.storage_column == "embedding_1024" else "embedding_1024"
     scored = []
-    for m in memories:
-        sim = 0.50
-        if query_embedding and m.embedding is not None:
-            dot = sum(a * b for a, b in zip(query_embedding, m.embedding))
-            norm_q = math.sqrt(sum(a * a for a in query_embedding)) or 1.0
-            norm_m = math.sqrt(sum(b * b for b in m.embedding)) or 1.0
-            sim = max(0.0, min(1.0, dot / (norm_q * norm_m)))
-        else:
-            q_words = set(query.lower().split())
-            m_words = set(f"{m.title} {m.content}".lower().split())
-            common = len(q_words & m_words)
-            sim = min(0.95, 0.50 + (0.15 * common))
-
-        if sim >= threshold:
+    for memory in memories:
+        vector = getattr(memory, profile.storage_column, None)
+        if vector is None or getattr(memory, other_column, None) is not None:
+            continue
+        try:
+            values = [float(value) for value in vector]
+        except (TypeError, ValueError):
+            continue
+        if len(values) != dimensions:
+            continue
+        norm_m = math.sqrt(math.fsum(value * value for value in values)) or 1.0
+        dot = math.fsum(query_embedding[index] * values[index] for index in range(dimensions))
+        similarity = max(0.0, min(1.0, dot / (norm_q * norm_m)))
+        if similarity >= threshold:
             scored.append({
-                "id": str(m.id),
-                "title": m.title,
-                "content": m.content,
-                "similarity": round(sim, 4),
-                "memory_type": m.memory_type,
-                "tags": m.tags or [],
-                "created_at": m.created_at.isoformat() if m.created_at else None,
+                "id": str(memory.id),
+                "title": memory.title,
+                "content": memory.content,
+                "similarity": round(similarity, 4),
+                "memory_type": memory.memory_type,
+                "tags": memory.tags or [],
+                "created_at": memory.created_at.isoformat() if memory.created_at else None,
             })
 
-    scored.sort(key=lambda x: x["similarity"], reverse=True)
+    scored.sort(key=lambda item: item["similarity"], reverse=True)
     return {
         "mode": "vector",
         "query": query,
@@ -258,7 +274,7 @@ async def hybrid_search_memories(
     embed_service = EmbeddingService()
     try:
         query_embedding = await embed_service.embed_text(query)
-    except Exception:
+    except EmbeddingError:
         query_embedding = None
 
     memory_repo = MemoryRepository(session, tenant_id=org_id)
@@ -343,6 +359,7 @@ async def get_memory(
         is_archived=memory.is_archived,
         valid_from=memory.valid_from.isoformat() if memory.valid_from else None,
         valid_to=memory.valid_to.isoformat() if memory.valid_to else None,
+        fact_key=memory.fact_key,
         created_at=memory.created_at.isoformat() if memory.created_at else None,
         updated_at=memory.updated_at.isoformat() if memory.updated_at else None,
         last_accessed_at=memory.last_accessed_at.isoformat() if memory.last_accessed_at else None,
@@ -456,13 +473,7 @@ async def explain_memory(
         )
 
     # Query historical versions
-    stmt = (
-        select(MemoryVersion)
-        .where(MemoryVersion.memory_id == memory_id)
-        .order_by(MemoryVersion.created_at.desc())
-    )
-    result = await session.execute(stmt)
-    versions = result.scalars().all()
+    versions = await MemoryVersionRepository(session).list_by_memory(memory_id)
 
     return {
         "memory_id": str(memory.id),

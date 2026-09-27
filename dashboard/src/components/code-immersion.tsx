@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -98,7 +98,7 @@ export function CodeImmersion() {
   };
 
   return (
-    <section id="integration" className="py-24 sm:py-32 border-t border-white/[0.04]">
+    <section id="integration" className="py-24 sm:py-32 border-t border-border">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
         <motion.div
           className="lg:col-span-5 space-y-6 lg:sticky lg:top-28"
@@ -110,14 +110,14 @@ export function CodeImmersion() {
           <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-blue-400">
             Drop-in integration
           </div>
-          <h2 className="text-title text-3xl sm:text-4xl tracking-tight text-white">
+          <h2 className="text-title text-3xl sm:text-4xl tracking-tight text-foreground">
             Three lines of code to connect persistent memory.
           </h2>
           <p className="text-sm font-light text-[#6B7280] leading-relaxed">
             Plug Contexta into LangChain, LlamaIndex, Cursor, or FastAPI with zero changes
-            to your agent prompt loops. Simulated locally — no key required.
+            to your agent prompt loops. Simulated locally â€” no key required.
           </p>
-          <div className="flex items-center gap-2 bg-white/[0.03] p-1 rounded-full w-fit" role="tablist" aria-label="Language">
+          <div className="flex items-center gap-2 bg-accent p-1 rounded-full w-fit" role="tablist" aria-label="Language">
             {(["python", "typescript", "curl"] as Lang[]).map((t) => (
               <button
                 key={t}
@@ -125,7 +125,7 @@ export function CodeImmersion() {
                 aria-selected={tab === t}
                 onClick={() => setTab(t)}
                 className={`px-4 py-1.5 rounded-full text-xs font-mono uppercase tracking-wider transition-all ${
-                  tab === t ? "bg-blue-500/20 text-blue-300" : "text-[#6B7280] hover:text-white"
+                  tab === t ? "bg-blue-500/20 text-blue-300" : "text-[#6B7280] hover:text-foreground"
                 }`}
               >
                 {t === "typescript" ? "ts" : t}
@@ -138,8 +138,8 @@ export function CodeImmersion() {
               { v: "<14ms", k: "ingest overhead" },
               { v: "MIT", k: "self-hosted" },
             ].map((s) => (
-              <div key={s.k} className="rounded-2xl bg-white/[0.02] p-3 shadow-elev-1">
-                <div className="text-lg font-light text-white">{s.v}</div>
+              <div key={s.k} className="rounded-lg bg-accent p-3 shadow-elev-1">
+                <div className="text-lg font-light text-foreground">{s.v}</div>
                 <div className="text-[10px] font-mono uppercase tracking-widest text-[#3D4450]">{s.k}</div>
               </div>
             ))}
@@ -147,7 +147,7 @@ export function CodeImmersion() {
         </motion.div>
 
         <motion.div
-          className="lg:col-span-7 relative p-6 sm:p-8 rounded-3xl bg-[#09090C] shadow-elev-3 backdrop-blur-xl overflow-hidden"
+          className="lg:col-span-7 relative p-6 sm:p-8 rounded-lg bg-[#09090C] shadow-elev-3  overflow-hidden"
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-60px" }}
@@ -156,10 +156,10 @@ export function CodeImmersion() {
           <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
           <button
             onClick={copy}
-            className="absolute top-4 right-4 px-3 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] text-[11px] font-mono text-[#6B7280] hover:text-white transition-all"
+            className="absolute top-4 right-4 px-3 py-1.5 rounded-full bg-accent hover:bg-accent text-[11px] font-mono text-[#6B7280] hover:text-foreground transition-all"
             aria-label="Copy code snippet"
           >
-            {copied ? "copied ✓" : "copy"}
+            {copied ? "copied âœ“" : "copy"}
           </button>
 
           <AnimatePresence mode="wait">
@@ -177,32 +177,32 @@ export function CodeImmersion() {
             </motion.pre>
           </AnimatePresence>
 
-          <div className="mt-6 pt-5 border-t border-white/[0.06] space-y-3">
-            <div className="text-[11px] font-mono uppercase tracking-widest text-[#3D4450]">Try it — simulated recall</div>
+          <div className="mt-6 pt-5 border-t border-border space-y-3">
+            <div className="text-[11px] font-mono uppercase tracking-widest text-[#3D4450]">Try it â€” simulated recall</div>
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && runTry()}
-                className="flex-1 rounded-xl bg-black/40 px-4 py-2.5 text-xs font-mono text-white outline-none focus:ring-2 focus:ring-blue-500/40 placeholder:text-[#3D4450]"
-                placeholder="Ask about language, region, office…"
+                className="flex-1 rounded-lg bg-black/40 px-4 py-2.5 text-xs font-mono text-foreground outline-none focus:ring-2 focus:ring-blue-500/40 placeholder:text-[#3D4450]"
+                placeholder="Ask about language, region, officeâ€¦"
                 aria-label="Test query"
               />
               <button
                 onClick={runTry}
                 disabled={running}
-                className="px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-xs font-mono text-white transition-all"
+                className="px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-xs font-mono text-foreground transition-all"
               >
-                {running ? "running…" : "Run ▸"}
+                {running ? "runningâ€¦" : "Run â–¸"}
               </button>
             </div>
-            <div className="min-h-[44px] rounded-xl bg-black/50 px-4 py-3 font-mono text-[11px] leading-relaxed" aria-live="polite">
+            <div className="min-h-[44px] rounded-lg bg-black/50 px-4 py-3 font-mono text-[11px] leading-relaxed" aria-live="polite">
               {running ? (
-                <span className="text-[#3D4450] animate-pulse">▍ fusing vector + BM25 + graph…</span>
+                <span className="text-[#3D4450] animate-pulse">â– fusing vector + BM25 + graphâ€¦</span>
               ) : result ? (
-                <span className="text-emerald-300">{result}</span>
+                <span className="tone-green">{result}</span>
               ) : (
-                <span className="text-[#3D4450]">result appears here • try “rust” or “tokyo”</span>
+                <span className="text-[#3D4450]">result appears here â€¢ try â€œrustâ€ or â€œtokyoâ€</span>
               )}
             </div>
           </div>
@@ -216,7 +216,7 @@ export function CodeImmersion() {
                 exit={{ opacity: 0, x: 24 }}
                 role="status"
               >
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="w-2 h-2 rounded-full dot dot-green" />
                 {toast}
               </motion.div>
             )}

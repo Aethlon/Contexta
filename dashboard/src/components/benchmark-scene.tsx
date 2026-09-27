@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -80,7 +80,7 @@ function LatencyChart({ hover, setHover }: { hover: number | null; setHover: (i:
             {s.label}
           </span>
         ))}
-        <span className="ml-auto text-[#3D4450]">lower is better • ms p95</span>
+        <span className="ml-auto text-[#3D4450]">lower is better â€¢ ms p95</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[300px]" role="img" aria-label="P95 latency vs corpus scale">
         <defs>
@@ -159,7 +159,7 @@ function LatencyChart({ hover, setHover }: { hover: number | null; setHover: (i:
                     SCALE {d.scale}
                   </text>
                   <text x={Math.min(x(i) + 20, W - 160)} y={PT + 42} fontSize="11" fill="#fff" fontFamily="monospace">
-                    ctx {d.contexta}ms • mem0 {d.mem0}ms
+                    ctx {d.contexta}ms â€¢ mem0 {d.mem0}ms
                   </text>
                   <text x={Math.min(x(i) + 20, W - 160)} y={PT + 56} fontSize="11" fill="#A855F7" fontFamily="monospace">
                     zep {d.langchain}ms
@@ -170,7 +170,7 @@ function LatencyChart({ hover, setHover }: { hover: number | null; setHover: (i:
           </g>
         ))}
       </svg>
-      <p className="text-xs text-[#3D4450] font-light pt-1">HNSW M=16 efSearch=64 • pgvector • stable recall as corpus grows to 50K.</p>
+      <p className="text-xs text-[#3D4450] font-light pt-1">HNSW M=16 efSearch=64 â€¢ pgvector â€¢ stable recall as corpus grows to 50K.</p>
     </div>
   );
 }
@@ -199,7 +199,7 @@ function IsoBars({
         return (
           <div
             key={d.name}
-            className="grid items-center gap-3 rounded-xl px-3 py-2 transition-colors"
+            className="grid items-center gap-3 rounded-lg px-3 py-2 transition-colors"
             style={{
               gridTemplateColumns: `${labelW}px 1fr 92px`,
               background: active ? "rgba(255,255,255,0.04)" : "transparent",
@@ -207,10 +207,10 @@ function IsoBars({
             onMouseEnter={() => setHover(i)}
             onMouseLeave={() => setHover(null)}
           >
-            <span className={`text-xs font-mono truncate ${d.hot ? "text-white" : "text-[#6B7280]"}`}>{d.name}</span>
+            <span className={`text-xs font-mono truncate ${d.hot ? "text-foreground" : "text-[#6B7280]"}`}>{d.name}</span>
             <div className="relative h-[26px]">
               {/* isometric block: top face + front face */}
-              <div className="absolute inset-y-[5px] left-0 right-0 rounded-[4px] bg-white/[0.03]" />
+              <div className="absolute inset-y-[5px] left-0 right-0 rounded-[4px] bg-accent" />
               <motion.div
                 className="absolute inset-y-[5px] left-0 rounded-[4px]"
                 style={{
@@ -263,7 +263,7 @@ export function BenchmarkScene() {
       <div className="absolute top-1/3 right-1/4 w-[700px] h-[350px] bg-blue-500/[0.025] rounded-full blur-[140px] pointer-events-none" />
       <div className="max-w-[1360px] mx-auto px-6 lg:px-12 relative">
         <motion.div
-          className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 pb-8 border-b border-white/[0.04]"
+          className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 pb-8 border-b border-border"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
@@ -271,9 +271,9 @@ export function BenchmarkScene() {
         >
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 mb-3 text-xs font-mono uppercase tracking-widest text-blue-400">
-              <span aria-hidden="true">✱</span> 50,000 Records Benchmark
+              <span aria-hidden="true">âœ±</span> 50,000 Records Benchmark
             </div>
-            <h2 className="text-title text-2xl sm:text-4xl lg:text-5xl tracking-tight text-white leading-[1.15]">
+            <h2 className="text-title text-2xl sm:text-4xl lg:text-5xl tracking-tight text-foreground leading-[1.15]">
               Sub-180ms p95 recall at enterprise scale
             </h2>
             <p className="mt-3 text-sm text-[#6B7280] font-light max-w-xl leading-relaxed">
@@ -281,7 +281,7 @@ export function BenchmarkScene() {
               graph entity synthesis, and hybrid retrieval latency up to 50,000 records.
             </p>
           </div>
-          <div className="flex items-center bg-white/[0.03] p-1 rounded-full" role="tablist" aria-label="Benchmark metric">
+          <div className="flex items-center bg-accent p-1 rounded-full" role="tablist" aria-label="Benchmark metric">
             {(["latency", "throughput", "accuracy"] as Tab[]).map((t) => (
               <button
                 key={t}
@@ -289,7 +289,7 @@ export function BenchmarkScene() {
                 aria-selected={tab === t}
                 onClick={() => { setTab(t); setHover(null); }}
                 className={`px-4 py-1.5 text-xs font-mono rounded-full transition-all duration-200 ${
-                  tab === t ? "bg-blue-500/20 text-blue-300" : "text-[#6B7280] hover:text-white"
+                  tab === t ? "bg-blue-500/20 text-blue-300" : "text-[#6B7280] hover:text-foreground"
                 }`}
               >
                 {t === "latency" ? "Recall Latency" : t === "throughput" ? "Throughput" : "Accuracy"}
@@ -300,21 +300,21 @@ export function BenchmarkScene() {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
-            { k: "P95 RECALL LATENCY", v: "38ms", s: "@ 50K", d: "6.3x faster than Mem0", c: "text-emerald-400" },
+            { k: "P95 RECALL LATENCY", v: "38ms", s: "@ 50K", d: "6.3x faster than Mem0", c: "tone-green" },
             { k: "INGESTION SPEED", v: "2,650", s: "rec/s", d: "Asyncpg batch pipeline", c: "text-blue-400" },
             { k: "HYBRID RECALL ACCURACY", v: "98.8%", s: "MRR@10", d: "+17.4% vs pure vector", c: "text-purple-400" },
             { k: "EGRESS COST OVERHEAD", v: "$0.00", s: "LOCAL", d: "Local Qwen 2.5 + ONNX", c: "text-cyan-400" },
           ].map((m, i) => (
             <motion.div
               key={m.k}
-              className="p-4 rounded-2xl bg-white/[0.02] shadow-elev-1"
+              className="p-4 rounded-lg bg-accent shadow-elev-1"
               initial={{ opacity: 0, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: i * 0.08 }}
             >
               <div className="text-[11px] font-mono text-[#6B7280] uppercase">{m.k}</div>
-              <div className="text-2xl sm:text-3xl font-light text-white mt-1 flex items-baseline gap-1.5">
+              <div className="text-2xl sm:text-3xl font-light text-foreground mt-1 flex items-baseline gap-1.5">
                 {m.v} <span className={`text-xs font-mono ${m.c}`}>{m.s}</span>
               </div>
               <div className={`text-[11px] font-mono mt-0.5 ${m.c}`}>{m.d}</div>
@@ -323,7 +323,7 @@ export function BenchmarkScene() {
         </div>
 
         <motion.div
-          className="p-6 sm:p-8 rounded-3xl bg-white/[0.02] shadow-elev-2 backdrop-blur-xl"
+          className="p-6 sm:p-8 rounded-lg bg-accent shadow-elev-2 "
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-60px" }}
@@ -332,22 +332,22 @@ export function BenchmarkScene() {
           <AnimatePresence mode="wait">
             {tab === "latency" && (
               <motion.div key="latency" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }}>
-                <h3 className="text-lg font-normal text-white">P95 Retrieval Latency vs Memory Corpus Scale</h3>
-                <p className="text-xs text-[#6B7280] font-light pb-4">Lower is better • hover any scale for exact values.</p>
+                <h3 className="text-lg font-normal text-foreground">P95 Retrieval Latency vs Memory Corpus Scale</h3>
+                <p className="text-xs text-[#6B7280] font-light pb-4">Lower is better â€¢ hover any scale for exact values.</p>
                 <LatencyChart hover={hover} setHover={setHover} />
               </motion.div>
             )}
             {tab === "throughput" && (
               <motion.div key="throughput" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }}>
-                <h3 className="text-lg font-normal text-white">Memory Record Ingestion Throughput</h3>
-                <p className="text-xs text-[#6B7280] font-light pb-4">Higher is better • records per second with live entity extraction.</p>
+                <h3 className="text-lg font-normal text-foreground">Memory Record Ingestion Throughput</h3>
+                <p className="text-xs text-[#6B7280] font-light pb-4">Higher is better â€¢ records per second with live entity extraction.</p>
                 <IsoBars data={THROUGHPUT} unit="rec/s" max={2800} hover={hover} setHover={setHover} />
               </motion.div>
             )}
             {tab === "accuracy" && (
               <motion.div key="accuracy" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }}>
-                <h3 className="text-lg font-normal text-white">Mean Reciprocal Rank (MRR @ 10)</h3>
-                <p className="text-xs text-[#6B7280] font-light pb-4">Higher is better • semantic relevance across multi-turn dialog queries.</p>
+                <h3 className="text-lg font-normal text-foreground">Mean Reciprocal Rank (MRR @ 10)</h3>
+                <p className="text-xs text-[#6B7280] font-light pb-4">Higher is better â€¢ semantic relevance across multi-turn dialog queries.</p>
                 <IsoBars data={ACCURACY} unit="%" max={100} hover={hover} setHover={setHover} />
               </motion.div>
             )}

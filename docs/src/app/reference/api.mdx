@@ -1,320 +1,679 @@
 # API Reference
 
-The HTTP API is the underlying wire protocol for the SDKs. Use the SDKs for development; use the API directly when an SDK is unavailable.
+The HTTP API is the wire protocol the SDKs speak. Use an SDK for day-to-day work; use this page when you need an endpoint the SDK does not cover, or when you need to know exactly what the server enforces.
+
+The authoritative list is always the live schema at **`GET /openapi.json`** (public) or **`/docs`** (public). Every route below was read out of that schema.
 
 ## Base URL
 
+Self-hosted Contexta serves the API from your own machine:
+
 ```
-https://api.contexta.dev/v1
+http://localhost:8000
 ```
 
-Regional endpoints:
-- `https://eu.api.contexta.dev/v1` — EU pin
-- `https://us.api.contexta.dev/v1` — US pin (available Q4 2026)
+There is no hosted Contexta API. Everything documented here is something you run.
 
 ## Authentication
 
-```
-Authorization: Bearer mk_live_<32 url-safe bytes>
-```
+**One API key carries both the organization and the actor.** You do not need identity headers.
 
-Dashboard server actions use `Authorization: contexta <session_jwt>`.
-
-### API Key Scopes
-
-| Scope | Access |
-|-------|--------|
-| `observations:write` | POST `/v1/observations` |
-| `retrieval:read` | POST `/v1/retrieve`, GET `/v1/context` |
-| `memories:read` | GET `/v1/memories/*` |
-| `memories:write` | POST/PATCH/DELETE on `/v1/memories/*` |
-| `policies:write` | Policy CRUD |
-| `schemas:write` | Custom schema CRUD |
-| `audit:read` | Audit log |
-| `*` | All scopes |
-
-Default scope: `observations:write,retrieval:read,memories:read`.
-
-## Standard Headers
-
-### Request
 ```
 Authorization: Bearer mk_live_...
-Content-Type: application/json
-Idempotency-Key: <uuid>  (recommended for writes)
-X-contexta-User-Id: <uuid> (mandatory for user-scoped endpoints)
 ```
 
-### Response
+or equivalently:
+
 ```
-X-contexta-Request-Id: 01J...
-X-contexta-Region: eu-fsn1
-X-contexta-Quota-Used: 0.42
-X-contexta-RateLimit-Remaining: 47
-X-contexta-RateLimit-Reset: 1716600000
+x-api-key: mk_live_...
 ```
+
+Keys are `mk_live_<url-safe>`. The server stores only a SHA-256 hash plus a 16-character display prefix; the raw token is returned exactly once, at creation.
+
+### Public endpoints
+
+These need no headers at all:
+
+```
+/healthz
+/readyz
+/metrics
+/docs
+/redoc
+/openapi.json
+/v1/auth/signup
+/v1/auth/signin
+/v1/auth/reset-password
+/v1/auth/emergency-wipe-reset
+/v1/auth/onboarding
+/v1/auth/verify-email
+/v1/auth/forgot-password
+```
+
+### Identity headers are cross-checks, not credentials
+
+`TenantMiddleware` will accept `x-organization-id` / `x-user-id` as a *pair* without any key, but only when the server is started with `CONTEXTA_ALLOW_LEGACY_TENANT_HEADERS` truthy (`1`, `true`, `yes`, `on`). It is **off by default**. The `Authorization: Bearer` form is the supported path.
+
+When you do send identity headers alongside a key, the server cross-checks them against the key and rejects disagreement rather than trusting either side silently:
+
+| Condition | Response | Body |
+| :--- | :---: | :--- |
+| Org header disagrees with the key | `403` | `{"error": "organization_mismatch"}` |
+| Actor header disagrees with the key | `403` | `{"error": "actor_mismatch"}` |
+| Identity header present but not a UUID, or two aliases carry different values | `400` | `{"error": "invalid_identity_header", "detail": "..."}` |
+| Legacy header pair only, `CONTEXTA_ALLOW_LEGACY_TENANT_HEADERS` not truthy | `401` | `{"error": "authentication_required"}` |
+| No key, no headers | `401` | `{"error": "authentication_required"}` |
+| Unknown or revoked key | `401` | `{"error": "invalid_api_key"}` |
+| Database or OS failure while looking the key up | `503` | `{"error": "authentication_unavailable"}` |
+| Only one of the two identity headers present | `401` | `{"error": "authentication_required"}` |
+
+Accepted org header aliases: `x-organization-id`, `x-org-id`, `X-Mem-Tenant-Id`, `x-mem-tenant-id`.
+Accepted actor header aliases: `x-user-id`, `x-contexta-user-id`, `X-Mem-Actor-Id`, `x-mem-actor-id`.
+
+### The key's actor is the user
+
+The actor bound to your key is the `user_id` for user-scoped work. Sending a different `user_id` in a path or query parameter is a `403`, not an empty result:
+
+```
+POST /v1/retrieve                 -> 403 "user_id does not match authenticated identity."
+GET  /v1/memories/context?...     -> 403 "Authenticated actor does not match request user_id."
+GET  /v1/graph/graph/{user_id}    -> 403 "Forbidden: user_id mismatch."
+```
+
+To serve more than one user, mint one key per (organization, actor) pair. There is no scope mechanism that lets one key impersonate several users.
+
+### Idempotency
+
+Write endpoints accept `Idempotency-Key` (or `X-Idempotency-Key`), and `POST /v1/observations` / `POST /v1/observations/batch` also read an `idempotency_key` field in the body. The value may be at most 255 characters. Replaying a key with a different payload returns `409`.
+
+`POST /v1/kernel/*` accepts the same header via `Idempotency-Key` or `X-Idempotency-Key` and answers `409` on a conflicting replay.
+
+### Rate limiting
+
+Per API key, metered from the key's `tier` column (`hobby`, `solo_pro`, `team`, `scale`, `standard`; `standard` is the default). The response cache is deliberately mounted *outside* the limiter, so a served-from-cache read does not consume your quota.
+
+### Standard response headers
+
+None are guaranteed. Do not build on `X-Contexta-Request-Id`, `X-Contexta-Region`, `X-Contexta-Quota-Used`, or `X-Contexta-RateLimit-*` — they are not emitted.
+
+---
 
 ## Observations
 
-### POST /v1/observations
+### `POST /v1/observations`
 
-Submit a single observation.
+Submit one observation. Returns `202 Accepted` only after the observation, its ordered source turns, and a durable outbox event have been committed, so a crash after the `202` cannot lose the observation.
+
+Request body (`ObservationPayload`):
+
+| Field | Type | Required | Notes |
+| :--- | :--- | :--- | :--- |
+| `user_id` | uuid | yes | Must equal the key's actor. |
+| `organization_id` | uuid | yes | Must equal the key's organization. |
+| `session_id` | uuid | yes | Created explicitly, or reuse one from `POST /v1/sessions`. |
+| `messages` | `list[object]` | yes | `{role, content}` turns. |
+| `occurred_at` | datetime | no | When the thing happened. |
+| `observed_at` | datetime | no | When Contexta saw it. |
+| `event_at`, `event_start`, `event_end` | datetime | no | Explicit event window. |
+| `temporal_precision`, `temporal_basis` | string | no | Aliases `precision` and `basis` are accepted. |
+| `timezone` | string | no | IANA zone. Alias `event_timezone` is accepted. |
+| `source_id`, `message_id`, `source_message_id` | any | no | Provenance. |
+| `source_start`, `source_end`, `source_span` | int / object | no | `span` is accepted as an alias. |
+| `original_text`, `normalized_text` | string | no | Redacted before they reach the LLM. |
+| `metadata` | object | no | Opaque. |
+| `policy` | string | no | Recorded on the observation; there is no policy registry to register into. |
+
+Body limit is `CONTEXTA_MAX_OBSERVATION_SIZE_BYTES` (1 MiB by default).
 
 ```json
 {
+  "user_id": "…",
+  "organization_id": "…",
   "session_id": "33333333-3333-4333-8333-333333333333",
   "messages": [
     {"role": "user", "content": "I prefer Postgres over Mongo"},
     {"role": "assistant", "content": "Noted."}
   ],
-  "metadata": {"agent": "coding-agent"},
-  "policy": "coding-agent"
+  "occurred_at": "2026-09-20T09:00:00Z",
+  "timezone": "Europe/London"
 }
 ```
 
-Response 202:
-```json
-{
-  "job_id": "01J9ZXAB1Q2R3S4T5V6W7X8Y9Z",
-  "status": "accepted",
-  "estimated_processing_seconds": 3
-}
-```
-
-### POST /v1/observations/batch
-
-Submit up to 50 observations.
+Response `202`:
 
 ```json
 {
-  "observations": [{...}, {...}]
+  "job_id": "cf87b96f-3707-432c-8cf7-de594455d3eb",
+  "observation_id": "cf87b96f-3707-432c-8cf7-de594455d3eb",
+  "status": "accepted"
 }
 ```
 
-Response:
+### `POST /v1/observations/batch`
+
+Up to **100** observations (not 50) in one call. Accepts either a bare JSON array or `{"observations": [...]}`.
+
+```json
+{"observations": [ { "…": "…" }, { "…": "…" } ]}
+```
+
 ```json
 {
-  "jobs": [{"job_id": "...", "status": "accepted"}, ...]
+  "jobs": [{"job_id": "…", "observation_id": "…", "status": "accepted"}],
+  "errors": [{"field": "[1].messages", "message": "Field required"}],
+  "status": "accepted"
 }
 ```
+
+Invalid items are reported in `errors` with an index-qualified field path; valid items still ingest.
+
+### `GET /v1/observations/{observation_id}`
+
+Also available as `GET /v1/observations/status/{observation_id}` and `GET /v1/observations/{observation_id}/status` — three aliases for the same handler.
+
+```json
+{
+  "job_id": "…",
+  "observation_id": "…",
+  "status": "completed",
+  "attempt_count": 1,
+  "outbox_status": "published",
+  "last_error": null,
+  "created_at": "2026-09-27T01:23:44.902177",
+  "updated_at": "2026-09-27T01:23:46.453738+00:00",
+  "completed_at": "2026-09-27T01:23:46.453738+00:00"
+}
+```
+
+---
 
 ## Retrieval
 
-### POST /v1/retrieve
+### `POST /v1/retrieve`
 
-Hybrid search.
+The hybrid path: dense + lexical + graph, fused with weighted RRF (`k = 60`), weights `dense 0.5 / lexical 0.3 / graph 0.2`.
+
+Request body (`ScopedRetrievalQuery`):
+
+| Field | Type | Default |
+| :--- | :--- | :--- |
+| `query_text` | string | required |
+| `user_id` | uuid | required, must equal the key's actor |
+| `organization_id` | uuid | required, must equal the key's organization |
+| `memory_types` | `list[MemoryType]` | all |
+| `tags` | `list[string]` | all |
+| `limit` | int `1..100` | `20` |
+| `graph_depth` | int `0..5` | `2` |
+| `include_cold` | bool | `true` |
+| `include_archived` | bool | `false` |
+| `as_of` | datetime | now |
+| `temporal_mode` | `auto` \| `current` \| `as_of` \| `range` | `auto` |
+| `memory_user_id`, `agent_id`, `project_id`, `session_id` | uuid / string | unset |
+
+There is **no `rerank` field**, and there never was on this route. Neural reranking is a constructor dependency of `RetrievalEngine` (`RERANK_POOL_SIZE = 45`) and is wired on the MCP path, not the HTTP path. If you need cross-encoder reranking over HTTP you would have to add it; the API does not offer it today.
 
 ```json
 {
+  "user_id": "…",
+  "organization_id": "…",
   "query_text": "what databases does the user prefer?",
-  "session_id": "...",
-  "memory_types": ["preference", "fact"],
-  "tags": ["database"],
   "limit": 20,
-  "graph_depth": 1,
-  "include_archived": false,
-  "include_cold": false,
-  "rerank": false
+  "graph_depth": 2
 }
 ```
 
 Response:
+
 ```json
 {
+  "status": "success",
+  "query": "what databases does the user prefer?",
   "results": [
     {
-      "memory_id": "...",
-      "memory_type": "preference",
-      "title": "Prefers Postgres",
-      "content": "User prefers Postgres over Mongo.",
-      "score": 0.872,
-      "score_breakdown": {
-        "semantic": 0.91,
-        "graph": 0.0,
-        "importance": 0.75,
-        "recency": 0.86,
-        "keyword": 0.50
+      "memory": {
+        "id": "…", "user_id": "…", "organization_id": "…",
+        "memory_type": "preference", "title": "Prefers Postgres",
+        "content": "User prefers Postgres over Mongo.",
+        "structured_data": { "fact": { "subject": "…", "predicate": "prefers", "object": "Postgres" } },
+        "tags": ["database"], "is_pinned": false, "is_archived": false,
+        "memory_state": "active", "created_at": "2026-09-27T01:23:46"
       },
-      "tags": ["database"],
-      "created_at": "2026-04-12T18:32:11Z"
+      "score": 0.916,
+      "semantic_score": 0.91, "graph_score": 0.0,
+      "importance_score": 0.75, "recency_score": 0.86, "keyword_score": 0.5
     }
-  ],
-  "request_id": "01J...",
-  "elapsed_ms": 47
-}
-```
-
-### GET /v1/context
-
-Token-budgeted context bundle.
-
-```
-GET /v1/context?user_id=...&session_id=...&token_budget=2000&query=...
-```
-
-Response:
-```json
-{
-  "user_profile": {...},
-  "active_projects": [...],
-  "preferences": [...],
-  "goals": [...],
-  "recent_events": [...],
-  "relevant_memories": [...],
-  "token_usage": {"total": 1853, "by_section": {...}},
-  "cache_hit": false,
-  "request_id": "01J..."
-}
-```
-
-## Memories
-
-### GET /v1/memories/{id}
-
-Full memory record.
-
-### GET /v1/memories/{id}/explain
-
-Explainability bundle: extraction source, scoring breakdown, supersession history.
-
-### POST /v1/memories/{id}/pin
-
-Pin a memory. Response:
-```json
-{"memory_id": "...", "is_pinned": true, "audit_event_id": "..."}
-```
-
-Same shape for `unpin`, `archive`, `restore`.
-
-### DELETE /v1/memories/{id}
-
-Hard delete. Returns 204.
-
-### GET /v1/memories/timeline/{user_id}
-
-Chronological memory events.
-
-## Sessions
-
-### POST /v1/sessions
-
-Start a session (optional — auto-created on first observation).
-
-### POST /v1/sessions/{id}/end
-
-End session, triggers epilogue analysis.
-
-### GET /v1/sessions/inspect/{user_id}
-
-List recent sessions.
-
-## Policies
-
-### GET /v1/policies
-
-List policies for tenant.
-
-### POST /v1/policies
-
-Register a custom policy.
-
-```json
-{
-  "name": "support-agent",
-  "store_rules": [
-    {"memory_types": ["preference", "fact", "contact"], "patterns": ["customer.*"]}
-  ],
-  "ignore_rules": [{"patterns": ["^(thanks|hi|hello)$"]}],
-  "priority_weights": {"preference": 0.9}
-}
-```
-
-## Schemas
-
-### POST /v1/schemas
-
-Register a custom memory schema.
-
-```json
-{
-  "name": "InvoiceLineItem",
-  "field_definitions": [
-    {"name": "vendor", "type": "string", "required": true},
-    {"name": "amount", "type": "number", "required": true}
   ]
 }
 ```
 
-## API Keys
+Note the result is nested under `memory`, and the score breakdown is a **flat set of sibling fields**, not a `score_breakdown` object. `GET /v1/memories/hybrid` uses the older flat `memory_id` + nested `score_breakdown` shape instead.
 
-### GET /v1/keys
-### POST /v1/keys
-### POST /v1/keys/{id}/rotate
+### `POST /v1/retrieve/batch`
 
-## Usage & Billing
-
-### GET /v1/usage
+```json
+{"queries": [ { "…": "one ScopedRetrievalQuery" } ]}
+```
 
 ```json
 {
-  "period": {"start": "2026-05-01", "end": "2026-06-01"},
-  "plan": "solo-pro",
-  "limits": {"active_memories": 250000, "observations": 500000, "retrievals": 5000000},
-  "consumed": {"active_memories": 91245, "observations": 213400, "retrievals": 1843200},
-  "cost_estimate_cents": 6900
+  "status": "success",
+  "count": 1,
+  "batch_results": [{"query": "…", "count": 3, "results": [ … ]}]
 }
 ```
 
-### POST /v1/billing/checkout
-Returns Stripe Checkout URL.
+### `POST /v1/retrieve/investigate`
 
-### POST /v1/billing/portal
-Returns Stripe Customer Portal URL.
+Iterative multi-hop agentic investigation. Own body shape: `query_text` required; `user_id`, `memory_user_id`, `organization_id`, `agent_id`, `project_id`, `session_id` optional; `max_hops` `0..5` (default `2`); `limit` `1..100` (default `15`).
+
+Returns `investigation_trace`, `entities_discovered`, `temporal_evolution`, `synthesized_context`, `execution_time_ms`, and `results` where each entry carries `is_current` (`valid_to is None`).
+
+---
+
+## Context assembly
+
+### `GET /v1/memories/context`
+
+The real path. There is no `GET /v1/context`.
+
+`user_id`, `organization_id`, and `session_id` are all required query parameters. `organization_id` must match the key's organization (`403` otherwise) and `user_id` must match the key's actor (`403` otherwise).
+
+| Parameter | Default |
+| :--- | :--- |
+| `token_budget` | unset (no cap) |
+| `include_user_model` | `true` |
+| `num_recent_messages` | `10` |
+| `num_relevant_memories` | `20` |
+| `graph_depth` | `2` (`0..5`) |
+
+```json
+{
+  "user_profile": {},
+  "rules": [],
+  "active_projects": [],
+  "preferences": [],
+  "goals": [],
+  "recent_events": [],
+  "relevant_memories": [],
+  "token_usage": {"total": 0, "by_section": {}},
+  "cache_hit": false,
+  "request_id": "…"
+}
+```
+
+`cache_hit` is currently always `false` and `request_id` falls back to the literal `"01J"` when no `x-request-id` header was sent. Do not treat either as meaningful.
+
+---
+
+## Memories
+
+All under `/v1/memories`. Every one of them is organization-scoped; none of them will return another tenant's row.
+
+### `GET /v1/memories`
+
+Filters: `user_id`, `memory_type`, `state`, `pinned`, `archived`, `offset` (default `0`), `limit` (default `50`).
+
+```json
+[{
+  "id": "…", "title": "Prefers Postgres", "memory_type": "preference",
+  "memory_state": "active", "importance": 0.52, "confidence": 1.0,
+  "tags": [], "is_pinned": false, "is_archived": false,
+  "created_at": "…", "updated_at": "…"
+}]
+```
+
+Offset/limit, not cursor pagination. There is no `next_cursor` and no `cursor` parameter.
+
+### `GET /v1/memories/{memory_id}`
+
+```json
+{
+  "id": "…", "user_id": "…", "organization_id": "…",
+  "memory_type": "fact", "title": "…", "content": "…",
+  "structured_data": {}, "source_type": "user_explicit",
+  "confidence": 1.0, "importance": 0.5167, "utility_score": 0.0,
+  "tags": [], "session_id": "…", "memory_state": "active",
+  "is_pinned": false, "is_archived": false,
+  "valid_from": "…", "valid_to": null,
+  "fact_key": "sfx1:…",
+  "created_at": "…", "updated_at": "…", "last_accessed_at": null
+}
+```
+
+`fact_key` being a `sfx1:<sha256>` slot key means the row occupies a structural fact slot; a bare 64-hex value is the legacy text-hash key.
+
+### `GET /v1/memories/{memory_id}/explain`
+
+```json
+{
+  "memory_id": "…",
+  "source": {"source_type": "user_explicit", "session_id": "…"},
+  "classification": {"memory_type": "fact", "tags": []},
+  "scoring": {"confidence": 1.0, "importance": 0.5167, "utility_score": 0.0},
+  "supersession_history": [
+    {"id": "…", "content": "…", "importance": 0.4,
+     "valid_from": "…", "valid_to": "…", "superseded_by_id": "…"}
+  ]
+}
+```
+
+### `GET /v1/memories/search`
+
+Pure vector. `query` required; `user_id`, `limit` (default `20`), `threshold` (default `0.65`), `memory_type` optional.
+
+```json
+{"mode": "vector", "query": "…", "count": 1,
+ "results": [{"id": "…", "title": "…", "content": "…",
+              "similarity": 0.94, "memory_type": "fact", "tags": [],
+              "created_at": "…"}]}
+```
+
+`503` when the embedding service is unavailable; `400` when the configured profile cannot serve the query.
+
+### `GET /v1/memories/hybrid`
+
+`query` required; `user_id`, `limit` (default `20`), `max_hops` (default `2`, capped at 3), `vector_weight` (default `0.40`), `graph_weight` (default `0.25`), `include_cold` (default `false`).
+
+```json
+{"mode": "hybrid", "query": "…", "count": 1,
+ "results": [{"memory_id": "…", "title": "…", "content": "…", "score": 0.87,
+              "score_breakdown": {"semantic": 0.91, "graph": 0.0, "importance": 0.75,
+                                  "recency": 0.86, "keyword": 0.5},
+              "tags": [], "created_at": "…"}]}
+```
+
+The `vector_weight` / `graph_weight` parameters are accepted but the engine's own channel weights are what the score actually uses; treat them as inert.
+
+### `GET /v1/memories/timeline/{user_id}`
+
+Up to 50 events, newest first. `event_type` is `created`, `archived`, or `superseded` (the last when `valid_to` is set).
+
+```json
+{"user_id": "…", "events": [{"id": "…", "event_type": "created",
+  "timestamp": "…", "memory": {"title": "…", "content": "…", "memory_type": "fact",
+  "is_pinned": false, "is_archived": false, "memory_state": "active"}}]}
+```
+
+### `POST /v1/memories/batch-get`
+
+```json
+{"memory_ids": ["…", "…"]}
+```
+
+```json
+{"count": 2, "memories": [{"id": "…", "user_id": "…", "memory_type": "fact",
+  "title": "…", "content": "…", "importance": 0.5, "confidence": 1.0,
+  "utility_score": 0.0, "tags": [], "memory_state": "active",
+  "is_pinned": false, "created_at": "…"}]}
+```
+
+### Lifecycle
+
+| Method | Path | Success body |
+| :--- | :--- | :--- |
+| `POST` | `/v1/memories/{id}/pin` | `{"memory_id": "…", "is_pinned": true}` |
+| `POST` | `/v1/memories/{id}/unpin` | `{"memory_id": "…", "is_pinned": false}` |
+| `POST` | `/v1/memories/{id}/archive` | `{"memory_id": "…", "is_archived": true}` |
+| `POST` | `/v1/memories/{id}/restore` | `{"memory_id": "…", "is_archived": false}` |
+| `DELETE` | `/v1/memories/{id}` | `{"memory_id": "…", "deleted": true}` |
+
+Each returns `404` when the id is not in your organization. None of them return an `audit_event_id`; audit rows are written internally and are only visible through `GET /v1/audit`.
+
+### `POST /v1/memories/{id}/feedback`
+
+```json
+{"signal": "negative", "user_correction": "…", "penalty": 0.5}
+```
+
+```json
+{"status": "success", "memory_id": "…", "utility_score": 0.0,
+ "confidence": 0.9, "memory_state": "active"}
+```
+
+This mutates `memory_record.utility_score` / `confidence` in place. It does **not** write to the `retrieval_feedback` table — that table was dropped in revision `020`.
+
+### `POST /v1/memories/reflect`
+
+```json
+{"user_id": "…", "apply_supersession": true, "min_occurrences_for_pattern": 3}
+```
+
+```json
+{"status": "success", "user_id": "…",
+ "contradictions_detected": 0, "contradictions_resolved": 0,
+ "patterns_consolidated": 0, "consolidated_patterns": []}
+```
+
+---
+
+## Sessions
+
+| Method | Path | Notes |
+| :--- | :--- | :--- |
+| `POST` | `/v1/sessions` | Body `{user_id, organization_id, metadata?}`. `organization_id` must match the key or `403`. |
+| `GET` | `/v1/sessions/{session_id}` | Counts memories and reports the earliest memory timestamp. |
+| `POST` | `/v1/sessions/{session_id}/end` | Sets `ended_at`; always reports `epilogue_worker: "queued"`. |
+| `GET` | `/v1/sessions/inspect/{user_id}` | Every session for a user with its memories inline. |
+
+---
+
+## Entity graph
+
+Three prefixes are mounted for the same router: `/v1/graph`, `/v1/entities`, and `/graph` (unversioned). Pick one and stay on it.
+
+| Method | Path |
+| :--- | :--- |
+| `GET` | `/v1/graph/traverse` (also `/v1/graph/graph/traverse`, `/v1/entities/traverse`, `/v1/entities/graph/traverse`) |
+| `GET` | `/v1/graph/graph/{user_id}` (also `/v1/entities/graph/{user_id}`, `/graph/graph/{user_id}`) |
+| `GET` | `/v1/graph/graph/{user_id}/entity/{entity_id}/memories` (also the `/v1/entities` and `/graph` equivalents) |
+
+### `GET /v1/graph/traverse`
+
+Multi-hop walk from a root entity, named by `source` (a UUID or a name) plus `hops` (default `2`, hard-capped at 3), optional `relationship_types` (comma-separated), and `direction`.
+
+A root that does not exist is **not** an error. You get `200` with a diagnostic body:
+
+```json
+{"mode": "graph", "source": "London", "error": "Root entity not found",
+ "hops": 2, "nodes": [], "edges": [], "linked_memories": []}
+```
+
+A successful walk:
+
+```json
+{
+  "mode": "graph",
+  "root_entity": {"id": "…", "name": "…", "entity_type": "…"},
+  "hops": 2,
+  "nodes": [{"id": "…", "name": "…", "entity_type": "…", "summary": null}],
+  "edges": [{"source": "…", "target": "…", "relationship_type": "related_to"}],
+  "linked_memories": [{"id": "…", "title": "…", "content": "…",
+                       "memory_type": "…", "created_at": "…"}]
+}
+```
+
+Every query in this handler is scoped by **both** organization and actor. An entity name shared with another tenant resolves only to your own copy, and an entity that exists only in another tenant is simply not found.
+
+### `GET /v1/graph/graph/{user_id}`
+
+```json
+{"nodes": [{"id": "…", "name": "…", "entity_type": "…",
+            "summary": null, "memory_count": 2}],
+ "edges": [{"source": "…", "target": "…", "relationship_type": "related_to"}]}
+```
+
+`max_depth` defaults to `2`.
+
+### Deliberate status-code changes in v1.5
+
+Two graph behaviours changed, and both are intentional:
+
+| Situation | Before | Now |
+| :--- | :--- | :--- |
+| Path `user_id` is not the authenticated actor | `200` (silently read the other user's graph) | **`403`** |
+| Entity belongs to another user | `200` with an empty or foreign body | **`404`** |
+
+The `403` is `{"detail": "Forbidden: user_id mismatch."}`. The `404` is `{"detail": "Entity not found"}`.
+
+Rationale: a path parameter is caller-supplied, and `Entity` and `MemoryRecord` are user-scoped, so accepting one as the scope let any key in an organization read any other user's graph. Regression coverage is `tests/test_graph_traverse_is_tenant_scoped.py`.
+
+---
+
+## API keys
+
+| Method | Path | Notes |
+| :--- | :--- | :--- |
+| `GET` | `/v1/keys` | Optional `organization_id` query param. Returns metadata only, never the token. |
+| `POST` | `/v1/keys` | Body `{name, organization_id, actor_id, scopes}`. `201` with the one-time `token`. |
+| `DELETE` | `/v1/keys/{key_id}` | `204`, or `404`. |
+
+```json
+[{"id": "…", "name": "first-key", "prefix": "mk_live_2ca330b9",
+  "organization_id": "…", "scopes": ["read", "write"],
+  "created_at": "…", "last_used_at": null}]
+```
+
+**There is no `POST /v1/keys/{id}/rotate`.** Rotation is create-then-revoke: `POST /v1/keys` to mint the replacement, then `DELETE /v1/keys/{old_id}`. The Python CLI still exposes a `keys rotate` subcommand that calls the removed endpoint and will `404`.
+
+`POST /v1/keys` is itself authenticated, so the *first* key on a fresh database has to be inserted directly. See the quickstart for the SQL that matches `ApiKeyRepository.create_key`.
+
+---
 
 ## Audit
 
-### GET /v1/audit?start=...&end=...&actor_id=...
+### `GET /v1/audit`
 
-Paginated audit log.
+Also mounted at `GET /audit/v1/audit` (an artifact of the router being included twice — prefer `/v1/audit`).
+
+**The only parameters this route implements are `limit` and `offset`.**
+
+| Parameter | Default | Range |
+| :--- | ---: | :--- |
+| `limit` | 20 | 1–100 |
+| `offset` | 0 | ≥ 0 |
+| `organization_id` | from the key | uuid |
+| `x-organization-id` / `x-org-id` | — | header fallback when the key did not resolve one |
+
+```json
+[{"id": "…", "organization_id": "…", "actor_id": "…",
+  "operation_type": "…", "target_id": "…", "details": {},
+  "created_at": "…"}]
+```
+
+> **Known documentation gap.** `start`, `end`, and `actor_id` filters are *not* implemented and are not documented below, because passing them has no effect — the route does not read them. Filter client-side, or add the filters to `contexta/api/routes/audit.py`. The response is ordered by insertion and there is no time-range index behind it yet.
+
+---
+
+## Artifacts
+
+| Method | Path | Notes |
+| :--- | :--- | :--- |
+| `POST` | `/v1/artifacts` | `201` with metadata. Storage backend is `local` by default (`CONTEXTA_ARTIFACT_STORAGE_BACKEND`, `CONTEXTA_ARTIFACT_STORAGE_PATH`). |
+| `GET` | `/v1/artifacts` | Optional `organization_id`. |
+| `GET` | `/v1/artifacts/{artifact_id}` | Metadata only. |
+
+---
+
+## Memory kernel read models
+
+Read-only projections under `/v1/memory-kernel`, all organization-scoped:
+
+```
+GET /v1/memory-kernel/facts
+GET /v1/memory-kernel/facts/{fact_id}
+GET /v1/memory-kernel/evidence
+GET /v1/memory-kernel/evidence/{evidence_id}
+GET /v1/memory-kernel/proposals
+GET /v1/memory-kernel/proposals/review-queue
+GET /v1/memory-kernel/proposals/{proposal_id}
+GET /v1/memory-kernel/consolidated-observations
+GET /v1/memory-kernel/consolidated-observations/{observation_id}
+GET /v1/memory-kernel/blocks
+GET /v1/memory-kernel/blocks/{block_id}
+```
+
+---
+
+## Kernel runtime
+
+An operation-oriented contract under `/v1/kernel`, where long work returns an operation id you poll:
+
+| Method | Path |
+| :--- | :--- |
+| `POST` | `/v1/kernel/observe` |
+| `POST` | `/v1/kernel/recall` |
+| `POST` | `/v1/kernel/build-context` |
+| `POST` | `/v1/kernel/explain` |
+| `POST` | `/v1/kernel/correct` |
+| `POST` | `/v1/kernel/propose-block-update` |
+| `POST` | `/v1/kernel/search-graph` |
+| `GET` | `/v1/kernel/operations/{operation_id}` |
+
+Operation status maps to HTTP as: accepted / queued / proposed → `202`; running / completed → `200`; not found → `404`; conflict / cancelled → `409`; failed → `500`. The request/response bodies live in `contexta/contracts/` and are the authoritative definition.
+
+---
+
+## System
+
+| Method | Path | Notes |
+| :--- | :--- | :--- |
+| `GET` | `/v1/system/engine-status` | Engine mode, model-server health, loaded models, queue depths, limits. |
+| `POST` | `/v1/system/engine-mode` | Switches the persisted engine mode. |
+| `POST` | `/v1/system/validate-providers` | Checks whether online providers are fully configured. |
+
+Also mounted unversioned as `/system/engine-status` etc. A healthy offline install reports `current_mode: "offline"`, `active_engine: "local_qwen"`, and `local_model_server.status: "healthy"` with both Qwen3 models loaded.
+
+---
 
 ## Errors
 
+Authentication errors come from the middleware as `{"error": "...", "detail": "..."}`. Everything else is FastAPI-shaped `{"detail": "..."}`, and validation failures from the observation routes are `{"detail": "...", "errors": [{"field": "...", "message": "..."}]}`.
+
 ```json
 {
-  "error": {
-    "type": "validation_error",
-    "code": "MISSING_FIELD",
-    "message": "Field 'session_id' is required.",
-    "fields": [{"field": "session_id", "message": "Field 'session_id' is required."}],
-    "request_id": "01J9ZXAB1Q2R3S4T5V6W7X8Y9Z"
-  }
+  "detail": "Validation failed: missing required fields.",
+  "errors": [{"field": "messages", "message": "Field required"}]
 }
 ```
 
-| Error Type | HTTP | Cause |
-|-----------|------|-------|
-| `validation_error` | 422 | Bad payload |
-| `authentication_error` | 401 | Missing/invalid bearer |
-| `authorization_error` | 403 | Missing scope |
-| `not_found` | 404 | Resource not found |
-| `quota_exceeded` | 429 | Plan limit hit |
-| `rate_limited` | 429 | RPS limit |
-| `conflict` | 409 | Idempotency collision |
-| `internal_error` | 500 | Unhandled error |
-| `service_unavailable` | 503 | Infrastructure issue |
+| Status | Where it comes from |
+| ---: | :--- |
+| `400` | `invalid_identity_header`, unusable tenant header, vector search against an incompatible embedding profile |
+| `401` | `authentication_required`, `invalid_api_key`, `invalid_authenticated_context`, unauthenticated graph read |
+| `403` | `organization_mismatch`, `actor_mismatch`, `identity_mismatch`, tenant `user_id` mismatch |
+| `404` | Unknown or other-tenant resource |
+| `409` | Idempotency-key replay with a different payload |
+| `422` | Pydantic request validation |
+| `429` | Per-key rate limit |
+| `500` | Unhandled error |
+| `503` | `authentication_unavailable`, observation storage unavailable, embedding service unavailable |
 
-## Pagination
+There is no `quota_exceeded` error, no plan limit, and no `error.type` / `error.code` envelope.
 
-Cursor-based pagination on list endpoints:
+---
 
-```
-GET /v1/memories?cursor=eyJpZCI6IjAxSjlaIn0&limit=50
-```
+## Endpoints that do not exist
 
-Response includes `"next_cursor": "..."` or `null`.
+These were documented at some point and are not in the current schema. If you are following an older integration, this is your migration list.
+
+| Removed | Replacement |
+| :--- | :--- |
+| `GET /v1/context` | `GET /v1/memories/context` |
+| `GET /v1/policies`, `POST /v1/policies` | none — no policy registry; `policy` on an observation is recorded as an opaque string |
+| `POST /v1/schemas` | none — custom schema registration was removed |
+| `POST /v1/keys/{id}/rotate` | `POST /v1/keys` then `DELETE /v1/keys/{id}` |
+| `GET /v1/usage` | none — there is no metering |
+| `POST /v1/billing/checkout`, `POST /v1/billing/portal` | none — billing is excised from Core |
+| `GET /api/v1/feedback` | `POST /v1/memories/{id}/feedback` |
+| `GET /v1/projects` | none |
+| `GET /v1/webhooks/dodo` | none |
+| `next_cursor` / `cursor` pagination | `offset` + `limit` |
+| `X-Contexta-Quota-Used` and friends | nothing |
+
+---
 
 ## Versioning
 
-- `/v1/` is locked. Breaking changes create `/v2/`.
-- Non-breaking additions ship within `/v1/`.
-- `/v1/` maintained 12 months after `/v2/` release.
+`/v1/` is the only version. The single exception is the graph router, which is additionally mounted unversioned at `/graph` for backwards compatibility; treat `/v1/graph` as canonical.
+
+`pyproject.toml` still declares `version = "0.1.0"` and `GET /healthz` reports `"0.1.0"`, while the release is documented as v1.5. That is a known packaging mismatch, not a versioning scheme.

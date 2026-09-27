@@ -5,8 +5,10 @@
 #   (combine with docker-compose.online.yml for cloud models)
 #
 # What changes vs default:
-# - SDKs must go through the Go gateway (:8443) which enforces Redis-backed
-#   API-key verification (key_id/tenant_id/scopes) + rate limits per tier.
+# - SDKs must go through the Go gateway (:8443), which is a stateless edge that
+#   enforces Redis-backed API-key verification (key_id/tenant_id/scopes) + rate
+#   limits per tier, then reverse proxies to the Python API. The Go layer holds
+#   no storage and no staging tables.
 # - Python API binds tenant scoping on every query (organization_id); direct
 #   :8000 access should be firewalled off in production.
 # - Celery eager mode is forced off so all extraction runs in workers with

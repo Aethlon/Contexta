@@ -2,33 +2,66 @@ import { HttpClient, configFromEnv } from "./http.js";
 import { ContextResult } from "./context.js";
 import type {
   contextaConfig,
-  ObserveInput,
-  ObserveResponse,
+  AddRuleInput,
+  BatchRetrievalEntry,
   BatchObserveResponse,
-  RetrieveInput,
-  RetrieveResponse,
   ContextInput,
   Context,
+  CreateSessionInput,
+  DeleteResult,
+  EndSessionResult,
   Explanation,
-  TimelineResponse,
+  FeedbackInput,
+  FeedbackResult,
+  HybridSearchInput,
+  HybridSearchResponse,
+  InvestigateInput,
+  InvestigateResult,
+  ListMemoriesInput,
   Memory,
+  MemoryBatchEntry,
+  MemoryBatchResponse,
+  MemoryFlag,
   MemoryListEntry,
+  ObserveInput,
+  ObserveResponse,
   Policy,
   PolicyInput,
+  ReflectInput,
+  ReflectResult,
+  RetrieveInput,
+  RetrieveResponse,
   Schema,
   SchemaInput,
+  SearchInput,
   Session,
+  TimelineResponse,
+  TraverseInput,
+  TraverseResult,
+  VectorSearchResponse,
 } from "./types.js";
 
-export class Asynccontexta {
+const DEPRECATION_WARNINGS = new Set<string>();
+
+function warnDeprecated(oldName: string, newName: string): void {
+  if (DEPRECATION_WARNINGS.has(oldName)) return;
+  DEPRECATION_WARNINGS.add(oldName);
+  console.warn(
+    `[contexta] ${oldName} is deprecated and will be removed in a future major release; use ${newName} instead.`
+  );
+}
+
+export class AsyncContexta {
   protected http: HttpClient;
+  readonly organizationId?: string;
 
   constructor(config: contextaConfig) {
     this.http = new HttpClient(config);
+    this.organizationId = config.organizationId;
   }
 
-  static fromEnv(): Asynccontexta {
-    return new Asynccontexta(configFromEnv());
+  static fromEnv(): AsyncContexta {
+    return new AsyncContexta(configFromEnv());
   }
 
   async observe(input: ObserveInput): Promise<ObserveResponse> {
@@ -39,6 +72,11 @@ export class Asynccontexta {
       messages: input.messages,
       ...(input.metadata !== undefined && { metadata: input.metadata }),
       ...(input.policy !== undefined && { policy: input.policy }),
+      ...(input.occurredAt !== undefined && { occurred_at: input.occurredAt }),
+      ...(input.observedAt !== undefined && { observed_at: input.observedAt }),
+      ...(input.sourceId !== undefined && { source_id: input.sourceId }),
+      ...(input.messageId !== undefined && { message_id: input.messageId }),
+      ...(input.timezone !== undefined && { timezone: input.timezone }),
     });
   }
 
@@ -50,6 +88,11 @@ export class Asynccontexta {
       messages: i.messages,
       ...(i.metadata !== undefined && { metadata: i.metadata }),
       ...(i.policy !== undefined && { policy: i.policy }),
+      ...(i.occurredAt !== undefined && { occurred_at: i.occurredAt }),
+      ...(i.observedAt !== undefined && { observed_at: i.observedAt }),
+      ...(i.sourceId !== undefined && { source_id: i.sourceId }),
+      ...(i.messageId !== undefined && { message_id: i.messageId }),
+      ...(i.timezone !== undefined && { timezone: i.timezone }),
     }));
     return this.http.request<BatchObserveResponse>("POST", "/observations/batch", body);
   }
@@ -68,13 +111,28 @@ export class Asynccontexta {
     });
   }
 
-  async search(input: {
-    query: string;
-    userId?: string;
-    limit?: number;
-    threshold?: number;
-    memoryType?: string;
-  }): Promise<{ mode: string; query: string; count: number; results: any[] }> {
+  async retrieveBatch(queries: RetrieveInput[]): Promise<BatchRetrievalEntry[]> {
+    const res = await this.http.request<{ count: number; batchResults: BatchRetrievalEntry[] }>(
+      "POST",
+      "/retrieve/batch",
+      {
+        queries: queries.map((q) => ({
+          user_id: q.userId,
+          organization_id: q.organizationId,
+          query_text: q.queryText,
+          ...(q.memoryTypes !== undefined && { memory_types: q.memoryTypes }),
+          ...(q.tags !== undefined && { tags: q.tags }),
+          ...(q.limit !== undefined && { limit: q.limit }),
+          ...(q.graphDepth !== undefined && { graph_depth: q.graphDepth }),
+          ...(q.includeCold !== undefined && { include_cold: q.includeCold }),
+          ...(q.includeArchived !== undefined && { include_archived: q.includeArchived }),
+        })),
+      }
+    );
+    return res.batchResults ?? [];
+  }
+
+  async search(input: SearchInput): Promise<VectorSearchResponse> {
     const params = new URLSearchParams({ query: input.query });
     if (input.userId) params.set("user_id", input.userId);
     if (input.limit !== undefined) params.set("limit", String(input.limit));
@@ -87,12 +145,7 @@ export class Asynccontexta {
     });
   }
 
-  async traverse(input: {
-    source: string;
-    hops?: number;
-    relationshipTypes?: string[];
-    direction?: "both" | "outgoing" | "incoming";
-  }): Promise<{ mode: string; root_entity: any; hops: number; nodes: any[]; edges: any[]; linked_memories: any[] }> {
+  async traverse(input: TraverseInput): Promise<TraverseResult> {
     const params = new URLSearchParams({ source: input.source });
     if (input.hops !== undefined) params.set("hops", String(input.hops));
     if (input.relationshipTypes && input.relationshipTypes.length > 0) {
@@ -105,15 +158,7 @@ export class Asynccontexta {
     });
   }
 
-  async hybrid(input: {
-    query: string;
-    userId?: string;
-    limit?: number;
-    maxHops?: number;
-    vectorWeight?: number;
-    graphWeight?: number;
-    includeCold?: boolean;
-  }): Promise<{ mode: string; query: string; count: number; results: any[] }> {
+  async hybrid(input: HybridSearchInput): Promise<HybridSearchResponse> {
     const params = new URLSearchParams({ query: input.query });
     if (input.userId) params.set("user_id", input.userId);
     if (input.limit !== undefined) params.set("limit", String(input.limit));
@@ -141,6 +186,7 @@ export class Asynccontexta {
 
     const data = await this.http.request<Context>("GET", `/memories/context?${params.toString()}`, undefined, {
       idempotent: true,
+      headers: { "X-contexta-User-Id": input.userId },
     });
     return new ContextResult(data);
   }
@@ -151,24 +197,24 @@ export class Asynccontexta {
     });
   }
 
-  async pin(memoryId: string): Promise<{ memoryId: string; isPinned: boolean }> {
-    return this.http.request<{ memoryId: string; isPinned: boolean }>("POST", `/memories/${memoryId}/pin`);
+  async pin(memoryId: string): Promise<MemoryFlag> {
+    return this.http.request<MemoryFlag>("POST", `/memories/${memoryId}/pin`);
   }
 
-  async unpin(memoryId: string): Promise<{ memoryId: string; isPinned: boolean }> {
-    return this.http.request<{ memoryId: string; isPinned: boolean }>("POST", `/memories/${memoryId}/unpin`);
+  async unpin(memoryId: string): Promise<MemoryFlag> {
+    return this.http.request<MemoryFlag>("POST", `/memories/${memoryId}/unpin`);
   }
 
-  async archive(memoryId: string): Promise<{ memoryId: string; isArchived: boolean }> {
-    return this.http.request<{ memoryId: string; isArchived: boolean }>("POST", `/memories/${memoryId}/archive`);
+  async archive(memoryId: string): Promise<MemoryFlag> {
+    return this.http.request<MemoryFlag>("POST", `/memories/${memoryId}/archive`);
   }
 
-  async restore(memoryId: string): Promise<{ memoryId: string; isArchived: boolean }> {
-    return this.http.request<{ memoryId: string; isArchived: boolean }>("POST", `/memories/${memoryId}/restore`);
+  async restore(memoryId: string): Promise<MemoryFlag> {
+    return this.http.request<MemoryFlag>("POST", `/memories/${memoryId}/restore`);
   }
 
-  async delete(memoryId: string): Promise<{ memoryId: string; deleted: boolean }> {
-    return this.http.request<{ memoryId: string; deleted: boolean }>("DELETE", `/memories/${memoryId}`);
+  async delete(memoryId: string): Promise<DeleteResult> {
+    return this.http.request<DeleteResult>("DELETE", `/memories/${memoryId}`);
   }
 
   async timeline(userId: string): Promise<TimelineResponse> {
@@ -183,15 +229,7 @@ export class Asynccontexta {
     });
   }
 
-  async listMemories(options?: {
-    userId?: string;
-    memoryType?: string;
-    state?: string;
-    pinned?: boolean;
-    archived?: boolean;
-    offset?: number;
-    limit?: number;
-  }): Promise<MemoryListEntry[]> {
+  async listMemories(options?: ListMemoriesInput): Promise<MemoryListEntry[]> {
     const params = new URLSearchParams();
     if (options?.userId !== undefined) params.set("user_id", options.userId);
     if (options?.memoryType !== undefined) params.set("memory_type", options.memoryType);
@@ -203,6 +241,7 @@ export class Asynccontexta {
 
     return this.http.request<MemoryListEntry[]>("GET", `/memories?${params.toString()}`, undefined, {
       idempotent: true,
+      headers: options?.userId ? { "X-contexta-User-Id": options.userId } : undefined,
     });
   }
 
@@ -221,23 +260,16 @@ export class Asynccontexta {
   async ping(): Promise<{ status: string; version: string }> {
     return this.http.request<{ status: string; version: string }>("GET", "/healthz", undefined, {
       idempotent: true,
+      absolute: true,
     });
   }
 
-  async createSession(input: {
-    userId: string;
-    organizationId: string;
-    metadata?: Record<string, unknown>;
-  }): Promise<Session> {
+  async createSession(input: CreateSessionInput): Promise<Session> {
     return this.http.request<Session>("POST", "/sessions", {
       user_id: input.userId,
       organization_id: input.organizationId,
       metadata: input.metadata,
     });
-  }
-
-  async endSession(sessionId: string): Promise<{ sessionId: string; endedAt: string }> {
-    return this.http.request<{ sessionId: string; endedAt: string }>("POST", `/sessions/${sessionId}/end`);
   }
 
   async getSession(sessionId: string): Promise<Session> {
@@ -246,8 +278,12 @@ export class Asynccontexta {
     });
   }
 
-  async getMany(memoryIds: string[]): Promise<any[]> {
-    const res = await this.http.request<{ count: number; memories: any[] }>(
+  async endSession(sessionId: string): Promise<EndSessionResult> {
+    return this.http.request<EndSessionResult>("POST", `/sessions/${sessionId}/end`);
+  }
+
+  async getMany(memoryIds: string[]): Promise<MemoryBatchEntry[]> {
+    const res = await this.http.request<MemoryBatchResponse>(
       "POST",
       "/memories/batch-get",
       { memory_ids: memoryIds }
@@ -255,32 +291,15 @@ export class Asynccontexta {
     return res.memories ?? [];
   }
 
-  async retrieveBatch(queries: any[]): Promise<any[]> {
-    const res = await this.http.request<{ count: number; batch_results: any[] }>(
-      "POST",
-      "/retrieve/batch",
-      { queries }
-    );
-    return res.batch_results ?? [];
-  }
-
-  async feedback(
-    memoryId: string,
-    options: { signal: "positive" | "negative"; userCorrection?: string; penalty?: number }
-  ): Promise<any> {
-    return this.http.request("POST", `/memories/${memoryId}/feedback`, {
+  async feedback(memoryId: string, options: FeedbackInput): Promise<FeedbackResult> {
+    return this.http.request<FeedbackResult>("POST", `/memories/${memoryId}/feedback`, {
       signal: options.signal,
-      user_correction: options.userCorrection,
+      ...(options.userCorrection !== undefined && { user_correction: options.userCorrection }),
       penalty: options.penalty ?? 0.5,
     });
   }
 
-  async addRule(options: {
-    userId: string;
-    rule: string;
-    title?: string;
-    tags?: string[];
-  }): Promise<any> {
+  async addRule(options: AddRuleInput): Promise<ObserveResponse> {
     const tags = [...(options.tags ?? []), "rule", "procedural"];
     return this.observe({
       userId: options.userId,
@@ -292,43 +311,75 @@ export class Asynccontexta {
     });
   }
 
-  async investigate(options: {
-    queryText: string;
-    userId: string;
-    organizationId?: string;
-    maxHops?: number;
-    limit?: number;
-  }): Promise<any> {
-    return this.http.request("POST", "/retrieve/investigate", {
+  async investigate(options: InvestigateInput): Promise<InvestigateResult> {
+    return this.http.request<InvestigateResult>("POST", "/retrieve/investigate", {
       query_text: options.queryText,
       user_id: options.userId,
-      organization_id: options.organizationId,
+      ...(options.organizationId !== undefined && { organization_id: options.organizationId }),
       max_hops: options.maxHops ?? 2,
       limit: options.limit ?? 15,
     });
   }
 
-  async reflect(options: {
-    userId: string;
-    applySupersession?: boolean;
-    minOccurrencesForPattern?: number;
-  }): Promise<any> {
-    return this.http.request("POST", "/memories/reflect", {
+  async reflect(options: ReflectInput): Promise<ReflectResult> {
+    return this.http.request<ReflectResult>("POST", "/memories/reflect", {
       user_id: options.userId,
       apply_supersession: options.applySupersession ?? true,
       min_occurrences_for_pattern: options.minOccurrencesForPattern ?? 3,
     });
   }
+
+  /** Force the durable offline buffer to drain. Resolves to entries replayed. */
+  async flush(): Promise<number> {
+    return this.http.flush();
+  }
+
+  /** Release transport resources. Safe to call more than once. */
+  close(): void {
+    this.http.close();
+  }
 }
 
+export class Contexta extends AsyncContexta {}
 
-
-export class contexta extends Asynccontexta {
+/** @deprecated Use {@link Contexta}. */
+export class contexta extends Contexta {
   constructor(config: contextaConfig) {
     super(config);
+    warnDeprecated("contexta", "Contexta");
   }
 
   static fromEnv(): contexta {
+    warnDeprecated("contexta", "Contexta");
     return new contexta(configFromEnv());
+  }
+}
+
+/** @deprecated Use {@link AsyncContexta}. */
+export class Asynccontexta extends AsyncContexta {
+  constructor(config: contextaConfig) {
+    super(config);
+    warnDeprecated("Asynccontexta", "AsyncContexta");
+  }
+
+  static fromEnv(): Asynccontexta {
+    warnDeprecated("Asynccontexta", "AsyncContexta");
+    return new Asynccontexta(configFromEnv());
+  }
+}
+
+/**
+ * Run `fn` with a client and always close it afterwards. The JavaScript equivalent
+ * of Python's `with Contexta(...) as memory:` block.
+ */
+export async function withContexta<T>(
+  config: contextaConfig,
+  fn: (client: Contexta) => Promise<T>
+): Promise<T> {
+  const client = new Contexta(config);
+  try {
+    return await fn(client);
+  } finally {
+    client.close();
   }
 }

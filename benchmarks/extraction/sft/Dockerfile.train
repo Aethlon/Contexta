@@ -1,0 +1,17 @@
+FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONUNBUFFERED=1 \
+    HF_HOME=/models/hf
+
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+    "transformers==4.57.2" \
+    "peft==0.17.1" \
+    "accelerate==1.10.1" \
+    "safetensors>=0.4.5" \
+    "huggingface-hub>=0.34.0"
+
+WORKDIR /workspace

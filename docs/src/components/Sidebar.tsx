@@ -14,6 +14,7 @@ const navigation = [
     { href: "/concepts/retrieval", label: "Retrieval" },
   ]},
   { title: "Integration Guides", items: [
+    { href: "/guide/how-to-send-data", label: "Sending Data & Ingestion" },
     { href: "/guide/openai", label: "OpenAI Assistants" },
     { href: "/guide/llamaindex", label: "LlamaIndex" },
     { href: "/guide/anthropic", label: "Anthropic Claude" },
@@ -26,6 +27,7 @@ const navigation = [
     { href: "/reference/sdk-python", label: "Python SDK" },
     { href: "/reference/sdk-typescript", label: "TypeScript SDK" },
     { href: "/reference/cli", label: "CLI" },
+    { href: "/reference/upgrade-v1.5", label: "Upgrading to v1.5" },
   ]},
   { title: "Examples", items: [
     { href: "/examples/coding-agent", label: "Coding Agent" },
@@ -33,7 +35,7 @@ const navigation = [
     { href: "/examples/crm-agent", label: "CRM Agent" },
   ]},
   { title: "More", items: [
-    { href: "/pricing", label: "Pricing" },
+    { href: "/licensing", label: "Licensing" },
     { href: "/changelog", label: "Changelog" },
   ]},
 ];

@@ -12,12 +12,17 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from contexta.api.middleware.auth import AuthenticationMiddleware
 from contexta.api.middleware.logging import RequestLoggingMiddleware
+from contexta.api.middleware.ratelimit import RateLimitMiddleware
+from contexta.api.middleware.response_cache import ResponseCacheMiddleware
 from contexta.api.middleware.tenant import TenantMiddleware
 from contexta.api.routes.api_keys import router as api_keys_router
+from contexta.api.routes.artifacts import router as artifacts_router
 from contexta.api.routes.audit import router as audit_router
 from contexta.api.routes.auth import router as auth_router
 from contexta.api.routes.graph import router as graph_router
+from contexta.api.routes.kernel_runtime import router as kernel_runtime_router
 from contexta.api.routes.memories import router as memories_router
+from contexta.api.routes.memory_kernel import router as memory_kernel_router
 from contexta.api.routes.observations import router as observations_router
 from contexta.api.routes.retrieval import router as retrieval_router
 from contexta.api.routes.sessions import router as sessions_router
@@ -55,60 +60,19 @@ async def lifespan(app: FastAPI):
                 "database_offline",
                 msg="Database is not reachable. Operating in standalone mode without active database persistence.",
             )
-        else:
-            # Auto-seed default admin account for local development
-            try:
-                from contexta.db import AsyncSessionFactory
-                from contexta.models.account import Account, Organization, OrganizationMember
-                from contexta.repositories.account_repo import AccountRepository, OrganizationRepository
-                from contexta.services.auth import hash_password
-                import structlog
-
-                log = structlog.get_logger("contexta.auth")
-                async with AsyncSessionFactory() as session:
-                    account_repo = AccountRepository(session)
-                    org_repo = OrganizationRepository(session)
-                    admin_account = await account_repo.find_by_email("User@aethlon.xyz")
-                    if not admin_account:
-                        admin_account = Account(
-                            email="User@aethlon.xyz",
-                            password_hash=hash_password("password1234"),
-                            display_name="User",
-                            status="active",
-                        )
-                        admin_account = await account_repo.create(admin_account)
-                        org = await org_repo.find_by_slug("default-org")
-                        if not org:
-                            org = Organization(
-                                name="Personal Memory Vault",
-                                slug="default-org",
-                                plan_code="sovereign",
-                                status="active",
-                            )
-                            org = await org_repo.create(org)
-                        member = OrganizationMember(
-                            organization_id=org.id,
-                            account_id=admin_account.id,
-                            role="owner",
-                        )
-                        session.add(member)
-                        await session.commit()
-                        log.info("default_user_ready", email="User@aethlon.xyz", password="password1234")
-            except Exception as seed_err:
-                import structlog
-                structlog.get_logger("contexta.auth").warning("admin_seed_skipped", error=str(seed_err))
-
-    # Validate Online mode requirements: both LLM and Embedding credentials must be present
-    if settings.validate_online_providers_at_startup and settings.engine_mode == "online":
-        if not settings.llm_api_key or not settings.embedding_api_key:
-            import structlog
-            log = structlog.get_logger("contexta.engine")
-            log.warning(
-                "online_mode_dual_provider_warning",
-                msg="Online mode requires BOTH LLM and Embedding provider API keys. Automatically falling back unconfigured provider to local model server.",
-                has_llm=bool(settings.llm_api_key),
-                has_embedding=bool(settings.embedding_api_key),
-            )
+    if (
+        settings.validate_online_providers_at_startup
+        and settings.engine_mode == "online"
+        and (not settings.llm_api_key or not settings.embedding_api_key)
+    ):
+        import structlog
+        log = structlog.get_logger("contexta.engine")
+        log.warning(
+            "online_mode_dual_provider_warning",
+            msg="Online mode requires BOTH LLM and Embedding provider API keys. Automatically falling back unconfigured provider to local model server.",
+            has_llm=bool(settings.llm_api_key),
+            has_embedding=bool(settings.embedding_api_key),
+        )
     yield
 
 
@@ -118,14 +82,19 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="contexta Memory Intelligence Engine",
         description="Memory intelligence pipeline for AI agents.",
-        version="0.1.0",
+        version="1.5.0",
         lifespan=lifespan,
     )
 
     # Store settings on app state for route access
     app.state.settings = settings
 
-    # Middleware execution order: Request Logging (outermost) -> CORS/GZip -> Auth -> Tenant
+    # Middleware is executed last-added-first, so the effective request order is:
+    #   Authentication -> Tenant -> ResponseCache -> RateLimit -> GZip -> CORS -> logging
+    # The cache and limiter sit inside auth/tenant because they need the resolved
+    # organization, actor and API key, and outside GZip so a cached entry replays
+    # with its content-encoding intact. The cache is outside the limiter on
+    # purpose: a served-from-cache read should not consume the caller's quota.
     app.add_middleware(RequestLoggingMiddleware)
     app.add_middleware(
         CORSMiddleware,
@@ -135,6 +104,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.add_middleware(GZipMiddleware, minimum_size=1000)
+    app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(ResponseCacheMiddleware)
     app.add_middleware(TenantMiddleware)
     app.add_middleware(AuthenticationMiddleware)
 
@@ -145,7 +116,7 @@ def create_app() -> FastAPI:
     @app.get("/healthz", status_code=status.HTTP_200_OK, tags=["system"])
     async def healthz() -> dict:
         """Lightweight endpoint to verify service is running."""
-        return {"status": "ok", "version": "0.1.0"}
+        return {"status": "ok", "version": "1.5.0"}
 
     @app.get("/readyz", tags=["system"])
     async def readyz() -> JSONResponse:
@@ -167,6 +138,7 @@ def create_app() -> FastAPI:
     app.include_router(system_router, prefix="/v1")
     app.include_router(system_router)
     app.include_router(api_keys_router)
+    app.include_router(artifacts_router, prefix="/v1/artifacts", tags=["artifacts"])
     app.include_router(audit_router)
     app.include_router(audit_router, prefix="/audit", tags=["audit"])
     app.include_router(observations_router, prefix="/v1/observations", tags=["observations"])
@@ -174,6 +146,8 @@ def create_app() -> FastAPI:
     app.include_router(retrieval_router, tags=["retrieval"])
     app.include_router(memories_router, prefix="/v1/memories", tags=["memories"])
     app.include_router(memories_router, prefix="/memories", tags=["memories"])
+    app.include_router(memory_kernel_router, prefix="/v1/memory-kernel", tags=["memory-kernel"])
+    app.include_router(kernel_runtime_router, prefix="/v1/kernel", tags=["kernel-runtime"])
     app.include_router(graph_router, prefix="/v1/entities", tags=["entities"])
     app.include_router(graph_router, prefix="/v1/graph", tags=["graph"])
     app.include_router(graph_router, prefix="/graph", tags=["graph"])

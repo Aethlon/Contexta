@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
@@ -278,7 +278,7 @@ export function HeroScene() {
   };
 
   return (
-    <div className="relative w-full aspect-[16/9] max-w-[1000px] mx-auto rounded-2xl sm:rounded-3xl overflow-hidden bg-[#050507] shadow-elev-3">
+    <div className="relative w-full aspect-[16/9] max-w-[1000px] mx-auto rounded-lg sm:rounded-lg overflow-hidden bg-[#050507] shadow-elev-3">
       <canvas
         ref={canvasRef}
         className="hero-canvas"
@@ -314,21 +314,21 @@ export function HeroSection() {
   return (
     <section className="relative flex flex-col items-center text-center pt-20 pb-10 lg:pt-28 lg:pb-14 space-y-7">
       <motion.div
-        className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-white/[0.03] backdrop-blur-xl text-xs font-mono text-[#6B7280] shadow-elev-1"
+        className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-accent  text-xs font-mono text-[#6B7280] shadow-elev-1"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
       >
         <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
         <span>50,000 AGENT MEMORY SCALE BENCHMARK READY</span>
-        <span className="text-white/20">|</span>
+        <span className="text-foreground/20">|</span>
         <a href="#benchmarks" className="text-blue-400 font-medium hover:underline inline-flex items-center gap-1">
-          View Graph <span aria-hidden="true">→</span>
+          View Graph <span aria-hidden="true">â†’</span>
         </a>
       </motion.div>
 
       <motion.h1
-        className="text-display text-4xl sm:text-6xl lg:text-7xl tracking-tight text-white max-w-5xl leading-[1.06]"
+        className="text-display text-4xl sm:text-6xl lg:text-7xl tracking-tight text-foreground max-w-5xl leading-[1.06]"
         initial={{ opacity: 0, y: 30 }}
         animate={visible ? { opacity: 1, y: 0 } : {}}
         transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
@@ -359,7 +359,7 @@ export function HeroSection() {
       >
         <Link href="/sign-up" className="btn-primary">
           <span>Deploy Free Enclave</span>
-          <span aria-hidden="true">→</span>
+          <span aria-hidden="true">â†’</span>
         </Link>
         <button onClick={copyInstall} className="btn-secondary" aria-label="Copy install command">
           <svg className="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">

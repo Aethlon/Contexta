@@ -1,0 +1,49 @@
+# Concepts
+
+Contexta turns conversations into memory. This section covers the three nouns that matter and how they relate.
+
+## Observations
+
+An **observation** is one submitted unit of input: a `user_id`, a `session_id`, and a `messages` array. Contexta persists it, its ordered source turns, and a durable outbox event, then returns `202` before any extraction has run. That ordering is deliberate — a crash after the `202` cannot lose the observation, and the outbox claims work with `SKIP LOCKED` so a second worker never picks up the same event.
+
+Deep dive: [Observations](/concepts/observations)
+
+## Memories
+
+A **memory** is a discrete, typed fact extracted from observations, with a confidence score, an importance score, entity links, a validity window, and a `fact_key`.
+
+The `fact_key` is the interesting part. When the extractor returns a `subject` / `predicate` / `object` triple, the key is a structural slot hash `sfx1:<sha256>` over subject and predicate. Two statements of the same slot share that key, so correcting one **supersedes** the other rather than sitting beside it. A partial unique index, `uq_memory_record_current_fact_slot`, makes that mandatory: at most one row per slot may be current.
+
+Deep dive: [Memories](/concepts/memories)
+
+## Truth maintenance
+
+When an observation contradicts a stored fact — *"I moved from New York to London"* — the old row is closed with `valid_to = now()` and `memory_version.superseded_by_id` records the lineage. Stale facts are excluded from active retrieval, so the system holds one current answer per slot rather than a pile of contradicting vectors and hoping the ranker sorts it out.
+
+## Retrieval
+
+Recall runs three independent channels and fuses them:
+
+| Channel | Engine | Default weight |
+| :--- | :--- | ---: |
+| Dense vector | pgvector HNSW, cosine | 0.5 |
+| Lexical | PostgreSQL `tsvector` GIN / BM25 | 0.3 |
+| Graph | recursive CTE, multi-hop, hard-capped | 0.2 |
+
+Fusion is weighted Reciprocal Rank Fusion with `k = 60`, plus a small quality prior from importance and confidence. Every hit updates read-age, so decay follows when a memory was last *useful* rather than when it was last written.
+
+There is a cascade mode that gathers lexical and graph evidence first and only consults dense when that evidence is judged insufficient. It is opt-in and off by default.
+
+Deep dive: [Retrieval](/concepts/retrieval)
+
+## Isolation
+
+Everything is scoped by `organization_id` and, for user-owned rows, by the actor. Isolation is inherited rather than remembered: every query goes through `TenantScopedRepository`, which appends the tenant predicate to every statement it builds.
+
+A `select()` on a tenant-owned model that bypasses the repository is treated as a security bug, not a style choice. v1.5 shipped exactly that defect three times — including a cross-tenant read in `GET /v1/graph/traverse` — and all three are now fixed with regression tests.
+
+## Where the rest lives
+
+- [API reference](/reference/api) — the wire protocol, including the authentication contract
+- [Upgrading to v1.5](/reference/upgrade-v1.5) — what revisions `015` through `020` do
+- [Changelog](/changelog) — what changed and what was removed

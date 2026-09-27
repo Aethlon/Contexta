@@ -271,6 +271,9 @@ class TestMemoriesApi:
         headers = {
             "x-organization-id": str(org_id),
             "x-user-id": str(user_id),
+            # The assembled context clears the 1000-byte GZipMiddleware threshold,
+            # and ASGITransport hands back the compressed body undecompressed.
+            "accept-encoding": "identity",
         }
         params = {
             "user_id": str(user_id),

@@ -7,11 +7,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from pydantic import BaseModel
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from contexta.db import get_db_session
-from contexta.models.audit import AuditLog
 from contexta.repositories.audit_repo import AuditRepository
 
 router = APIRouter(prefix="/v1/audit", tags=["audit"])
@@ -35,7 +33,7 @@ def _resolve_organization_id(
     x_org_id: str | None = None,
     state_org_id: str | None = None,
 ) -> UUID:
-    raw = str(organization_id) if organization_id else (x_organization_id or x_org_id or state_org_id)
+    raw = state_org_id or (str(organization_id) if organization_id else (x_organization_id or x_org_id))
     if not raw:
         # Fallback to default tenant if not specified (local dev / single node OSS)
         return UUID("00000000-0000-0000-0000-000000000001")
@@ -68,22 +66,7 @@ async def list_audit_logs(
     )
 
     repo = AuditRepository(session, tenant_id=org_id)
-
-    # Query with tenant scoping, ordered by created_at DESC
-    stmt = (
-        select(AuditLog)
-        .where(AuditLog.organization_id == org_id)
-        .order_by(AuditLog.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-    )
-    result = await session.execute(stmt)
-    scalars = result.scalars()
-    if hasattr(scalars, "__await__"):
-        scalars = await scalars
-    records = scalars.all() if hasattr(scalars, "all") else []
-    if hasattr(records, "__await__"):
-        records = await records
+    records = await repo.list_recent(offset=offset, limit=limit)
 
     return [
         AuditLogResponse(

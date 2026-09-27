@@ -26,5 +26,9 @@ class ApiKeyRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     actor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     scopes: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
+    # Rate-limit tier. Previously absent, so every key was metered identically.
+    tier: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="standard", server_default="standard"
+    )
     last_used_at: Mapped[datetime | None] = mapped_column(nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(nullable=True)

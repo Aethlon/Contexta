@@ -1,13 +1,15 @@
 # CLI Reference
 
-The `contexta` CLI ships in the `contexta-client` Pip package.
+The `contexta` CLI ships inside the `contexta-client` Python package (`clients/python`), as a Typer application.
 
 ## Installation
 
 ```bash
-pip install contexta-client
+pip install -e clients/python
 contexta --help
 ```
+
+The package is not on PyPI yet, so `pip install contexta-client` will not work.
 
 ## Configuration
 
@@ -15,109 +17,64 @@ The CLI stores credentials in `~/.contexta/config.toml`:
 
 ```toml
 [default]
-api_url = "https://api.contexta.dev"
+api_url = "http://localhost:8000"
 api_key = "mk_live_..."
 org_id = "..."
-project_id = "..."
 
 [profiles.staging]
-api_url = "https://api.contexta.dev"
-api_key = "mk_test_..."
+api_url = "http://localhost:8000"
+api_key = "mk_live_..."
 project_id = "..."
 ```
 
-Use profiles: `contexta --profile=staging memories list`.
+Use a profile with `contexta --profile=staging memories list`.
 
-## Commands
-
-### Authentication
+## What works against a v1.5 server
 
 | Command | Description |
-|---------|-------------|
-| `contexta login` | Authenticate via browser |
-| `contexta logout` | Clear stored credentials |
-| `contexta whoami` | Show active org, project, key |
-
-### Project Setup
-
-| Command | Description |
-|---------|-------------|
-| `contexta init` | Scaffold .env and integration snippet |
-| `contexta test` | Smoke test: ping, observe, retrieve |
-| `contexta projects list` | List projects |
-| `contexta projects create` | Create project |
-| `contexta projects use` | Set default project |
-
-### API Keys
-
-| Command | Description |
-|---------|-------------|
-| `contexta keys list` | List API keys |
-| `contexta keys create` | Create a key |
-| `contexta keys rotate` | Rotate a key |
-| `contexta keys revoke` | Revoke a key |
-
-### Policies
-
-| Command | Description |
-|---------|-------------|
-| `contexta policies list` | List policies |
-| `contexta policies show` | Show a policy |
-| `contexta policies create` | Register from YAML |
-| `contexta policies sync` | Sync from directory |
-
-### Schemas
-
-| Command | Description |
-|---------|-------------|
-| `contexta schemas list` | List schemas |
-| `contexta schemas create` | Register from YAML |
-
-### Memories
-
-| Command | Description |
-|---------|-------------|
-| `contexta memories list` | List memories (paginated) |
-| `contexta memories show` | Show a memory |
-| `contexta memories explain` | Show explainability |
+| :--- | :--- |
+| `contexta login` / `logout` / `whoami` | Local credential management |
+| `contexta init` | Scaffold `.env` and an integration snippet |
+| `contexta test` | Smoke test: `ping`, `observe`, `context` |
+| `contexta keys list` | `GET /v1/keys` |
+| `contexta keys create` | `POST /v1/keys` |
+| `contexta keys revoke` | `DELETE /v1/keys/{id}` |
+| `contexta memories list` | Ranked memory list |
+| `contexta memories show` | One memory |
+| `contexta memories explain` | Scoring and supersession history |
 | `contexta memories pin` | Pin a memory |
 | `contexta memories archive` | Archive a memory |
 | `contexta memories delete` | Delete a memory |
-
-### Observations
-
-| Command | Description |
-|---------|-------------|
-| `contexta observations send` | Send observation from JSON or stdin |
-
-### Context
-
-| Command | Description |
-|---------|-------------|
-| `contexta context get` | Get context bundle |
-| `contexta context preview` | Preview with sample query |
-
-### Monitoring
-
-| Command | Description |
-|---------|-------------|
-| `contexta usage` | Show current period usage |
-| `contexta audit` | Tail audit log |
+| `contexta observations send` | Send an observation from JSON or stdin |
+| `contexta context get` | Context bundle |
+| `contexta context preview` | Context with a sample query |
+| `contexta audit` | Tail the audit log (`GET /v1/audit`) |
 | `contexta export` | Export memories to JSONL |
 
-## Sample Session
+## What returns 404 in v1.5
+
+These subcommands still exist in the CLI but call endpoints that were removed. They will fail against a v1.5 server:
+
+| Command | Dead endpoint | What to do instead |
+| :--- | :--- | :--- |
+| `contexta keys rotate` | `POST /v1/keys/{id}/rotate` | `keys create` then `keys revoke` |
+| `contexta policies list` / `show` / `create` / `sync` | `GET`/`POST /v1/policies` | none — no policy registry |
+| `contexta schemas list` / `create` | `GET`/`POST /v1/schemas` | none — no schema registry |
+| `contexta projects list` / `create` / `use` | `GET`/`POST /v1/projects` | none |
+| `contexta usage` | `GET /v1/usage` | none — there is no metering |
+
+This is a client-side gap, not a server regression. The endpoints were removed with the billing and policy/schema subsystems; the CLI was never updated.
+
+## A real session
 
 ```bash
-$ contexta login
-✓ Logged in as alice@acme.com (Acme Inc, project: default)
-
 $ contexta init
 ✓ Created .env with CONTEXTA_API_KEY and CONTEXTA_API_URL
 ✓ Created CONTEXTA_example.py
 
 $ contexta test
-→ Pinging api.contexta.dev...
-✓ API reachable (eu-fsn1)
+→ Pinging http://localhost:8000...
+✓ API reachable
 → Sending sample observation...
 ✓ Accepted (job_id 01J9ZX...)
 ✓ Extracted 2 memories
@@ -125,11 +82,18 @@ $ contexta test
 ✓ Got 2 memories
 🎉 contexta is working.
 
-$ contexta usage
-Builder plan, period 2026-05-01 to 2026-06-01
-  Active memories     91,245 / 250,000
-  Observations        213,400 / 500,000
-  Retrievals          1,843,200 / 5,000,000
-  Reranks             22,100 / 100,000
-  Estimated cost: $29.00
+$ contexta keys list
+  mk_live_2ca330b9   first-key   scopes: read,write
+
+$ contexta audit
+  2026-09-27T01:23:46  key.create      org=d800e242
+  2026-09-27T01:23:46  observation.ingest
 ```
+
+## Key scoping, and why the first key is special
+
+`POST /v1/keys` is authenticated, so the first key on a fresh database has to be inserted directly into Postgres. The [quickstart](/quickstart) has the SQL, and it matches `ApiKeyRepository.create_key` exactly: `mk_live_` prefix, SHA-256 token hash, 16-character display prefix.
+
+Once one key exists, use `contexta keys create` (or the console's **API Keys** page) for everything else.
+
+**Remember that the key's actor is your `user_id`.** Sending a different one is a `403`, not an empty result. One key = one (organization, actor) pair.

@@ -17,7 +17,7 @@ if [ -n "$MODE" ] && [ "$MODE" != "host" ] && [ "$MODE" != "start" ]; then
             ;;
         worker)
             echo "Starting Contexta Celery Worker..."
-            exec celery -A contexta.workers.celery_app.celery_app worker --loglevel=info -Q extraction,embedding,maintenance,celery
+            exec celery -A contexta.workers.celery_app.celery_app worker --loglevel=info -Q extraction,embedding,maintenance,outbox,celery
             ;;
         beat)
             echo "Starting Contexta Celery Beat..."
@@ -30,6 +30,10 @@ if [ -n "$MODE" ] && [ "$MODE" != "host" ] && [ "$MODE" != "start" ]; then
         model-server)
             echo "Starting Contexta Local Qwen3 Model Server..."
             exec uvicorn contexta.workers.model_server:app --host 0.0.0.0 --port "${MODEL_SERVER_PORT:-8001}" --workers 1
+            ;;
+        inference-server)
+            echo "Starting Contexta Local Generative Inference Server..."
+            exec uvicorn contexta.workers.inference_server:app --host 0.0.0.0 --port "${CONTEXTA_INFERENCE_PORT:-8002}" --workers 1
             ;;
         mcp)
             echo "Starting Contexta Model Context Protocol (MCP) Server on port 8765..."
@@ -249,7 +253,13 @@ start_services() {
         echo -e "  • ${BOLD}MCP Server (SSE):${NC}      http://localhost:8765/sse"
         echo -e "  • ${BOLD}Local Model Server:${NC}   http://localhost:8001"
         echo "─────────────────────────────────────────────────────────────"
-        echo -e "Default Dashboard Login: ${CYAN}User@aethlon.xyz${NC} / ${CYAN}password1234${NC}"
+        if [ "${CONTEXTA_DASHBOARD_AUTH:-off}" = "on" ]; then
+            echo -e "Dashboard auth: ${CYAN}enabled${NC} (sign-in required)"
+        else
+            echo -e "Dashboard auth: ${CYAN}off${NC} — open the console directly."
+            echo -e "  ${NC}It is unauthenticated: do not expose this to an untrusted network."
+            echo -e "  ${NC}Set CONTEXTA_DASHBOARD_AUTH=on to require a sign-in."
+        fi
         echo ""
         echo "Helpful commands:"
         echo "  • View logs:    ./entrypoint.sh logs"

@@ -20,14 +20,12 @@ import argparse
 import asyncio
 import json
 import logging
-import math
-import os
 import re
 import sys
 import time
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -38,11 +36,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
 from contexta.config.settings import get_settings  # noqa: E402
-from contexta.core.entities.resolver import EntityResolver  # noqa: E402
+from contexta.core.context.builder import ContextBuilder  # noqa: E402
+from contexta.core.pipeline import FastMemoryOrchestrator  # noqa: E402
 from contexta.core.retrieval.engine import RetrievalEngine, RetrievalResult  # noqa: E402
-from contexta.core.schemas import ExtractedMemory, MemoryType, ObservationPayload, RetrievalQuery  # noqa: E402
-from contexta.core.scoring.engine import MemoryScoringEngine  # noqa: E402
-from contexta.core.types import SourceType  # noqa: E402
+from contexta.core.schemas import (  # noqa: E402
+    ContextConfig,
+    ContextRequest,
+    ObservationPayload,
+    RetrievalQuery,
+)
 from contexta.models.memory import MemoryRecord  # noqa: E402
 from contexta.repositories.entity_repo import (  # noqa: E402
     EntityEdgeRepository,
@@ -103,6 +105,70 @@ def load_fastembed_model():
     from fastembed import TextEmbedding
 
     return TextEmbedding(model_name=EMBEDDING_MODEL_NAME)
+
+
+async def call_ollama_answer(
+    client: httpx.AsyncClient,
+    *,
+    question: str,
+    memories: list[MemoryRecord],
+    model: str,
+    base_url: str,
+    context_text: str | None = None,
+    max_tokens: int = 256,
+) -> str:
+    if context_text is None:
+        context_lines = []
+        for memory in memories:
+            timestamp = memory.event_at or memory.observed_at or memory.valid_from
+            label = f"[{timestamp.strftime('%d %B %Y')}] " if timestamp is not None else ""
+            context_lines.append(f"- {label}{memory.title}: {memory.content}")
+        context = "\n".join(context_lines) or "(no relevant memories)"
+    else:
+        context = context_text
+    system_prompt = (
+        "Answer the question using only the supplied memories. "
+        "Use exact dates when the question asks when. "
+        "If the memories do not contain the answer, say not mentioned. "
+        "For list questions, include every supported item. "
+        "Do not invent details. Output only the final answer, without analysis or explanation."
+    )
+    body = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Memories:\n{context}\n\nQuestion: {question}\nAnswer:"},
+        ],
+        "options": {
+            "temperature": 0.1,
+            "num_ctx": 4096,
+            "num_predict": max(max_tokens, 768) if "qwen" in model.lower() else max_tokens,
+        },
+        "stream": False,
+        "think": False,
+    }
+    response = await client.post(f"{base_url.rstrip('/')}/api/chat", json=body, timeout=120.0)
+    if response.status_code == 404:
+        fallback = await client.post(
+            f"{base_url.rstrip('/')}/v1/chat/completions",
+            json={
+                "model": model,
+                "messages": body["messages"],
+                "temperature": 0.1,
+                "max_tokens": body["options"]["num_predict"],
+            },
+            timeout=120.0,
+        )
+        fallback.raise_for_status()
+        content = fallback.json()["choices"][0]["message"]["content"]
+    else:
+        response.raise_for_status()
+        data = response.json()
+        content = data.get("message", {}).get("content", "")
+        if not content and data.get("message", {}).get("thinking"):
+            content = data["message"]["thinking"]
+    content = re.sub(r"<think>.*?</think>", "", str(content), flags=re.DOTALL).strip()
+    return content
 
 
 # ─── Neural Reranker ─────────────────────────────────────────────────────
@@ -191,95 +257,62 @@ async def ingest_instance(
     session_factory,
     user_id: UUID,
     organization_id: UUID,
-    fastembed_provider: FastEmbedProvider,
-    scoring_engine: MemoryScoringEngine,
+    embedding_service: EmbeddingService,
+    orchestrator: FastMemoryOrchestrator,
 ) -> int:
     sessions = instance.get("haystack_sessions", [])
     dates = instance.get("haystack_dates", [])
+    source_id = str(instance.get("question_id", "longmemeval"))
+    stored_count = 0
 
-    memories_to_persist: list[tuple[datetime | None, str, str, UUID]] = []
-    for s_idx, session_turns in enumerate(sessions):
-        date_str = dates[s_idx] if s_idx < len(dates) else ""
+    for session_index, session_turns in enumerate(sessions):
+        date_str = dates[session_index] if session_index < len(dates) else ""
         session_dt = parse_date_str(date_str)
-        session_id = uuid4()
-        for turn in session_turns:
-            role = turn.get("role", "user")
-            content = turn.get("content", "").strip()
+        messages = []
+        for turn_index, turn in enumerate(session_turns):
+            content = str(turn.get("content", "")).strip()
             if not content:
                 continue
-            title = f"Session {s_idx + 1} {role.capitalize()}"
-            formatted_content = f"[{role.capitalize()} on {date_str}]: {content}" if date_str else f"[{role.capitalize()}]: {content}"
-            memories_to_persist.append((session_dt, title, formatted_content, session_id))
+            messages.append(
+                {
+                    "role": turn.get("role", "user"),
+                    "content": content,
+                    "text": content,
+                    "occurred_at": session_dt.isoformat() if session_dt else None,
+                    "observed_at": session_dt.isoformat() if session_dt else None,
+                    "message_id": f"{source_id}:{session_index}:{turn_index}",
+                    "timezone": "UTC",
+                }
+            )
+        if not messages:
+            continue
 
-    if not memories_to_persist:
-        return 0
-
-    texts_to_embed = [f"{t}\n{c}".strip() for _, t, c, _ in memories_to_persist]
-    embeddings = await fastembed_provider.embed_batch(texts_to_embed)
-
-    async with session_factory() as db_session:
-        memory_repo = MemoryRepository(db_session, tenant_id=organization_id)
-        entity_repo = EntityRepository(db_session, tenant_id=organization_id)
-        entity_resolver = EntityResolver(
-            entity_repository=entity_repo,
-            link_repository=MemoryEntityLinkRepository(db_session, tenant_id=organization_id),
-            edge_repository=EntityEdgeRepository(db_session, tenant_id=organization_id),
+        payload = ObservationPayload(
+            user_id=user_id,
+            organization_id=organization_id,
+            session_id=uuid4(),
+            messages=messages,
+            occurred_at=session_dt,
+            observed_at=session_dt,
+            source_id=source_id,
+            timezone="UTC",
         )
-
-        for idx, (dt, title, content, sess_id) in enumerate(memories_to_persist):
-            emb = embeddings[idx] if idx < len(embeddings) else None
-            mem = MemoryRecord(
-                user_id=user_id,
-                organization_id=organization_id,
-                session_id=sess_id,
-                memory_type=MemoryType.EPISODIC,
-                title=title,
-                content=content,
-                valid_from=dt,
-                source_type=SourceType.USER_EXPLICIT,
-                embedding=emb,
-            )
-            importance = scoring_engine.compute_importance(mem.memory_type, mem.content)
-            confidence = scoring_engine.compute_confidence(SourceType.USER_EXPLICIT)
-            persisted = await memory_repo.persist(
-                user_id=user_id,
-                organization_id=organization_id,
-                session_id=sess_id,
-                memory=mem,
-                confidence=confidence,
-                importance=importance.final_score,
-                valid_from=dt,
-            )
-            if emb is not None:
-                persisted.embedding = emb
-
-            # Heuristic entity resolution
-            words = set(re.findall(r"\b[A-Z][a-z]{2,}\b", content))
-            if words:
-                try:
-                    payload = ObservationPayload(
-                        user_id=user_id,
-                        organization_id=organization_id,
-                        session_id=sess_id,
-                        messages=[],
+        async with session_factory() as db_session:
+            result = await orchestrator.orchestrate(payload, db_session)
+            await db_session.commit()
+            stored_count += result.stored_count
+            memory_repo = MemoryRepository(db_session, tenant_id=organization_id)
+            for memory_id in result.embedding_memory_ids:
+                record = await memory_repo.get_by_id(UUID(memory_id))
+                if record is not None:
+                    await embedding_service.generate_and_store(
+                        record,
+                        memory_repo,
+                        enqueue_on_failure=False,
                     )
-                    ext_mem = ExtractedMemory(
-                        content=content,
-                        memory_type=MemoryType.EPISODIC,
-                        entities=list(words)[:5],
-                    )
-                    await entity_resolver.resolve_memory_entities(
-                        payload=payload,
-                        memory_id=persisted.id,
-                        memory=ext_mem,
-                        observed_at=dt,
-                    )
-                except Exception:
-                    pass
+            await db_session.commit()
 
-        await db_session.commit()
-
-    return len(memories_to_persist)
+    return stored_count
 
 
 # ─── Evaluation & Offline Judging ────────────────────────────────────────
@@ -293,7 +326,6 @@ def judge_longmemeval(
     is_abstention: bool,
 ) -> bool:
     gen_lower = generated_answer.lower().strip()
-    context_lower = " ".join(retrieved_contents).lower()
 
     if is_abstention or gold_answer is None or not str(gold_answer).strip():
         # Model correctly abstains or indicates information is absent
@@ -309,16 +341,16 @@ def judge_longmemeval(
         return False
 
     # 1. Exact or substring match in generated response or top context
-    if gold_str in gen_lower or gold_str in context_lower:
+    if gold_str in gen_lower:
         return True
 
     # 2. Word boundary match
-    if re.search(r"\b" + re.escape(gold_str) + r"\b", gen_lower) or re.search(r"\b" + re.escape(gold_str) + r"\b", context_lower):
+    if re.search(r"\b" + re.escape(gold_str) + r"\b", gen_lower):
         return True
 
     # 3. Numeric & date normalized match
     gold_numbers = re.findall(r"\d+", gold_str)
-    if gold_numbers and all(n in gen_lower or n in context_lower for n in gold_numbers):
+    if gold_numbers and all(n in gen_lower for n in gold_numbers):
         return True
 
     # 4. Bigram salient entity match
@@ -326,17 +358,15 @@ def judge_longmemeval(
     gold_words = [w for w in re.findall(r"[a-z0-9]+", gold_str) if w not in stopwords]
     for i in range(len(gold_words) - 1):
         bigram = f"{gold_words[i]} {gold_words[i+1]}"
-        if len(bigram) > 5 and (bigram in gen_lower or bigram in context_lower):
+        if len(bigram) > 5 and bigram in gen_lower:
             return True
 
     # 5. Token overlap (≥ 50% content tokens)
     gold_tokens = set(gold_words)
     if gold_tokens:
         gen_tokens = set(re.findall(r"[a-z0-9]+", gen_lower))
-        ctx_tokens = set(re.findall(r"[a-z0-9]+", context_lower))
         overlap_gen = len(gold_tokens.intersection(gen_tokens)) / len(gold_tokens)
-        overlap_ctx = len(gold_tokens.intersection(ctx_tokens)) / len(gold_tokens)
-        if overlap_gen >= 0.50 or overlap_ctx >= 0.50:
+        if overlap_gen >= 0.50:
             return True
 
     return False
@@ -356,6 +386,7 @@ class InstanceResult:
     correct: bool
     num_retrieved: int
     is_abstention: bool
+    retrieved_memory_ids: list[str] = field(default_factory=list)
 
 
 async def run_instance(
@@ -363,9 +394,11 @@ async def run_instance(
     *,
     session_factory,
     embedding_service: EmbeddingService,
-    fastembed_provider: FastEmbedProvider,
-    scoring_engine: MemoryScoringEngine,
+    orchestrator: FastMemoryOrchestrator,
     reranker: LocalModelServerReranker,
+    ollama_client: httpx.AsyncClient,
+    generator_model: str,
+    ollama_url: str,
     semaphore: asyncio.Semaphore,
 ) -> InstanceResult:
     question_id = instance.get("question_id", str(uuid4()))
@@ -385,8 +418,8 @@ async def run_instance(
             session_factory=session_factory,
             user_id=user_id,
             organization_id=organization_id,
-            fastembed_provider=fastembed_provider,
-            scoring_engine=scoring_engine,
+            embedding_service=embedding_service,
+            orchestrator=orchestrator,
         )
 
         # Retrieval
@@ -412,14 +445,29 @@ async def run_instance(
             )
             results = await engine.retrieve(query, query_embedding=query_embedding, now=question_date)
 
-        # Answer generation & judging
-        if not results:
+        context_builder = ContextBuilder()
+        context_request = ContextRequest(
+            user_id=user_id,
+            organization_id=organization_id,
+            session_id=uuid4(),
+            config=ContextConfig(num_relevant_memories=8),
+        )
+        built_context = context_builder.build(
+            context_request,
+            [result_item.memory for result_item in results],
+            preserve_input_order=True,
+        )
+        context_text = context_builder.to_system_prompt(built_context, format="xml")
+        generated = await call_ollama_answer(
+            ollama_client,
+            question=question,
+            memories=[result_item.memory for result_item in results],
+            model=generator_model,
+            base_url=ollama_url,
+            context_text=context_text,
+        )
+        if not generated:
             generated = "Not mentioned in the memories."
-        elif is_abstention:
-            # Check if memories contain answer or if information is truly ungrounded
-            generated = "Not mentioned in the memories."
-        else:
-            generated = results[0].memory.content
 
         retrieved_contents = [r.memory.content for r in results]
         correct = judge_longmemeval(
@@ -439,6 +487,7 @@ async def run_instance(
         correct=correct,
         num_retrieved=len(results),
         is_abstention=is_abstention,
+        retrieved_memory_ids=[str(result_item.memory.id) for result_item in results],
     )
 
 
@@ -505,8 +554,24 @@ async def main() -> None:
     parser.add_argument("--stratified-per-cat", type=int, default=5, help="Number of instances per category (default: 5 per category = 35 total)")
     parser.add_argument("--concurrency", type=int, default=4, help="Concurrency limit")
     parser.add_argument("--model-server-url", type=str, default="http://localhost:8001")
+    parser.add_argument("--generator-model", type=str, default="qwen3:4b")
+    parser.add_argument("--ollama-url", type=str, default="http://localhost:11434")
+    parser.add_argument("--max-tokens", type=int, default=256)
     parser.add_argument("--db-url", type=str, default=DB_URL)
+    parser.add_argument("--output-tag", type=str, default=None)
+    parser.add_argument("--question-ids", type=str, default="")
     args = parser.parse_args()
+
+    output_tag = args.output_tag.strip() if isinstance(args.output_tag, str) else None
+    if output_tag:
+        safe_tag = re.sub(r"[^a-zA-Z0-9_.-]+", "-", output_tag).strip("-")
+        if not safe_tag:
+            raise SystemExit("--output-tag must contain at least one safe character")
+        results_json_path = REPO_ROOT / "benchmarks" / "longmemeval" / f"results-{safe_tag}.json"
+        results_md_path = REPO_ROOT / "benchmarks" / "longmemeval" / f"RESULTS-{safe_tag}.md"
+    else:
+        results_json_path = RESULTS_JSON_PATH
+        results_md_path = RESULTS_MD_PATH
 
     if not DATA_PATH.exists():
         print("Dataset not found. Downloading...")
@@ -516,7 +581,11 @@ async def main() -> None:
     with open(DATA_PATH, encoding="utf-8") as f:
         dataset = json.load(f)
 
-    if args.stratified_per_cat and args.stratified_per_cat > 0:
+    if args.question_ids.strip():
+        wanted_ids = {value.strip() for value in args.question_ids.split(",") if value.strip()}
+        dataset = [item for item in dataset if item.get("question_id") in wanted_ids]
+        print(f"Selected {len(dataset)} requested LongMemEval instances.", flush=True)
+    elif args.stratified_per_cat and args.stratified_per_cat > 0:
         by_cat = defaultdict(list)
         for x in dataset:
             cat = "abstention" if x.get("question_id", "").endswith("_abs") or x.get("answer") is None else x.get("question_type", "general")
@@ -541,10 +610,12 @@ async def main() -> None:
     print(f"Loading local offline semantic embedding model ({EMBEDDING_MODEL_NAME})...", flush=True)
     fastembed_model = load_fastembed_model()
     settings = get_settings()
+    settings.embedding_dimensions = DB_VECTOR_DIM
     fastembed_provider = FastEmbedProvider(fastembed_model)
     embedding_service = EmbeddingService(settings=settings, provider=fastembed_provider)
-    scoring_engine = MemoryScoringEngine()
+    orchestrator = FastMemoryOrchestrator()
     reranker = LocalModelServerReranker(args.model_server_url)
+    ollama_client = httpx.AsyncClient(timeout=120.0)
 
     semaphore = asyncio.Semaphore(args.concurrency)
     start_time = time.monotonic()
@@ -559,9 +630,11 @@ async def main() -> None:
                 inst,
                 session_factory=session_factory,
                 embedding_service=embedding_service,
-                fastembed_provider=fastembed_provider,
-                scoring_engine=scoring_engine,
+                orchestrator=orchestrator,
                 reranker=reranker,
+                ollama_client=ollama_client,
+                generator_model=args.generator_model,
+                ollama_url=args.ollama_url,
                 semaphore=asyncio.Semaphore(1),
             )
             return res, time.monotonic() - t0
@@ -579,17 +652,22 @@ async def main() -> None:
         )
 
     await reranker.aclose()
+    await ollama_client.aclose()
     await engine.dispose()
 
     elapsed = time.monotonic() - start_time
     summary = aggregate_results(results)
 
-    RESULTS_JSON_PATH.write_text(
+    results_json_path.write_text(
         json.dumps(
             {
                 "summary": summary,
                 "elapsed_seconds": elapsed,
                 "instances_evaluated": len(results),
+                "generator_model": args.generator_model,
+                "output_tag": output_tag,
+                "embedding_backend": "fastembed",
+                "production_ingestion": True,
                 "instances": [
                     {
                         "question_id": r.question_id,
@@ -600,6 +678,7 @@ async def main() -> None:
                         "correct": r.correct,
                         "num_retrieved": r.num_retrieved,
                         "is_abstention": r.is_abstention,
+                        "retrieved_memory_ids": r.retrieved_memory_ids,
                     }
                     for r in results
                 ],
@@ -608,10 +687,10 @@ async def main() -> None:
         ),
         encoding="utf-8",
     )
-    RESULTS_MD_PATH.write_text(render_markdown(summary, elapsed, len(results)), encoding="utf-8")
+    results_md_path.write_text(render_markdown(summary, elapsed, len(results)), encoding="utf-8")
 
     print()
-    print(f"Done in {elapsed:.1f}s. Wrote {RESULTS_JSON_PATH} and {RESULTS_MD_PATH}")
+    print(f"Done in {elapsed:.1f}s. Wrote {results_json_path} and {results_md_path}")
     print()
     print(json.dumps(summary, indent=2))
 

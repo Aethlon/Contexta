@@ -6,15 +6,54 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from contexta.db import get_db_session
-from contexta.models.entity import Entity, MemoryEntityLink
-from contexta.models.memory import MemoryRecord
-from contexta.repositories.entity_repo import EntityEdgeRepository, EntityRepository
+from contexta.models.entity import Entity
+from contexta.repositories.entity_repo import (
+    EntityEdgeRepository,
+    EntityRepository,
+    MemoryEntityLinkRepository,
+)
+from contexta.repositories.memory_repo import MemoryRepository
 
 router = APIRouter()
+
+
+def _state_uuid(request: Request, name: str) -> uuid.UUID:
+    value = getattr(request.state, name, None)
+    if value in (None, ""):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authenticated tenant context is required.",
+        )
+    try:
+        return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authenticated tenant context is invalid.",
+        ) from exc
+
+
+def _scope(request: Request) -> tuple[uuid.UUID, uuid.UUID]:
+    """The authenticated (organization, actor) pair every read below is scoped to."""
+    return _state_uuid(request, "organization_id"), _state_uuid(request, "actor_id")
+
+
+def _require_actor(user_id: uuid.UUID, actor_id: uuid.UUID) -> uuid.UUID:
+    """Reject a path `user_id` that is not the caller's own identity.
+
+    `Entity` and `MemoryRecord` are user-scoped, and a path parameter is chosen
+    by the caller, so accepting one as the scope would let any key in the
+    organization read any other user's graph.
+    """
+    if user_id != actor_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: user_id mismatch.",
+        )
+    return user_id
 
 
 class GraphNode(BaseModel):
@@ -47,23 +86,21 @@ async def traverse_graph(
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """Multi-hop entity graph traversal starting from a root entity name or UUID."""
-    org_id = uuid.UUID(str(getattr(request.state, "organization_id", "00000000-0000-0000-0000-000000000001")))
+    org_id, actor_id = _scope(request)
     entity_repo = EntityRepository(session, tenant_id=org_id)
     edge_repo = EntityEdgeRepository(session, tenant_id=org_id)
-    link_repo = MemoryEntityLinkRepository(session, tenant_id=org_id)
+    memory_repo = MemoryRepository(session, tenant_id=org_id)
 
     # 1. Find root entity by ID or name
     root_entity: Entity | None = None
     try:
         source_uuid = uuid.UUID(source)
-        root_entity = await entity_repo.get_by_id(source_uuid)
+        root_entity = await entity_repo.get_by_id_for_user(source_uuid, actor_id)
     except ValueError:
         pass
 
     if not root_entity:
-        stmt = select(Entity).where(Entity.name.ilike(source.strip()))
-        res = await session.execute(stmt)
-        root_entity = res.scalar_one_or_none()
+        root_entity = await entity_repo.get_by_name_ilike(actor_id, source.strip())
 
     if not root_entity:
         return {
@@ -82,7 +119,7 @@ async def traverse_graph(
     frontier: set[uuid.UUID] = {root_entity.id}
     all_nodes: dict[uuid.UUID, Entity] = {root_entity.id: root_entity}
     all_edges: list[dict[str, str]] = []
-    rel_filter = set(r.strip() for r in relationship_types.split(",")) if relationship_types else None
+    rel_filter = {r.strip() for r in relationship_types.split(",")} if relationship_types else None
 
     for _ in range(max_hops):
         if not frontier:
@@ -107,23 +144,14 @@ async def traverse_graph(
     # Load missing node records
     missing_ids = [nid for nid in visited if nid not in all_nodes]
     if missing_ids:
-        stmt = select(Entity).where(Entity.id.in_(missing_ids))
-        res = await session.execute(stmt)
-        for ent in res.scalars().all():
+        for ent in await entity_repo.get_many_by_ids(missing_ids, user_id=actor_id):
             all_nodes[ent.id] = ent
 
     # 3. Find linked memories
     all_entity_ids = list(all_nodes.keys())
     linked_memories: list[dict] = []
     if all_entity_ids:
-        stmt = (
-            select(MemoryRecord)
-            .join(MemoryEntityLink, MemoryRecord.id == MemoryEntityLink.memory_id)
-            .where(MemoryEntityLink.entity_id.in_(all_entity_ids))
-            .distinct()
-        )
-        res = await session.execute(stmt)
-        for mem in res.scalars().all():
+        for mem in await memory_repo.get_linked_to_entities(all_entity_ids, user_id=actor_id):
             linked_memories.append({
                 "id": str(mem.id),
                 "title": mem.title,
@@ -158,10 +186,12 @@ async def get_entity_graph(
     session: AsyncSession = Depends(get_db_session),
 ) -> GraphResponse:
     """Retrieve the entity graph for a user, including nodes and edges."""
-    org_id = uuid.UUID(str(request.state.organization_id))
+    org_id, actor_id = _scope(request)
+    _require_actor(user_id, actor_id)
 
     entity_repo = EntityRepository(session, tenant_id=org_id)
     edge_repo = EntityEdgeRepository(session, tenant_id=org_id)
+    link_repo = MemoryEntityLinkRepository(session, tenant_id=org_id)
 
     entities = await entity_repo.get_by_user(user_id, limit=200)
     entity_ids = {e.id for e in entities}
@@ -192,22 +222,15 @@ async def get_entity_graph(
 
     missing_ids = {eid for eid, ent in all_nodes.items() if ent is None}
     if missing_ids:
-        stmt = select(Entity).where(Entity.id.in_(missing_ids))
-        result = await session.execute(stmt)
-        for ent in result.scalars().all():
+        for ent in await entity_repo.get_many_by_ids(sorted(missing_ids), user_id=actor_id):
             all_nodes[ent.id] = ent
 
     # Count memories per entity
-    memory_counts: dict[uuid.UUID, int] = {}
-    if all_nodes:
-        stmt = (
-            select(MemoryEntityLink.entity_id)
-            .where(MemoryEntityLink.entity_id.in_(list(all_nodes.keys())))
-        )
-        result = await session.execute(stmt)
-        for row in result:
-            eid = row[0]
-            memory_counts[eid] = memory_counts.get(eid, 0) + 1
+    memory_counts: dict[uuid.UUID, int] = (
+        await link_repo.count_memories_per_entity(list(all_nodes.keys()))
+        if all_nodes
+        else {}
+    )
 
     nodes = [
         GraphNode(
@@ -243,23 +266,22 @@ async def get_entity_memories(
     session: AsyncSession = Depends(get_db_session),
 ) -> EntityMemoriesResponse:
     """Get all memories linked to a specific entity."""
-    org_id = uuid.UUID(str(request.state.organization_id))
+    org_id, actor_id = _scope(request)
+    _require_actor(user_id, actor_id)
 
     entity_repo = EntityRepository(session, tenant_id=org_id)
-    entity = await entity_repo.get_by_id(entity_id)
+    entity = await entity_repo.get_by_id_for_user(entity_id, actor_id)
     if not entity:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entity not found")
 
     # Get memory links for this entity
-    from contexta.repositories.entity_repo import MemoryEntityLinkRepository
     link_repo = MemoryEntityLinkRepository(session, tenant_id=org_id)
+    memory_repo = MemoryRepository(session, tenant_id=org_id)
     links = await link_repo.get_memories_for_entity(entity_id)
 
     memories = []
     for link in links:
-        stmt = select(MemoryRecord).where(MemoryRecord.id == link.memory_id)
-        result = await session.execute(stmt)
-        memory = result.scalar_one_or_none()
+        memory = await memory_repo.get_by_id(link.memory_id)
         if memory:
             memories.append({
                 "id": str(memory.id),

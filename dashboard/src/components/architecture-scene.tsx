@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -49,9 +49,9 @@ const ARCHITECTURE_LAYERS: LayerSpec[] = [
     name: "KNOWLEDGE GRAPH",
     category: "GRAPH SYNTHESIS",
     title: "Entity Resolution & Relational Triples",
-    description: "Converts raw conversational context into formal Subject • Predicate • Object semantic triples with cross-session entity linking and 2-hop graph traversal.",
+    description: "Converts raw conversational context into formal Subject â€¢ Predicate â€¢ Object semantic triples with cross-session entity linking and 2-hop graph traversal.",
     specs: [
-      { label: "EXTRACTION ENGINE", value: "FastEmbed + Local Qwen 2.5" },
+      { label: "EXTRACTION ENGINE", value: "Fine-tuned LFM2.5-1.2B (local)" },
       { label: "TRIPLE PRECISION", value: "99.4%" },
       { label: "GRAPH TRAVERSAL", value: "2-Hop Spreading Activation" },
     ],
@@ -144,7 +144,7 @@ const SANDBOX_NODES = [
     role: "INGESTION & MCP ROUTER",
     latency: "12ms",
     status: "online",
-    led: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]",
+    led: "dot dot-green shadow-[0_0_8px_rgba(52,211,153,0.9)]",
     load: "34%",
   },
   {
@@ -162,7 +162,7 @@ const SANDBOX_NODES = [
     role: "HYBRID VECTOR HNSW ENGINE",
     latency: "18ms",
     status: "active",
-    led: "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)]",
+    led: "dot dot-amber shadow-[0_0_8px_rgba(251,191,36,0.9)]",
     load: "49%",
   },
   {
@@ -171,7 +171,7 @@ const SANDBOX_NODES = [
     role: "POSTGRES PERSISTENT STORE",
     latency: "9ms",
     status: "ready",
-    led: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]",
+    led: "dot dot-green shadow-[0_0_8px_rgba(52,211,153,0.9)]",
     load: "22%",
   },
 ];
@@ -203,10 +203,10 @@ function IsometricSlab({ layer, isActive, onClick, index }: {
           onClick();
         }
       }}
-      className={`absolute inset-0 rounded-2xl cursor-pointer preserve-3d ${
+      className={`absolute inset-0 rounded-lg cursor-pointer preserve-3d ${
         isActive
-          ? `bg-gradient-to-br ${layer.color} shadow-[0_20px_60px_${layer.glowColor}] backdrop-blur-md`
-          : "bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-sm"
+          ? `bg-gradient-to-br ${layer.color} shadow-[0_20px_60px_${layer.glowColor}] `
+          : "bg-accent hover:bg-accent "
       }`}
       style={{
         transform: `translateZ(${layer.elevation}px) scale(${isActive ? 1.04 : 0.96})`,
@@ -219,12 +219,12 @@ function IsometricSlab({ layer, isActive, onClick, index }: {
     >
       <div className="relative w-full h-full preserve-3d" style={{ transformStyle: "preserve-3d" }}>
         {/* Top Face */}
-        <div className="absolute inset-0 rounded-2xl iso-light-top flex flex-col justify-between overflow-hidden">
+        <div className="absolute inset-0 rounded-lg iso-light-top flex flex-col justify-between overflow-hidden">
           {/* Corner pinholes */}
-          <div className="absolute top-2.5 left-2.5 w-1.5 h-1.5 rounded-full border border-white/30 bg-black/40" />
-          <div className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full border border-white/30 bg-black/40" />
-          <div className="absolute bottom-2.5 left-2.5 w-1.5 h-1.5 rounded-full border border-white/30 bg-black/40" />
-          <div className="absolute bottom-2.5 right-2.5 w-1.5 h-1.5 rounded-full border border-white/30 bg-black/40" />
+          <div className="absolute top-2.5 left-2.5 w-1.5 h-1.5 rounded-full border border-border/30 bg-black/40" />
+          <div className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full border border-border/30 bg-black/40" />
+          <div className="absolute bottom-2.5 left-2.5 w-1.5 h-1.5 rounded-full border border-border/30 bg-black/40" />
+          <div className="absolute bottom-2.5 right-2.5 w-1.5 h-1.5 rounded-full border border-border/30 bg-black/40" />
 
           {/* Blueprint grid watermark */}
           <div
@@ -241,45 +241,45 @@ function IsometricSlab({ layer, isActive, onClick, index }: {
               <motion.span
                 className={`w-2 h-2 rounded-full ${
                   isActive
-                    ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse"
-                    : "bg-white/20"
+                    ? "dot dot-green shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse"
+                    : "bg-card/20"
                 }`}
                 initial={false}
                 animate={{ scale: isActive ? 1 : 0.8 }}
               />
-              <span className={`text-[10px] font-mono tracking-wider uppercase font-semibold ${isActive ? "text-white" : "text-white/40"}`}>
+              <span className={`text-[10px] font-mono tracking-wider uppercase font-semibold ${isActive ? "text-foreground" : "text-foreground/40"}`}>
                 {layer.category}
               </span>
             </div>
-            <span className="text-[10px] font-mono text-white/20 tracking-widest">{"//////"}</span>
+            <span className="text-[10px] font-mono text-foreground/20 tracking-widest">{"//////"}</span>
           </div>
 
           {/* Content */}
           <div className="flex-1 flex items-center justify-center p-4 z-10">
             {isActive ? (
               <div className="grid grid-cols-3 gap-2">
-                <div className="p-2 rounded-lg bg-white/[0.06] border border-white/[0.1] text-[9px] font-mono text-blue-200">
+                <div className="p-2 rounded-lg bg-accent border border-border text-[9px] font-mono text-blue-200">
                   <div className="text-[8px] text-blue-300/70 uppercase">CORE</div>
                   HNSW INDEX
                 </div>
-                <div className="p-2 rounded-lg bg-white/[0.06] border border-white/[0.1] text-[9px] font-mono text-blue-200">
+                <div className="p-2 rounded-lg bg-accent border border-border text-[9px] font-mono text-blue-200">
                   <div className="text-[8px] text-blue-300/70 uppercase">STATE</div>
                   ASYNC POOL
                 </div>
-                <div className="p-2 rounded-lg bg-white/[0.06] border border-white/[0.1] text-[9px] font-mono text-blue-200">
+                <div className="p-2 rounded-lg bg-accent border border-border text-[9px] font-mono text-blue-200">
                   <div className="text-[8px] text-blue-300/70 uppercase">RECALL</div>
                   SUB-180MS
                 </div>
               </div>
             ) : (
-              <span className="text-[11px] font-mono text-white/20 tracking-wider">
+              <span className="text-[11px] font-mono text-foreground/20 tracking-wider">
                 {layer.name}
               </span>
             )}
           </div>
 
           {/* Bottom telemetry */}
-          <div className="flex items-center justify-between text-[9px] font-mono text-white/40 z-10 p-3">
+          <div className="flex items-center justify-between text-[9px] font-mono text-foreground/40 z-10 p-3">
             <span>0x{index.toString(16).toUpperCase().padStart(2, "0")}F2C</span>
             <span>ACTIVE NODE</span>
           </div>
@@ -334,10 +334,10 @@ function SandboxCube({ sandbox, isActive, onClick, index }: {
       }}
       whileHover={{ scale: 1.03 }}
       style={{ top: pos.top, left: pos.left }}
-      className={`absolute w-[180px] sm:w-[210px] h-[130px] rounded-2xl cursor-pointer p-4 transition-all duration-300 ${
+      className={`absolute w-[180px] sm:w-[210px] h-[130px] rounded-lg cursor-pointer p-4 transition-all duration-300 ${
         isActive
-          ? "bg-white/[0.06] border-2 border-emerald-400/80 shadow-[0_20px_50px_rgba(52,211,153,0.25)] backdrop-blur-md"
-          : "bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.12] backdrop-blur-sm"
+          ? "bg-accent border-2 border-emerald-400/80 shadow-[0_20px_50px_rgba(52,211,153,0.25)] "
+          : "bg-accent border border-border hover:border-[color:var(--ring)] "
       }`}
       animate={{
         scale: isActive ? 1.03 : 1,
@@ -346,27 +346,27 @@ function SandboxCube({ sandbox, isActive, onClick, index }: {
       transition={{ type: "spring", stiffness: 220, damping: 20 }}
     >
       {/* Corner pinholes */}
-      <div className="absolute top-2 left-2 w-1.5 h-1.5 rounded-full border border-white/30 bg-black/40" />
-      <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full border border-white/30 bg-black/40" />
-      <div className="absolute bottom-2 left-2 w-1.5 h-1.5 rounded-full border border-white/30 bg-black/40" />
-      <div className="absolute bottom-2 right-2 w-1.5 h-1.5 rounded-full border border-white/30 bg-black/40" />
+      <div className="absolute top-2 left-2 w-1.5 h-1.5 rounded-full border border-border/30 bg-black/40" />
+      <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full border border-border/30 bg-black/40" />
+      <div className="absolute bottom-2 left-2 w-1.5 h-1.5 rounded-full border border-border/30 bg-black/40" />
+      <div className="absolute bottom-2 right-2 w-1.5 h-1.5 rounded-full border border-border/30 bg-black/40" />
 
       {/* Top status */}
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-mono font-bold tracking-wider text-white">{sandbox.label}</span>
+        <span className="text-[11px] font-mono font-bold tracking-wider text-foreground">{sandbox.label}</span>
         <div className="flex items-center gap-1.5">
           <span className={`w-2 h-2 rounded-full ${sandbox.led}`} />
-          <span className="text-[9px] font-mono text-emerald-300">{sandbox.latency}</span>
+          <span className="text-[9px] font-mono tone-green">{sandbox.latency}</span>
         </div>
       </div>
 
       {/* Cooling vents */}
-      <div className="mt-2 text-[10px] font-mono text-white/20 tracking-widest">{"//////"}</div>
+      <div className="mt-2 text-[10px] font-mono text-foreground/20 tracking-widest">{"//////"}</div>
 
       {/* Role & telemetry */}
       <div className="mt-2">
         <div className="text-[9px] font-mono text-[#6B7280] uppercase">{sandbox.role}</div>
-        <div className="flex items-center justify-between text-[9px] font-mono text-white/50 mt-1">
+        <div className="flex items-center justify-between text-[9px] font-mono text-foreground/50 mt-1">
           <span>LOAD: {sandbox.load}</span>
           <span>SOC2 ENCLAVE</span>
         </div>
@@ -413,7 +413,7 @@ export function ArchitectureScene() {
       <div className="max-w-[1360px] mx-auto px-6 lg:px-12 relative z-10">
         {/* Header */}
         <motion.div
-          className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16 pb-8 border-b border-white/[0.04]"
+          className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16 pb-8 border-b border-border"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
@@ -427,11 +427,11 @@ export function ArchitectureScene() {
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.2 }}
             >
-              <span className="text-blue-400 text-sm">✱</span>
+              <span className="text-blue-400 text-sm">âœ±</span>
               What is Contexta?
             </motion.div>
             <motion.h2
-              className="text-title text-2xl sm:text-4xl lg:text-5xl font-light tracking-tight text-white leading-[1.15]"
+              className="text-title text-2xl sm:text-4xl lg:text-5xl font-light tracking-tight text-foreground leading-[1.15]"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -452,13 +452,13 @@ export function ArchitectureScene() {
               Each layer of our platform is optimized to let autonomous agents remember, retrieve, and evolve.
             </p>
 
-            <div className="flex items-center bg-white/[0.03] p-1 rounded-full border border-white/[0.06]">
+            <div className="flex items-center bg-accent p-1 rounded-full border border-border">
               <button
                 onClick={() => setViewMode("layers")}
                 className={`px-3 py-1 text-xs font-mono rounded-full transition-all duration-200 ${
                   viewMode === "layers"
                     ? "bg-blue-500/20 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.3)]"
-                    : "text-[#6B7280] hover:text-white"
+                    : "text-[#6B7280] hover:text-foreground"
                 }`}
               >
                 Exploded Stack
@@ -468,7 +468,7 @@ export function ArchitectureScene() {
                 className={`px-3 py-1 text-xs font-mono rounded-full transition-all duration-200 ${
                   viewMode === "sandboxes"
                     ? "bg-blue-500/20 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.3)]"
-                    : "text-[#6B7280] hover:text-white"
+                    : "text-[#6B7280] hover:text-foreground"
                 }`}
               >
                 Enclave Sandboxes
@@ -512,10 +512,10 @@ export function ArchitectureScene() {
                     transition={{ duration: 0.5, delay: 0.3 + idx * 0.08 }}
                   >
                     <div
-                      className={`flex items-center justify-between p-3.5 rounded-xl transition-all duration-300 ${
+                      className={`flex items-center justify-between p-3.5 rounded-lg transition-all duration-300 ${
                         isActive
-                          ? "bg-white/[0.05] shadow-elev-2"
-                          : "hover:bg-white/[0.02]"
+                          ? "bg-accent shadow-elev-2"
+                          : "hover:bg-accent"
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -523,14 +523,14 @@ export function ArchitectureScene() {
                           className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
                             isActive
                               ? "bg-blue-400 scale-125 shadow-[0_0_8px_rgba(96,165,250,0.9)]"
-                              : "bg-white/20 group-hover:bg-white/40"
+                              : "bg-card/20 group-hover:bg-card/40"
                           }`}
                         />
                         <span
                           className={`font-mono text-xs sm:text-sm tracking-wider uppercase transition-colors duration-200 ${
                             isActive
                               ? "text-blue-400 font-semibold"
-                              : "text-[#6B7280] group-hover:text-white"
+                              : "text-[#6B7280] group-hover:text-foreground"
                           }`}
                         >
                           {layer.number} {layer.name}
@@ -617,7 +617,7 @@ export function ArchitectureScene() {
                     <span className="text-[11px] font-mono uppercase tracking-widest text-blue-400">
                       LAYER INSPECTION
                     </span>
-                    <h3 className="text-xl font-normal text-white tracking-tight">{activeLayer.title}</h3>
+                    <h3 className="text-xl font-normal text-foreground tracking-tight">{activeLayer.title}</h3>
                   </motion.div>
 
                   <motion.p
@@ -654,7 +654,7 @@ export function ArchitectureScene() {
                   </motion.div>
 
                   <motion.div
-                    className="p-3.5 rounded-xl bg-white/[0.03] space-y-2"
+                    className="p-3.5 rounded-lg bg-accent space-y-2"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, delay: 0.4 }}
@@ -694,10 +694,10 @@ export function ArchitectureScene() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
             >
-              <span className="text-xs font-mono uppercase tracking-widest text-emerald-400">
+              <span className="text-xs font-mono uppercase tracking-widest tone-green">
                 MULTI-ENCLAVE CLUSTER
               </span>
-              <h3 className="text-2xl font-light text-white mt-1">Isolated Cryptographic Sandboxes</h3>
+              <h3 className="text-2xl font-light text-foreground mt-1">Isolated Cryptographic Sandboxes</h3>
               <p className="text-xs text-[#6B7280] mt-1 font-light">
                 Each agent workspace executes within dedicated, tenant-isolated memory containers.
               </p>
@@ -746,19 +746,19 @@ export function ArchitectureScene() {
             </motion.div>
 
             <motion.div
-              className="mt-10 p-6 rounded-2xl bg-white/[0.03] border border-white/[0.06] max-w-md mx-auto text-center"
+              className="mt-10 p-6 rounded-lg bg-accent border border-border max-w-md mx-auto text-center"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.4 }}
             >
               <div className="space-y-2">
-                <span className="text-[11px] font-mono uppercase tracking-widest text-emerald-400">
-                  {SANDBOX_NODES[activeSandbox].label} • {SANDBOX_NODES[activeSandbox].role}
+                <span className="text-[11px] font-mono uppercase tracking-widest tone-green">
+                  {SANDBOX_NODES[activeSandbox].label} â€¢ {SANDBOX_NODES[activeSandbox].role}
                 </span>
                 <div className="flex items-center justify-center gap-4 text-xs font-mono text-[#6B7280]">
-                  <span>Latency: <span className="text-white font-medium">{SANDBOX_NODES[activeSandbox].latency}</span></span>
-                  <span>Load: <span className="text-white font-medium">{SANDBOX_NODES[activeSandbox].load}</span></span>
-                  <span>Status: <span className="text-emerald-400 font-medium">{SANDBOX_NODES[activeSandbox].status.toUpperCase()}</span></span>
+                  <span>Latency: <span className="text-foreground font-medium">{SANDBOX_NODES[activeSandbox].latency}</span></span>
+                  <span>Load: <span className="text-foreground font-medium">{SANDBOX_NODES[activeSandbox].load}</span></span>
+                  <span>Status: <span className="tone-green font-medium">{SANDBOX_NODES[activeSandbox].status.toUpperCase()}</span></span>
                 </div>
               </div>
             </motion.div>

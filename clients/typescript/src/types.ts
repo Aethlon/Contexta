@@ -1,9 +1,226 @@
+export interface TlsOptions {
+  ca?: string;
+  caPath?: string;
+  rejectUnauthorized?: boolean;
+}
+
+export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+
 export interface contextaConfig {
   apiKey: string;
   baseUrl?: string;
   timeout?: number;
   maxRetries?: number;
   telemetry?: boolean;
+  organizationId?: string;
+  tls?: TlsOptions;
+  dispatcher?: unknown;
+  fetch?: FetchLike;
+}
+
+export interface AddRuleInput {
+  userId: string;
+  rule: string;
+  title?: string;
+  tags?: string[];
+}
+
+export interface FeedbackInput {
+  signal: "positive" | "negative";
+  userCorrection?: string;
+  penalty?: number;
+}
+
+export interface InvestigateInput {
+  queryText: string;
+  userId: string;
+  organizationId?: string;
+  maxHops?: number;
+  limit?: number;
+}
+
+export interface ReflectInput {
+  userId: string;
+  applySupersession?: boolean;
+  minOccurrencesForPattern?: number;
+}
+
+export interface InvestigateStep {
+  step: number;
+  action: string;
+  target: string;
+  rationale: string;
+  discoveredCount: number;
+}
+
+export interface InvestigateResultItem {
+  id: string;
+  title: string;
+  content: string;
+  memoryType: string;
+  score: number;
+  isCurrent: boolean;
+  createdAt: string | null;
+}
+
+export interface InvestigateResult {
+  status: string;
+  query: string;
+  executionTimeMs: number;
+  entitiesDiscovered: number;
+  investigationTrace: InvestigateStep[];
+  temporalEvolution: unknown;
+  synthesizedContext: string;
+  results: InvestigateResultItem[];
+}
+
+export interface FeedbackResult {
+  status: string;
+  memoryId: string;
+  utilityScore: number;
+  confidence: number;
+  memoryState: string;
+}
+
+export interface ReflectResult {
+  status: string;
+  userId: string;
+  contradictionsDetected: number;
+  contradictionsResolved: number;
+  patternsConsolidated: number;
+  consolidatedPatterns: { title: string; content: string; tags: string[] }[];
+}
+
+export interface MemoryBatchEntry {
+  id: string;
+  userId: string;
+  memoryType: string;
+  title: string;
+  content: string;
+  importance: number;
+  confidence: number;
+  utilityScore: number;
+  tags: string[] | null;
+  memoryState: string;
+  isPinned: boolean;
+  createdAt: string | null;
+}
+
+export interface MemoryBatchResponse {
+  count: number;
+  memories: MemoryBatchEntry[];
+}
+
+export interface BatchRetrievalEntry {
+  query: string;
+  count: number;
+  results: ScoredMemory[];
+}
+
+export interface VectorSearchResponse {
+  mode: string;
+  query: string;
+  count: number;
+  results: {
+    id: string;
+    title: string;
+    content: string;
+    similarity: number;
+    memoryType: string;
+    tags: string[];
+    createdAt: string | null;
+  }[];
+}
+
+export interface MemoryFlag {
+  memoryId: string;
+  isPinned?: boolean;
+  isArchived?: boolean;
+}
+
+export interface DeleteResult {
+  memoryId: string;
+  deleted: boolean;
+}
+
+export interface SearchInput {
+  query: string;
+  userId?: string;
+  limit?: number;
+  threshold?: number;
+  memoryType?: string;
+}
+
+export interface TraverseInput {
+  source: string;
+  hops?: number;
+  relationshipTypes?: string[];
+  direction?: "both" | "outgoing" | "incoming";
+}
+
+export interface TraverseResult {
+  mode: string;
+  rootEntity: GraphEntity;
+  hops: number;
+  nodes: GraphEntity[];
+  edges: GraphEdge[];
+  linkedMemories: MemoryListEntry[];
+}
+
+export interface GraphEntity {
+  id: string;
+  name: string;
+  entityType: string;
+  [key: string]: unknown;
+}
+
+export interface GraphEdge {
+  id: string;
+  sourceEntityId: string;
+  targetEntityId: string;
+  relationshipType: string;
+  [key: string]: unknown;
+}
+
+export interface HybridSearchInput {
+  query: string;
+  userId?: string;
+  limit?: number;
+  maxHops?: number;
+  vectorWeight?: number;
+  graphWeight?: number;
+  includeCold?: boolean;
+}
+
+export interface HybridSearchResponse {
+  mode: string;
+  query: string;
+  count: number;
+  results: {
+    memoryId: string;
+    title: string;
+    content: string;
+    score: number;
+    scoreBreakdown: Record<string, number>;
+    tags: string[];
+    createdAt: string | null;
+  }[];
+}
+
+export interface ListMemoriesInput {
+  userId?: string;
+  memoryType?: string;
+  state?: string;
+  pinned?: boolean;
+  archived?: boolean;
+  offset?: number;
+  limit?: number;
+}
+
+export interface CreateSessionInput {
+  userId: string;
+  organizationId: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ObserveInput {
@@ -13,6 +230,11 @@ export interface ObserveInput {
   messages: Record<string, unknown>[];
   metadata?: Record<string, unknown>;
   policy?: string;
+  occurredAt?: string;
+  observedAt?: string;
+  sourceId?: string;
+  messageId?: string;
+  timezone?: string;
 }
 
 export interface RetrieveInput {
@@ -201,6 +423,12 @@ export interface Session {
   metadata?: Record<string, unknown> | null;
   memoryCount?: number;
   earliestMemoryCreatedAt?: string | null;
+}
+
+export interface EndSessionResult {
+  sessionId: string;
+  endedAt: string;
+  epilogueWorker: string;
 }
 
 export interface UserProfile {

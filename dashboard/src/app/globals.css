@@ -1,10 +1,15 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: var(--font-mono), "JetBrains Mono", "Geist Mono", monospace;
+  --font-sans: var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, "SF Mono", "JetBrains Mono",
+    "Geist Mono", Menlo, monospace;
 
-  /* web-public aligned Dark Ash Design System */
+  /* Notion-aligned design system.
+     Token NAMES are kept identical to the previous "Dark Ash" system so every
+     existing `bg-card` / `text-muted-foreground` / `border-border` call site keeps
+     working — only the VALUES changed. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -25,50 +30,124 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.25rem;
+  /* New semantic surface tokens (Notion-style) */
+  --color-sidebar: var(--sidebar);
+  --color-surface: var(--surface);
+  --color-hover: var(--hover);
+  --color-selected: var(--selected);
+  --color-overlay: var(--overlay);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-green: var(--accent-green);
+  --color-accent-yellow: var(--accent-yellow);
+  --color-accent-purple: var(--accent-purple);
+
+  /* Notion uses tight radii — 3px controls, 4-6px cards, 8px dialogs. */
+  --radius-sm: 0.1875rem;
+  --radius-md: 0.25rem;
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.75rem;
   --radius-full: 9999px;
 }
 
-:root {
-  /* Core brand ash tokens identical to web-public */
-  --color-abyss: #0e0e11;
-  --color-ash: #141418;
-  --color-charcoal: #1c1c21;
-  --color-graphite: #2b2b32;
-  --color-smoke: #8a8a93;
-  --color-ghost: #f4f4f6;
+/* ---------------------------------------------------------------------------
+   Light — the default, matching Notion.
+   Declared on BOTH :root and .light so the class name is irrelevant.
+--------------------------------------------------------------------------- */
+:root,
+.light {
+  color-scheme: light;
 
-  --background: #141418;
-  --foreground: #f4f4f6;
-  --card: #1b1b20;
-  --card-foreground: #f4f4f6;
-  --popover: #1b1b20;
-  --popover-foreground: #f4f4f6;
-  --primary: #f4f4f6;
-  --primary-foreground: #141418;
-  --secondary: #23232a;
-  --secondary-foreground: #f4f4f6;
-  --muted: #23232a;
-  --muted-foreground: #8a8a93;
-  --accent: #23232a;
-  --accent-foreground: #f4f4f6;
-  --destructive: #ef4444;
-  --destructive-foreground: #f4f4f6;
-  --border: oklch(100% 0 0 / 0.14);
-  --input: oklch(100% 0 0 / 0.10);
-  --ring: oklch(75% 0 0);
+  --background: #ffffff;
+  --foreground: #37352f;
 
-  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+  --card: #ffffff;
+  --card-foreground: #37352f;
+  --popover: #ffffff;
+  --popover-foreground: #37352f;
+
+  --primary: #37352f;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f1ef;
+  --secondary-foreground: #37352f;
+  --muted: #f1f1ef;
+  --muted-foreground: #73726e;
+  --accent: #f1f1ef;
+  --accent-foreground: #37352f;
+  --destructive: #e03e3e;
+  --destructive-foreground: #ffffff;
+
+  /* Hairlines, never heavy */
+  --border: rgba(55, 53, 47, 0.09);
+  --input: rgba(55, 53, 47, 0.16);
+  --ring: rgba(55, 53, 47, 0.3);
+
+  --sidebar: #f7f7f5;
+  --surface: #ffffff;
+  --hover: rgba(55, 53, 47, 0.06);
+  --selected: rgba(55, 53, 47, 0.09);
+  --overlay: rgba(15, 15, 15, 0.35);
+  --text-secondary: #73726e;
+  --text-tertiary: #9b9a97;
+
+  --accent-blue: #2383e2;
+  --accent-green: #0f7b6c;
+  --accent-yellow: #cb7b37;
+  --accent-purple: #8a63b8;
+
+  /* Notion barely uses shadows; only for floating layers. */
+  --shadow-card: 0 1px 2px rgba(15, 15, 15, 0.04);
+  --shadow-overlay: 0 16px 48px rgba(15, 15, 15, 0.2);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: #191919;
+  --foreground: rgba(255, 255, 255, 0.81);
+
+  --card: #202020;
+  --card-foreground: rgba(255, 255, 255, 0.81);
+  --popover: #252525;
+  --popover-foreground: rgba(255, 255, 255, 0.81);
+
+  --primary: rgba(255, 255, 255, 0.81);
+  --primary-foreground: #191919;
+  --secondary: #2c2c2c;
+  --secondary-foreground: rgba(255, 255, 255, 0.81);
+  --muted: #2c2c2c;
+  --muted-foreground: rgba(255, 255, 255, 0.46);
+  --accent: #2c2c2c;
+  --accent-foreground: rgba(255, 255, 255, 0.81);
+  --destructive: #ff7369;
+  --destructive-foreground: #191919;
+
+  --border: rgba(255, 255, 255, 0.094);
+  --input: rgba(255, 255, 255, 0.115);
+  --ring: rgba(255, 255, 255, 0.25);
+
+  --sidebar: #202020;
+  --surface: #202020;
+  --hover: rgba(255, 255, 255, 0.055);
+  --selected: rgba(255, 255, 255, 0.094);
+  --overlay: rgba(0, 0, 0, 0.55);
+  --text-secondary: rgba(255, 255, 255, 0.46);
+  --text-tertiary: rgba(255, 255, 255, 0.3);
+
+  --accent-blue: #529cca;
+  --accent-green: #4dab9a;
+  --accent-yellow: #ffbd59;
+  --accent-purple: #a98bd3;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.5);
 }
 
 html {
   background: var(--background);
   color: var(--foreground);
-  color-scheme: dark;
   scroll-behavior: smooth;
 }
 
@@ -77,68 +156,340 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 ::selection {
-  background-color: #27272a;
-  color: #e4e4e7;
+  background-color: rgba(35, 131, 226, 0.22);
+  color: inherit;
 }
 
-/* Scrollbar */
+/* Notion scrollbars are thin and near-invisible. */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-abyss);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-graphite);
-  border-radius: 3px;
+  background: var(--border);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 6px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-smoke);
+  background: var(--input);
+  background-clip: content-box;
 }
 
-/* Focus Visible */
 :focus-visible {
-  outline: none;
-  ring: 1px;
-  ring-color: var(--ring);
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 1px;
+  border-radius: 3px;
 }
 
-/* Animations matching web-public */
+/* ---------------------------------------------------------------------------
+   Notion-style primitives. These let pages stay consistent without
+   hand-rolling long Tailwind chains for every control.
+--------------------------------------------------------------------------- */
+
+/* Page heading block: big title + optional muted subtitle */
+.nb-page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--foreground);
+}
+.nb-page-subtitle {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* Section header inside a page */
+.nb-section-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+}
+.nb-section-subtitle {
+  margin-top: 0.125rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+/* Flat bordered container */
+.nb-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+/* Primary / secondary / ghost buttons */
+.nb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease,
+    color 120ms ease, opacity 120ms ease;
+  user-select: none;
+}
+.nb-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.nb-btn-primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid transparent;
+}
+.nb-btn-primary:hover:not(:disabled) {
+  opacity: 0.85;
+}
+.nb-btn-secondary {
+  background: var(--card);
+  color: var(--foreground);
+  border: 1px solid var(--input);
+}
+.nb-btn-secondary:hover:not(:disabled) {
+  background: var(--hover);
+}
+.nb-btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+}
+.nb-btn-ghost:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--foreground);
+}
+.nb-btn-danger {
+  background: transparent;
+  color: var(--destructive);
+  border: 1px solid var(--input);
+}
+.nb-btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
+  border-color: color-mix(in srgb, var(--destructive) 40%, transparent);
+}
+
+/* Text inputs */
+.nb-input {
+  width: 100%;
+  height: 2.25rem;
+  padding: 0 0.625rem;
+  background: var(--card);
+  color: var(--foreground);
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: border-color 120ms ease;
+}
+.nb-input::placeholder {
+  color: var(--text-tertiary);
+}
+.nb-input:hover {
+  border-color: var(--ring);
+}
+
+/* Small status pill */
+.nb-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  height: 1.5rem;
+  padding: 0 0.5rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--card);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Row that reads like a Notion list item */
+.nb-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-md);
+  transition: background-color 100ms ease;
+  cursor: pointer;
+}
+.nb-row:hover {
+  background: var(--hover);
+}
+
+/* Sidebar nav item */
+.nb-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  transition: background-color 100ms ease, color 100ms ease;
+}
+.nb-nav-item:hover {
+  background: var(--hover);
+  color: var(--foreground);
+}
+.nb-nav-item-active {
+  background: var(--selected);
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+/* Hairline divider */
+.nb-divider {
+  height: 1px;
+  background: var(--border);
+  border: 0;
+}
+
+/* Status tones — one accent per semantic state, no rainbow */
+.tone-green {
+  color: var(--accent-green);
+}
+.tone-amber {
+  color: var(--accent-yellow);
+}
+.tone-red {
+  color: var(--destructive);
+}
+.tone-blue {
+  color: var(--accent-blue);
+}
+.tone-purple {
+  color: var(--accent-purple);
+}
+
+.dot {
+  display: inline-block;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+.dot-green {
+  background: var(--accent-green);
+}
+.dot-amber {
+  background: var(--accent-yellow);
+}
+.dot-red {
+  background: var(--destructive);
+}
+.dot-blue {
+  background: var(--accent-blue);
+}
+
+.edge-green {
+  border-color: color-mix(in srgb, var(--accent-green) 35%, transparent);
+}
+.edge-amber {
+  border-color: color-mix(in srgb, var(--accent-yellow) 35%, transparent);
+}
+.edge-red {
+  border-color: color-mix(in srgb, var(--destructive) 35%, transparent);
+}
+
+/* Tinted status pill */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.5rem;
+  padding: 0 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.pill-green {
+  color: var(--accent-green);
+  border-color: color-mix(in srgb, var(--accent-green) 30%, transparent);
+  background: color-mix(in srgb, var(--accent-green) 8%, transparent);
+}
+.pill-amber {
+  color: var(--accent-yellow);
+  border-color: color-mix(in srgb, var(--accent-yellow) 30%, transparent);
+  background: color-mix(in srgb, var(--accent-yellow) 8%, transparent);
+}
+.pill-red {
+  color: var(--destructive);
+  border-color: color-mix(in srgb, var(--destructive) 30%, transparent);
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+}
+.pill-blue {
+  color: var(--accent-blue);
+  border-color: color-mix(in srgb, var(--accent-blue) 30%, transparent);
+  background: color-mix(in srgb, var(--accent-blue) 8%, transparent);
+}
+
+/* Monospace block for code / keys / IDs */
+.nb-code {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.125rem 0.3125rem;
+}
+
+/* Muted table header / cell helpers */
+.nb-th {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+}
+.nb-td {
+  font-size: 0.875rem;
+  color: var(--foreground);
+  padding: 0.625rem 0.75rem;
+}
+
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fade-in {
-  animation: fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Flow connector dash animation */
-@keyframes iso-dash {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
   to {
-    stroke-dashoffset: -28;
+    opacity: 1;
+    transform: translateY(0);
   }
 }
-
-.iso-flow {
-  stroke-dasharray: 7 7;
-  animation: iso-dash 1.4s linear infinite;
+.animate-fade-in {
+  animation: fade-in 160ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .iso-flow {
+  .animate-fade-in {
     animation: none !important;
   }
-}
-
-/* Monospace text helper */
-.font-mono-subtle {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
+  html {
+    scroll-behavior: auto;
+  }
 }

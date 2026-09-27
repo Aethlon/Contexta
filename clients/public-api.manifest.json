@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "description": "Canonical public method surface of the Contexta SDKs. Both clients are asserted against this file so the Python and TypeScript SDKs cannot silently drift. Python: clients/python/tests/test_public_api_parity.py. TypeScript: clients/typescript/tests/parity.test.ts.",
+  "python": {
+    "clientClass": "Contexta",
+    "asyncClientClass": "AsyncContexta",
+    "deprecatedAliases": {
+      "contexta": "Contexta",
+      "Asynccontexta": "AsyncContexta"
+    }
+  },
+  "typescript": {
+    "clientClass": "Contexta",
+    "asyncClientClass": "AsyncContexta",
+    "deprecatedAliases": {
+      "contexta": "Contexta",
+      "Asynccontexta": "AsyncContexta"
+    }
+  },
+  "methods": [
+    { "name": "from_env", "typescript": "fromEnv" },
+    { "name": "observe", "typescript": "observe" },
+    { "name": "observe_batch", "typescript": "observeBatch" },
+    { "name": "retrieve", "typescript": "retrieve" },
+    { "name": "retrieve_batch", "typescript": "retrieveBatch" },
+    { "name": "investigate", "typescript": "investigate" },
+    { "name": "search", "typescript": "search" },
+    { "name": "hybrid", "typescript": "hybrid" },
+    { "name": "context", "typescript": "context" },
+    { "name": "explain", "typescript": "explain" },
+    { "name": "get_memory", "typescript": "getMemory" },
+    { "name": "list_memories", "typescript": "listMemories" },
+    { "name": "get_many", "typescript": "getMany" },
+    { "name": "timeline", "typescript": "timeline" },
+    { "name": "pin", "typescript": "pin" },
+    { "name": "unpin", "typescript": "unpin" },
+    { "name": "archive", "typescript": "archive" },
+    { "name": "restore", "typescript": "restore" },
+    { "name": "delete", "typescript": "delete" },
+    { "name": "traverse", "typescript": "traverse" },
+    { "name": "list_policies", "typescript": "listPolicies" },
+    { "name": "register_policy", "typescript": "registerPolicy" },
+    { "name": "register_schema", "typescript": "registerSchema" },
+    { "name": "feedback", "typescript": "feedback" },
+    { "name": "add_rule", "typescript": "addRule" },
+    { "name": "reflect", "typescript": "reflect" },
+    { "name": "create_session", "typescript": "createSession" },
+    { "name": "get_session", "typescript": "getSession" },
+    { "name": "end_session", "typescript": "endSession" },
+    { "name": "ping", "typescript": "ping" },
+    { "name": "flush", "typescript": "flush" },
+    { "name": "close", "typescript": "close" }
+  ]
+}

@@ -113,6 +113,7 @@ async def test_near_duplicate_is_merged(payload: ObservationPayload) -> None:
     assert result.action == "merge"
     update = repo.updates[0][1]
     assert "The user prefers Python." in update["content"]
+    assert "The user likes Python." in update["search_text"]
     assert update["tags"] == ["backend", "python"]
 
 

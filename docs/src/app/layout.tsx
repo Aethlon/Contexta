@@ -5,7 +5,8 @@ import "@/styles/docs.css";
 
 export const metadata: Metadata = {
   title: "contexta Docs — Memory Intelligence for AI Agents",
-  description: "Build agents that remember. SDK-first memory layer with hybrid retrieval, extraction, and lifecycle management.",
+  description:
+    "Self-hosted, offline-first long-term memory for AI agents. Hybrid retrieval, durable ingestion, and truth maintenance on infrastructure you own.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -22,13 +23,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <nav className="docs-header-nav">
                 <a href="/quickstart">Quickstart</a>
                 <a href="/concepts">Concepts</a>
+                <a href="/reference/api">API</a>
                 <a href="/reference/sdks">SDKs</a>
-                <a href="/pricing">Pricing</a>
+                <a href="/licensing">Licensing</a>
                 <a href="/changelog">Changelog</a>
               </nav>
               <div className="docs-header-right">
                 <Search />
-                <a href="https://app.contexta.dev" className="docs-btn docs-btn-primary" target="_blank" rel="noreferrer">Dashboard</a>
+                <a href="/quickstart" className="docs-btn docs-btn-primary">Get started</a>
               </div>
             </div>
           </header>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -66,7 +66,7 @@ export function SovereignSignInForm() {
           return;
         }
 
-        // On successful authentication, navigate to root to resolve mandatory reset/onboarding/dashboard
+        // On successful authentication, go to the console.
         router.push("/");
         router.refresh();
       } catch (err: any) {
@@ -79,7 +79,7 @@ export function SovereignSignInForm() {
     <form onSubmit={handleSubmit} className="space-y-3 font-mono">
       {/* Error Banner */}
       {error && (
-        <div className="mb-4 rounded border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-400 space-y-2">
+        <div className="mb-4 rounded border border-red-500/30 bg-red-500/10 p-3.5 text-xs tone-red space-y-2">
           <div className="flex items-start gap-2.5">
             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
             <div className="space-y-1">
@@ -96,7 +96,7 @@ export function SovereignSignInForm() {
               type="button"
               onClick={handleLaunchEngine}
               disabled={isLaunching}
-              className="w-full py-2 px-3 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 text-xs font-mono transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2 px-3 rounded bg-amber-500/20 border border-amber-500/40 tone-amber hover:bg-amber-500/30 text-xs font-mono transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               {isLaunching ? (
                 <>
@@ -124,7 +124,7 @@ export function SovereignSignInForm() {
           placeholder="Email address"
           required
           disabled={isPending}
-          className="w-full rounded border border-border/40 bg-card/60 px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+          className="w-full rounded border border-border bg-card px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
         />
       </div>
 
@@ -160,7 +160,7 @@ export function SovereignSignInForm() {
           placeholder="Master Password"
           required
           disabled={isPending}
-          className="w-full rounded border border-border/40 bg-card/60 px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+          className="w-full rounded border border-border bg-card px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
         />
       </div>
 

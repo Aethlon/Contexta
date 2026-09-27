@@ -39,6 +39,10 @@ class ImportanceFramework:
         MemoryType.EPISODIC: 0.4,
         MemoryType.PROCEDURAL: 0.75,
         MemoryType.RULE: 0.8,
+        # A constraint is a hard boundary, same category as a rule: it exists
+        # to be obeyed, so it sits at the top of the base range rather than
+        # being treated as a preference.
+        MemoryType.CONSTRAINT: 0.8,
         MemoryType.PATTERN: 0.6,
         MemoryType.CONTACT: 0.7,
         MemoryType.CUSTOM: 0.5,

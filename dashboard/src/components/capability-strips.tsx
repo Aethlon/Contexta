@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import { motion } from "framer-motion";
@@ -29,7 +29,7 @@ function TripleDiagram() {
       {[
         { x: 130, top: "SUBJECT", main: "User usr_9102", c: "#93C5FD" },
         { x: 330, top: "PREDICATE", main: "prefers_language", c: "#67E8F9" },
-        { x: 520, top: "OBJECT", main: "Rust · 0.99", c: "#6EE7B7" },
+        { x: 520, top: "OBJECT", main: "Rust Â· 0.99", c: "#6EE7B7" },
       ].map((b, i) => (
         <g key={b.top}>
           <rect x={b.x - 88} y={52} width={176} height={86} rx={14} fill="rgba(255,255,255,0.03)" />
@@ -50,12 +50,12 @@ function TemporalDiagram() {
     <svg viewBox="0 0 600 150" className="w-full h-[130px]" role="img" aria-label="Temporal state transition">
       <line x1={60} y1={75} x2={540} y2={75} stroke="rgba(255,255,255,0.12)" strokeWidth={1.5} />
       <circle cx={150} cy={75} r={7} fill="none" stroke="#F87171" strokeWidth={1.6} opacity={0.8} />
-      <text x={150} y={52} textAnchor="middle" fontSize="10" fill="#6B7280" fontFamily="monospace" textDecoration="line-through">London · 2024</text>
+      <text x={150} y={52} textAnchor="middle" fontSize="10" fill="#6B7280" fontFamily="monospace" textDecoration="line-through">London Â· 2024</text>
       <text x={150} y={104} textAnchor="middle" fontSize="9" fill="#F87171" fontFamily="monospace">ARCHIVED</text>
       <circle cx={450} cy={75} r={9} fill="#10B981">
         <animate attributeName="r" values="8;10;8" dur="2.4s" repeatCount="indefinite" />
       </circle>
-      <text x={450} y={52} textAnchor="middle" fontSize="10" fill="#fff" fontFamily="monospace">Tokyo · Active</text>
+      <text x={450} y={52} textAnchor="middle" fontSize="10" fill="#fff" fontFamily="monospace">Tokyo Â· Active</text>
       <text x={450} y={104} textAnchor="middle" fontSize="9" fill="#10B981" fontFamily="monospace">GROUNDED</text>
       <path d="M170 75 H 420" stroke="#10B981" strokeWidth={1.4} strokeDasharray="6 5" opacity={0.7}>
         <animate attributeName="stroke-dashoffset" from="22" to="0" dur="1s" repeatCount="indefinite" />
@@ -73,13 +73,13 @@ function EnclaveDiagram() {
           <rect x={x - 62} y={34} width={124} height={12} rx={6} fill={i === 1 ? "rgba(59,130,246,0.5)" : "rgba(255,255,255,0.08)"} transform="translate(5,-3) skewX(-24)" />
           <circle cx={x - 40} cy={72} r={4} fill={["#10B981", "#3B82F6", "#8B5CF6"][i]} />
           <text x={x + 4} y={76} fontSize="10" fill="#D1D5DB" fontFamily="monospace">tenant_{["acme", "lc-prod", "cursor"][i]}</text>
-          <text x={x} y={98} textAnchor="middle" fontSize="9" fill="#3D4450" fontFamily="monospace">AES-256 • ISOLATED</text>
+          <text x={x} y={98} textAnchor="middle" fontSize="9" fill="#3D4450" fontFamily="monospace">AES-256 â€¢ ISOLATED</text>
         </g>
       ))}
       <line x1={202} y1={75} x2={238} y2={75} stroke="#EF4444" strokeWidth={1.4} strokeDasharray="3 4" />
-      <text x={220} y={64} textAnchor="middle" fontSize="11" fill="#EF4444">✕</text>
+      <text x={220} y={64} textAnchor="middle" fontSize="11" fill="#EF4444">âœ•</text>
       <line x1={362} y1={75} x2={398} y2={75} stroke="#EF4444" strokeWidth={1.4} strokeDasharray="3 4" />
-      <text x={380} y={64} textAnchor="middle" fontSize="11" fill="#EF4444">✕</text>
+      <text x={380} y={64} textAnchor="middle" fontSize="11" fill="#EF4444">âœ•</text>
     </svg>
   );
 }
@@ -110,13 +110,15 @@ function RetrievalDiagram() {
 function LocalDiagram() {
   return (
     <div className="flex flex-wrap items-center gap-3 font-mono text-xs px-1 py-3">
-      <span className="px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-300">Local Ollama / vLLM</span>
-      <span className="text-[#3D4450]">•</span>
-      <span className="text-[#6B7280]">Qwen 2.5 7B quantized</span>
-      <span className="text-[#3D4450]">•</span>
-      <span className="text-[#6B7280]">FastEmbed ONNX</span>
-      <span className="text-[#3D4450]">•</span>
-      <span className="text-emerald-400">$0 inference</span>
+      <span className="px-3 py-1.5 rounded-full bg-emerald-500/10 tone-green">Local Ollama / vLLM</span>
+      <span className="text-[#3D4450]">â€¢</span>
+      <span className="text-[#6B7280]">Qwen3 Reranker 0.6B</span>
+      <span className="text-[#3D4450]">â€¢</span>
+      <span className="text-[#6B7280]">Fine-tuned LFM2.5-1.2B</span>
+      <span className="text-[#3D4450]">â€¢</span>
+      <span className="text-[#6B7280]">Qwen3 Embedding 0.6B</span>
+      <span className="text-[#3D4450]">â€¢</span>
+      <span className="tone-green">$0 inference</span>
     </div>
   );
 }
@@ -124,13 +126,13 @@ function LocalDiagram() {
 function McpDiagram() {
   return (
     <div className="flex flex-wrap items-center gap-3 font-mono text-xs px-1 py-3">
-      <span className="px-3 py-1.5 rounded-full bg-indigo-500/10 text-indigo-300">Cursor & Windsurf</span>
-      <span className="text-[#3D4450]">•</span>
+      <span className="px-3 py-1.5 rounded-full bg-indigo-500/10 tone-blue">Cursor & Windsurf</span>
+      <span className="text-[#3D4450]">â€¢</span>
       <span className="text-[#6B7280]">Claude Desktop</span>
-      <span className="text-[#3D4450]">•</span>
+      <span className="text-[#3D4450]">â€¢</span>
       <span className="text-[#6B7280]">LangChain / LlamaIndex</span>
-      <span className="text-[#3D4450]">•</span>
-      <span className="text-indigo-300">MCP 2.0 tools</span>
+      <span className="text-[#3D4450]">â€¢</span>
+      <span className="tone-blue">MCP 2.0 tools</span>
     </div>
   );
 }
@@ -140,7 +142,7 @@ const STRIPS: Strip[] = [
     n: "01",
     label: "ATOMIC FACT EXTRACTION",
     title: "Dialogue distilled to relational triples",
-    body: "Conversational fluff, pleasantries, and greetings are purged. What remains are structured, immutable facts: (Subject • Predicate • Object) with confidence scores and temporal anchors.",
+    body: "Conversational fluff, pleasantries, and greetings are purged. What remains are structured, immutable facts: (Subject â€¢ Predicate â€¢ Object) with confidence scores and temporal anchors.",
     metric: "99.4% Precision",
     diagram: <TripleDiagram />,
   },
@@ -172,7 +174,7 @@ const STRIPS: Strip[] = [
     n: "05",
     label: "LOCAL ENGINE",
     title: "Zero data egress option",
-    body: "Run extraction fully on-prem via quantized local Qwen 2.5 7B with FastEmbed ONNX. Zero cloud inference spend, zero context leaving your network.",
+    body: "Run extraction fully on-prem with a fine-tuned LFM2.5-1.2B extractor and Qwen3 embedding plus reranking. Zero cloud inference spend, zero context leaving your network.",
     metric: "$0 egress",
     diagram: <LocalDiagram />,
   },
@@ -189,12 +191,12 @@ const STRIPS: Strip[] = [
 export function CapabilityStrips() {
   return (
     <section id="capabilities" className="py-24 sm:py-32">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 pb-8 border-b border-white/[0.04]">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 pb-8 border-b border-border">
         <div className="max-w-2xl">
           <div className="inline-flex items-center gap-2 mb-3 text-xs font-mono uppercase tracking-widest text-purple-400">
-            <span aria-hidden="true">✱</span> Architecture Capabilities
+            <span aria-hidden="true">âœ±</span> Architecture Capabilities
           </div>
-          <h2 className="text-title text-2xl sm:text-4xl lg:text-5xl tracking-tight text-white leading-[1.15]">
+          <h2 className="text-title text-2xl sm:text-4xl lg:text-5xl tracking-tight text-foreground leading-[1.15]">
             Engineered for stateful agent intelligence
           </h2>
         </div>
@@ -207,8 +209,8 @@ export function CapabilityStrips() {
         {STRIPS.map((s, i) => (
           <motion.article
             key={s.n}
-            className={`rounded-3xl p-7 sm:p-9 shadow-elev-1 backdrop-blur-xl grid gap-6 lg:grid-cols-12 lg:items-center ${
-              i % 2 === 0 ? "bg-white/[0.02]" : "bg-white/[0.035]"
+            className={`rounded-lg p-7 sm:p-9 shadow-elev-1  grid gap-6 lg:grid-cols-12 lg:items-center ${
+              i % 2 === 0 ? "bg-accent" : "bg-accent"
             }`}
             initial={{ opacity: 0, y: 28 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -218,16 +220,16 @@ export function CapabilityStrips() {
             <div className="lg:col-span-4 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-[#6B7280]">
-                  {s.n} • {s.label}
+                  {s.n} â€¢ {s.label}
                 </span>
-                <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-white/[0.05] text-blue-300 whitespace-nowrap">
+                <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-accent text-blue-300 whitespace-nowrap">
                   {s.metric}
                 </span>
               </div>
-              <h3 className="text-xl sm:text-2xl font-light text-white tracking-tight">{s.title}</h3>
+              <h3 className="text-xl sm:text-2xl font-light text-foreground tracking-tight">{s.title}</h3>
               <p className="text-sm font-light text-[#6B7280] leading-relaxed">{s.body}</p>
             </div>
-            <div className="lg:col-span-8 rounded-2xl bg-black/30 p-3 sm:p-5 overflow-hidden">
+            <div className="lg:col-span-8 rounded-lg bg-black/30 p-3 sm:p-5 overflow-hidden">
               {s.diagram}
             </div>
           </motion.article>

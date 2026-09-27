@@ -1,11 +1,14 @@
 # LlamaIndex Integration
 
-contexta implements LlamaIndex's `BaseMemory` protocol, making it a drop-in replacement for `ChatMemoryBuffer`.
+Contexta implements LlamaIndex's `BaseMemory`, so it works as a conversational memory alongside (not instead of) a vector store.
 
 ## Installation
 
+The adapter ships **inside** the `contexta-client` package in this repository. There is no separate `contexta-llamaindex` distribution, and the import path is `contexta_client.adapters.llamaindex` (not `CONTEXTA_llamaindex`).
+
 ```bash
-pip install contexta-client contexta-llamaindex llama-index
+pip install -e clients/python
+pip install llama-index-core
 ```
 
 ## Usage
@@ -13,11 +16,16 @@ pip install contexta-client contexta-llamaindex llama-index
 ```python
 from llama_index.core.agent import ReActAgent
 from llama_index.core.tools import FunctionTool
-from CONTEXTA_llamaindex import contextaChatMemory
 
-memory = contextaChatMemory.from_env(
-    user_id="u_123",
-    session_id="s_456",
+from contexta_client import Contexta
+from contexta_client.adapters.llamaindex import contextaChatMemory
+
+client = Contexta.from_env()
+
+memory = contextaChatMemory(
+    client,
+    user_id=ACTOR_UUID,
+    session_id=session_id,
     token_budget=1500,
 )
 
@@ -31,36 +39,46 @@ agent = ReActAgent.from_tools(
 response = agent.chat("What database did I say I prefer?")
 ```
 
-## How It Works
+`contextaChatMemory(client, user_id, session_id, token_budget=None, **kwargs)` — positional client, keyword scope. It raises `ImportError` at construction if `llama-index-core` is not importable.
 
-- `get_all()` calls `contexta.context()` and returns a list of `ChatMessage` synthesized from the context bundle
-- `put(message)` buffers messages and emits a single observation at turn boundaries
-- Token budget is passed through to contexta's context endpoint
+There is no `contextaChatMemory.from_env()`. Build the client yourself and pass it in.
 
-## Complementary to Vector Stores
+## How it works
 
-contexta does **not** replace LlamaIndex's `VectorMemory`. Use both:
+- `get_all()` calls `client.context(...)` and synthesises `ChatMessage` objects from the context bundle, so the agent sees prior preferences, goals, projects, and relevant memories as chat history.
+- `put(message)` buffers messages and emits a single observation at turn boundaries.
+- `token_budget` is passed through to `GET /v1/memories/context`.
 
-- **LlamaIndex VectorMemory** — for document RAG
-- **contexta ChatMemory** — for conversational memory
+## Complementary to vector stores, not a replacement
+
+Contexta does **not** replace LlamaIndex's `VectorMemory`. Use both:
+
+- **LlamaIndex `VectorMemory`** — document RAG
+- **Contexta `contextaChatMemory`** — conversational memory
 
 ```python
 from llama_index.core.memory import VectorMemory
-from CONTEXTA_llamaindex import contextaChatMemory
+from contexta_client.adapters.llamaindex import contextaChatMemory
 
-# Document RAG
-doc_memory = VectorMemory.from_defaults(vector_store=...)
-
-# Conversational memory
-conv_memory = contextaChatMemory.from_env(
-    user_id="u_123",
-    session_id="s_456",
+doc_memory = VectorMemory.from_defaults(vector_store=...)     # documents
+conv_memory = contextaChatMemory(                              # conversation
+    client,
+    user_id=ACTOR_UUID,
+    session_id=session_id,
 )
 
 agent = ReActAgent.from_tools(
     tools=[...],
     llm=llm,
-    memory=conv_memory,  # contexta handles conversation
+    memory=conv_memory,
     verbose=True,
 )
 ```
+
+## No TypeScript adapter
+
+There is no LlamaIndex adapter for TypeScript. The four TypeScript adapters are OpenAI, Anthropic, LangChain, and Vercel AI.
+
+## Gotcha
+
+`user_id` must equal the actor bound to your API key, or the context fetch inside `get_all()` gets a `403` and the agent runs with empty history.

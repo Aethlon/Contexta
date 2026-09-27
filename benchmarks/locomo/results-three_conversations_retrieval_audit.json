@@ -1,0 +1,144 @@
+{
+  "summary": {
+    "n": 15,
+    "retrieval_hits": 12,
+    "accuracy": 0.8
+  },
+  "questions": [
+    {
+      "sample_id": "conv-26",
+      "category": 2,
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "gold_answer": "7 May 2023",
+      "retrieval_hit": true,
+      "retrieved": 20,
+      "top": "Caroline: [Date: 8:56 pm on 20 July, 2023] Thanks, Melanie! It's awesome to have our own platform to be ourselves and support others' rights. Our group, 'Connected LGBTQ Activists'"
+    },
+    {
+      "sample_id": "conv-26",
+      "category": 2,
+      "question": "When did Melanie paint a sunrise?",
+      "gold_answer": 2022,
+      "retrieval_hit": true,
+      "retrieved": 20,
+      "top": "Melanie: [Date: 1:56 pm on 8 May, 2023] Yeah, I painted that lake sunrise 2022-01-01 through 2022-12-31! It's special to me."
+    },
+    {
+      "sample_id": "conv-26",
+      "category": 3,
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "gold_answer": "Psychology, counseling certification",
+      "retrieval_hit": false,
+      "retrieved": 20,
+      "top": "Caroline: [Date: 4:33 pm on 12 July, 2023] Thanks, Mell! I'm still looking into counseling and mental health jobs. It's important to me that people have someone to talk to, and I w"
+    },
+    {
+      "sample_id": "conv-26",
+      "category": 1,
+      "question": "What did Caroline research?",
+      "gold_answer": "Adoption agencies",
+      "retrieval_hit": true,
+      "retrieved": 20,
+      "top": "Caroline: [Date: 1:14 pm on 25 May, 2023] Researching adoption agencies — it's been a dream to have a family and give a loving home to kids who need it."
+    },
+    {
+      "sample_id": "conv-26",
+      "category": 1,
+      "question": "What is Caroline's identity?",
+      "gold_answer": "Transgender woman",
+      "retrieval_hit": true,
+      "retrieved": 20,
+      "top": "Caroline: [Date: 2:24 pm on 14 August, 2023] Thanks, Melanie. Here's one- 'Embracing Identity' is all about finding comfort and love in being yourself. The woman in the painting st"
+    },
+    {
+      "sample_id": "conv-30",
+      "category": 2,
+      "question": "When Jon has lost his job as a banker?",
+      "gold_answer": "19 January, 2023",
+      "retrieval_hit": true,
+      "retrieved": 20,
+      "top": "Jon: [Date: 4:04 pm on 20 January, 2023] Hey Gina! Good to see you too. Lost my job as a banker 2023-01-19, so I'm gonna take a shot at starting my own business."
+    },
+    {
+      "sample_id": "conv-30",
+      "category": 2,
+      "question": "When Gina has lost her job at Door Dash?",
+      "gold_answer": "January, 2023",
+      "retrieval_hit": true,
+      "retrieved": 20,
+      "top": "Gina: [Date: 4:04 pm on 20 January, 2023] Sorry about your job Jon, but starting your own business sounds awesome! Unfortunately, I also lost my job at Door Dash 2023-01-01 through"
+    },
+    {
+      "sample_id": "conv-30",
+      "category": 4,
+      "question": "How do Jon and Gina both like to destress?",
+      "gold_answer": "by dancing",
+      "retrieval_hit": true,
+      "retrieved": 20,
+      "top": "Gina: [Date: 1:25 pm on 9 July, 2023] Wow, Jon! That's awesome. Loving what you do and bringing joy to others is so rewarding. You're definitely the perfect mentor & guide. Your po"
+    },
+    {
+      "sample_id": "conv-30",
+      "category": 1,
+      "question": "What do Jon and Gina both have in common?",
+      "gold_answer": "They lost their jobs and decided to start their own businesses.",
+      "retrieval_hit": false,
+      "retrieved": 20,
+      "top": "Gina: [Date: 1:25 pm on 9 July, 2023] Wow, Jon! That's awesome. Loving what you do and bringing joy to others is so rewarding. You're definitely the perfect mentor & guide. Your po"
+    },
+    {
+      "sample_id": "conv-30",
+      "category": 4,
+      "question": "Why did Jon decide to start his dance studio?",
+      "gold_answer": "He lost his job and decided to start his own business to share his passion.",
+      "retrieval_hit": true,
+      "retrieved": 20,
+      "top": "Jon: [Date: 8:29 pm on 13 June, 2023] Thanks, Gina! It's been so inspiring to work with our young dancers, seeing their passion and commitment. Opening the dance studio's been a gr"
+    },
+    {
+      "sample_id": "conv-41",
+      "category": 2,
+      "question": "Who did Maria have dinner with on May 3, 2023?",
+      "gold_answer": "her mother",
+      "retrieval_hit": false,
+      "retrieved": 20,
+      "top": "Maria: [Date: 3:18 pm on 4 May, 2023] Wow, John! It's great when you have that kind of support. My mom and I made some dinner together last night! [shared an image: a photo of a ta"
+    },
+    {
+      "sample_id": "conv-41",
+      "category": 2,
+      "question": "When did Maria donate her car?",
+      "gold_answer": "21 December 2022",
+      "retrieval_hit": true,
+      "retrieved": 20,
+      "top": "Maria: [Date: 6:10 pm on 22 December, 2022] Hey John, been a few days since we chatted. In the meantime, I donated my old car to a homeless shelter I volunteer at 2022-12-21. How's"
+    },
+    {
+      "sample_id": "conv-41",
+      "category": 1,
+      "question": "What martial arts has John done?",
+      "gold_answer": "Kickboxing, Taekwondo",
+      "retrieval_hit": true,
+      "retrieved": 20,
+      "top": "John: [Date: 11:01 am on 17 December, 2022] Woah, Maria, that sounds cool! I'm doing kickboxing and it's giving me so much energy."
+    },
+    {
+      "sample_id": "conv-41",
+      "category": 1,
+      "question": "What type of volunteering have John and Maria both done?",
+      "gold_answer": "Volunteering at a homeless shelter",
+      "retrieval_hit": true,
+      "retrieved": 20,
+      "top": "Maria: [Date: 11:08 am on 16 August, 2023] Hey John, I'm here for you. 2023-08-11, I spent some time at the shelter volunteering at the front desk. Seeing the smiles on their faces"
+    },
+    {
+      "sample_id": "conv-41",
+      "category": 2,
+      "question": "When did John join the online support group?",
+      "gold_answer": "The week before 1 January 2023",
+      "retrieval_hit": true,
+      "retrieved": 20,
+      "top": "John: [Date: 6:20 pm on 3 August, 2023] Hey Maria, hope you're doing OK. I had to share something cool with you - I asked family and friends to join the virtual support group I am "
+    }
+  ]
+}

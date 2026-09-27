@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from "react";
 import {
@@ -121,7 +121,7 @@ console.log(memories);`;
   return (
     <div className="w-full max-w-3xl mx-auto flex flex-col items-center space-y-8 animate-fade-in font-mono text-xs pb-16">
       {/* Header - Center Aligned */}
-      <div className="w-full border-b border-border/40 pb-6 text-center flex flex-col items-center">
+      <div className="w-full border-b border-border pb-6 text-center flex flex-col items-center">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] bg-blue-500/10 border border-blue-500/20 text-blue-400 mb-3">
           <BookOpen className="h-3.5 w-3.5" />
           <span>Quickstart & Integration</span>
@@ -133,21 +133,21 @@ console.log(memories);`;
       </div>
 
       {/* Connectivity Banner */}
-      <div className="w-full rounded-2xl border border-border/40 bg-secondary/20 p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="w-full rounded-lg border border-border bg-secondary/20 p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-3 text-center sm:text-left">
-          <div className="p-2 rounded-xl bg-secondary border border-border/40 text-foreground">
+          <div className="p-2 rounded-lg bg-secondary border border-border text-foreground">
             <Server className="h-4 w-4" />
           </div>
           <div>
             <div className="flex items-center justify-center sm:justify-start gap-2">
               <span className="text-xs font-medium text-foreground">Contexta Engine Connectivity</span>
               {testStatus === "online" && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 tone-green border border-emerald-500/20">
                   Online
                 </span>
               )}
               {testStatus === "offline" && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 tone-amber border border-amber-500/20">
                   Not Detected
                 </span>
               )}
@@ -182,11 +182,11 @@ console.log(memories);`;
                   Launch Sovereign Contexta Engine
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Runs natively in the background—no Docker required.
+                  Runs natively in the backgroundâ€”no Docker required.
                 </CardDescription>
               </div>
             </div>
-            <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px]">
+            <Badge className="bg-emerald-500/15 tone-green border-emerald-500/30 text-[10px]">
               Offline-First & Native
             </Badge>
           </div>
@@ -197,10 +197,10 @@ console.log(memories);`;
               Click &quot;Start Engine&quot; in the header bar for instant background execution, or run natively:
             </p>
             {/* Native Python Command */}
-            <div className="rounded-xl border border-border/40 bg-background/80 p-3 flex items-center justify-between font-mono text-xs">
+            <div className="rounded-lg border border-border bg-background/80 p-3 flex items-center justify-between font-mono text-xs">
               <div className="overflow-x-auto mr-2">
                 <span className="text-muted-foreground select-none"># Native Python: </span>
-                <span className="text-emerald-400 select-all">{nativeCommand}</span>
+                <span className="tone-green select-all">{nativeCommand}</span>
               </div>
               <button
                 type="button"
@@ -208,12 +208,12 @@ console.log(memories);`;
                 className="text-muted-foreground hover:text-foreground p-1 shrink-0"
                 title="Copy command"
               >
-                {copiedId === "cmd-native" ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                {copiedId === "cmd-native" ? <Check className="h-3.5 w-3.5 tone-green" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
             </div>
 
             {/* Windows PowerShell */}
-            <div className="rounded-xl border border-border/40 bg-background/80 p-3 flex items-center justify-between font-mono text-xs">
+            <div className="rounded-lg border border-border bg-background/80 p-3 flex items-center justify-between font-mono text-xs">
               <div>
                 <span className="text-muted-foreground select-none"># PowerShell Script: </span>
                 <span className="text-blue-400 select-all">.\\start.ps1</span>
@@ -224,7 +224,7 @@ console.log(memories);`;
                 className="text-muted-foreground hover:text-foreground p-1"
                 title="Copy command"
               >
-                {copiedId === "cmd-ps" ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                {copiedId === "cmd-ps" ? <Check className="h-3.5 w-3.5 tone-green" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
             </div>
           </div>
@@ -249,7 +249,7 @@ console.log(memories);`;
               </div>
             </div>
             {/* Language Switcher */}
-            <div className="flex items-center gap-1 bg-secondary/50 p-0.5 rounded-lg border border-border/40">
+            <div className="flex items-center gap-1 bg-secondary/50 p-0.5 rounded-lg border border-border">
               <button
                 type="button"
                 onClick={() => setSdkLanguage("python")}
@@ -272,16 +272,16 @@ console.log(memories);`;
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="relative rounded-xl border border-border/40 bg-background/90 p-4 font-mono text-xs overflow-x-auto">
+          <div className="relative rounded-lg border border-border bg-background/90 p-4 font-mono text-xs overflow-x-auto">
             <button
               type="button"
               onClick={() => handleCopy(sdkLanguage === "python" ? pythonSdkSnippet : tsSdkSnippet, "sdk-code")}
-              className="absolute top-3 right-3 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground bg-secondary/70 px-2 py-1 rounded border border-border/40 transition-colors"
+              className="absolute top-3 right-3 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground bg-secondary/70 px-2 py-1 rounded border border-border transition-colors"
             >
               {copiedId === "sdk-code" ? (
                 <>
-                  <Check className="h-3 w-3 text-emerald-400" />
-                  <span className="text-emerald-400">Copied!</span>
+                  <Check className="h-3 w-3 tone-green" />
+                  <span className="tone-green">Copied!</span>
                 </>
               ) : (
                 <>
@@ -316,7 +316,7 @@ console.log(memories);`;
             </div>
             <Link
               href="/dashboard/mcp"
-              className="text-xs text-emerald-400 hover:underline flex items-center gap-1"
+              className="text-xs tone-green hover:underline flex items-center gap-1"
             >
               <Bot className="h-3.5 w-3.5" />
               <span>Open MCP Hub &rarr;</span>

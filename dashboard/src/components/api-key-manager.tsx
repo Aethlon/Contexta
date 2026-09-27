@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { CheckCircle2, Copy, Loader2, RefreshCw, Trash2, AlertCircle } from "lucide-react";
@@ -97,15 +97,15 @@ export function ApiKeyManager({ initialKeys = [] }: { initialKeys?: ApiKey[] }) 
         </CardHeader>
         <CardContent className="space-y-6">
           {created ? (
-            <div className="mb-4 border-b border-[var(--color-graphite)]/30 pb-4">
+            <div className="mb-4 border-b border-[var(--border)]/30 pb-4">
               <div className="flex items-start gap-3">
-                <CheckCircle2 size={18} strokeWidth={1.2} className="text-[var(--color-smoke)] mt-0.5" />
+                <CheckCircle2 size={18} strokeWidth={1.2} className="text-[var(--text-secondary)] mt-0.5" />
                 <div className="flex flex-col gap-1">
-                  <span className="text-sm font-normal text-[var(--color-ghost)]">Copy this token now</span>
-                  <span className="text-xs font-light text-[var(--color-smoke)]">It will not be shown again.</span>
+                  <span className="text-sm font-normal text-[var(--foreground)]">Copy this token now</span>
+                  <span className="text-xs font-light text-[var(--text-secondary)]">It will not be shown again.</span>
                 </div>
               </div>
-              <code className="mt-3 block break-all rounded-xl bg-[var(--color-abyss)] p-3 font-mono text-xs text-[var(--color-ghost)] border border-[var(--color-graphite)]/30">
+              <code className="mt-3 block break-all rounded-lg bg-[var(--background)] p-3 font-mono text-xs text-[var(--foreground)] border border-[var(--border)]/30">
                 {created.token}
               </code>
               <Button className="mt-3" onClick={copyToken} variant="outline">
@@ -116,10 +116,10 @@ export function ApiKeyManager({ initialKeys = [] }: { initialKeys?: ApiKey[] }) 
 
           {error ? (
             <div className="mb-4 flex items-start gap-3">
-              <AlertCircle size={18} strokeWidth={1.2} className="text-[var(--color-smoke)] mt-0.5" />
+              <AlertCircle size={18} strokeWidth={1.2} className="text-[var(--text-secondary)] mt-0.5" />
               <div className="flex flex-col gap-1">
-                <span className="text-sm font-normal text-[var(--color-ghost)]">Key generation failed</span>
-                <span className="text-xs font-light text-[var(--color-smoke)]">{error}</span>
+                <span className="text-sm font-normal text-[var(--foreground)]">Key generation failed</span>
+                <span className="text-xs font-light text-[var(--text-secondary)]">{error}</span>
               </div>
             </div>
           ) : null}
@@ -133,7 +133,7 @@ export function ApiKeyManager({ initialKeys = [] }: { initialKeys?: ApiKey[] }) 
               <Label>Scopes</Label>
               <div className="flex flex-col gap-2">
                 {AVAILABLE_SCOPES.map((scope) => (
-                  <label key={scope.id} className="flex items-center gap-3 rounded-xl border border-[var(--color-graphite)]/30 bg-[var(--color-ash)] p-4 cursor-pointer hover:bg-[var(--color-charcoal)] transition-colors duration-200">
+                  <label key={scope.id} className="flex items-center gap-3 rounded-lg border border-[var(--border)]/30 bg-[var(--card)] p-4 cursor-pointer hover:bg-[var(--muted)] transition-colors duration-200">
                     <Checkbox
                       checked={selectedScopes.includes(scope.id)}
                       onCheckedChange={(checked) => {
@@ -143,8 +143,8 @@ export function ApiKeyManager({ initialKeys = [] }: { initialKeys?: ApiKey[] }) 
                       }}
                     />
                     <div className="leading-tight">
-                      <p className="text-sm font-normal text-[var(--color-ghost)]">{scope.label}</p>
-                      <p className="text-xs font-light text-[var(--color-smoke)]">{scope.description}</p>
+                      <p className="text-sm font-normal text-[var(--foreground)]">{scope.label}</p>
+                      <p className="text-xs font-light text-[var(--text-secondary)]">{scope.description}</p>
                     </div>
                   </label>
                 ))}
@@ -181,27 +181,27 @@ export function ApiKeyManager({ initialKeys = [] }: { initialKeys?: ApiKey[] }) 
             </TableHeader>
             <TableBody>
               {keys.map((key) => (
-                <TableRow key={key.id} className="hover:bg-[var(--color-charcoal)]/30 transition-colors duration-200">
-                  <TableCell className="font-normal text-[var(--color-ghost)]">{key.name}</TableCell>
-                  <TableCell className="font-mono text-xs text-[var(--color-smoke)]">{key.prefix}...</TableCell>
+                <TableRow key={key.id} className="hover:bg-[var(--muted)]/30 transition-colors duration-200">
+                  <TableCell className="font-normal text-[var(--foreground)]">{key.name}</TableCell>
+                  <TableCell className="font-mono text-xs text-[var(--text-secondary)]">{key.prefix}...</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {key.scopes.map((scope) => <Badge key={scope}>{scope}</Badge>)}
                     </div>
                   </TableCell>
-                  <TableCell className="text-[var(--color-smoke)] text-xs">
+                  <TableCell className="text-[var(--text-secondary)] text-xs">
                     {new Date(key.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
                     <Button onClick={() => handleRevoke(key.id)} variant="ghost" className="h-8 w-8 p-0 rounded-lg">
-                      <Trash2 className="h-3.5 w-3.5 text-[var(--color-smoke)] hover:text-red-400" strokeWidth={1.2} />
+                      <Trash2 className="h-3.5 w-3.5 text-[var(--text-secondary)] hover:text-destructive" strokeWidth={1.2} />
                     </Button>
                   </TableCell>
                 </TableRow>
               ))}
               {!isLoading && keys.length === 0 ? (
                 <TableRow>
-                  <TableCell className="text-[var(--color-smoke)] text-center py-8 font-light" colSpan={5}>
+                  <TableCell className="text-[var(--text-secondary)] text-center py-8 font-light" colSpan={5}>
                     No API keys yet.
                   </TableCell>
                 </TableRow>

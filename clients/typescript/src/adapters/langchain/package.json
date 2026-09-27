@@ -6,7 +6,7 @@
   "main": "./index.js",
   "types": "./index.d.ts",
   "peerDependencies": {
-    "@contexta/client": "^0.1.0",
+    "@contexta/client": "^0.2.0",
     "@langchain/core": "^0.3.0"
   },
   "repository": {

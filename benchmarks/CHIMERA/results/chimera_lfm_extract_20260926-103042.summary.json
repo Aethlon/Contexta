@@ -1,0 +1,106 @@
+{
+  "meta": {
+    "tag": "lfm_extract_20260926-103042",
+    "ran_at": "2026-09-26T10:33:57.124861+00:00",
+    "answer_model": "gemma3:1b",
+    "rerank": "off",
+    "db_url": "localhost:55433/chimera",
+    "retrieval_limit": 20,
+    "question_source": "C:\\Users\\jenit\\Desktop\\mono-repo\\Memento\\benchmarks\\CHIMERA\\data\\questions.jsonl",
+    "contexta_config": {
+      "engine_mode": "auto",
+      "embedding_provider": "local",
+      "embedding_profile": "offline-qwen3-1024",
+      "embedding_dimensions": 1024,
+      "local_model_server_url": "http://localhost:8001",
+      "llm_model": "contexta-lfm-extract:latest"
+    }
+  },
+  "totals": {
+    "questions": 6,
+    "passed": 0,
+    "failed": 6,
+    "accuracy": 0.0
+  },
+  "latency": {
+    "retrieve_ms": {
+      "p50": 1106.27,
+      "p95": 1212.37,
+      "p99": 1215.77,
+      "mean": 1042.75,
+      "min": 590.06,
+      "max": 1216.62
+    },
+    "answer_ms": {
+      "p50": 2747.32,
+      "p95": 10150.86,
+      "mean": 4790.28
+    }
+  },
+  "ingestion": {
+    "sessions": 10,
+    "chunks": 53,
+    "memories_extracted": 41,
+    "memories_stored": 27,
+    "skipped": 0,
+    "discarded": 10,
+    "failures": 5,
+    "embeddings_generated": 27,
+    "embedding_failures": 0,
+    "embedding_errors": [],
+    "total_s": 160.33,
+    "mean_session_ms": 16032.89,
+    "max_session_ms": 52097.97
+  },
+  "by_category": {
+    "distractor_density": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 1216.62,
+      "retrieve_p95_ms": 1216.62
+    },
+    "identity_resolution": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 590.06,
+      "retrieve_p95_ms": 590.06
+    },
+    "multi_hop_sessions": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 1037.65,
+      "retrieve_p95_ms": 1037.65
+    },
+    "negative_recall": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 1199.61,
+      "retrieve_p95_ms": 1199.61
+    },
+    "temporal_contradiction": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 1089.7,
+      "retrieve_p95_ms": 1089.7
+    },
+    "update_vs_append": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 1122.84,
+      "retrieve_p95_ms": 1122.84
+    }
+  },
+  "flags": {
+    "hallucinated": 1,
+    "abstained": 2,
+    "leaked": 0,
+    "partial": 0,
+    "errors": 0
+  }
+}

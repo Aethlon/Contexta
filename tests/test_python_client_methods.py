@@ -31,10 +31,12 @@ def test_python_client_advanced_methods():
         body={"queries": [{"query_text": "q1"}]},
     )
 
-    # 3. Test feedback
+    # 3. Test feedback -- client.feedback returns a typed FeedbackResult
     client._http._request.return_value = {"status": "success", "memory_id": "m1", "utility_score": 0.8}
     res = client.feedback("m1", signal="positive", user_correction="Correction", penalty=0.2)
-    assert res["status"] == "success"
+    assert res.status == "success"
+    assert res.memory_id == "m1"
+    assert res.utility_score == 0.8
     client._http._request.assert_called_with(
         method="POST",
         endpoint="/memories/m1/feedback",
@@ -53,7 +55,7 @@ def test_python_client_advanced_methods():
     assert "rule" in call_kwargs["metadata"]["tags"]
     assert "procedural" in call_kwargs["metadata"]["tags"]
 
-    # 5. Test investigate
+    # 5. Test investigate -- client.investigate returns a plain dict
     client._http._request.return_value = {"status": "success", "query": "What stack?", "results": []}
     res = client.investigate("What stack?", user_id="u1", max_hops=3)
     assert res["status"] == "success"
@@ -63,10 +65,10 @@ def test_python_client_advanced_methods():
         body={"query_text": "What stack?", "user_id": "u1", "max_hops": 3, "limit": 15},
     )
 
-    # 6. Test reflect
+    # 6. Test reflect -- client.reflect returns a typed ReflectResult
     client._http._request.return_value = {"status": "success", "contradictions_resolved": 2}
     res = client.reflect(user_id="u1", apply_supersession=True)
-    assert res["contradictions_resolved"] == 2
+    assert res.contradictions_resolved == 2
     client._http._request.assert_called_with(
         method="POST",
         endpoint="/memories/reflect",

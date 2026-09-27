@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from typing import Optional
+from uuid import uuid4
 
 import typer
 
@@ -14,6 +14,7 @@ def test(
 ) -> None:
     """Smoke test: ping API, send observation, retrieve context."""
     client = _get_client(profile)
+    session_id = str(uuid4())
 
     typer.echo("Pinging api...")
     try:
@@ -27,6 +28,7 @@ def test(
     try:
         resp = client.observe(
             user_id=user_id,
+            session_id=session_id,
             messages=[
                 {"role": "user", "content": "Hello, this is a test observation."},
                 {"role": "assistant", "content": "Test recorded."},
@@ -42,7 +44,12 @@ def test(
 
     typer.echo("Retrieving context...")
     try:
-        ctx = client.context(user_id=user_id, token_budget=500)
+        ctx = client.context(
+            user_id=user_id,
+            organization_id=client.organization_id,
+            session_id=session_id,
+            token_budget=500,
+        )
         memory_count = len(ctx.relevant_memories)
         typer.echo(f"Got context with {memory_count} memories")
     except Exception as e:

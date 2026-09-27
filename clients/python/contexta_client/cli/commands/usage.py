@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import typer
 
 from contexta_client.cli.commands.login import _get_client
@@ -53,6 +51,5 @@ def export_data(
     client = _get_client(profile)
     memories = client.retrieve(user_id=user_id, query_text="*", limit=1000)
     with open(output, "w") as f:
-        for m in memories:
-            f.write(m.model_dump_json(exclude_none=True) + "\n")
+        f.writelines(m.model_dump_json(exclude_none=True) + "\n" for m in memories)
     typer.echo(f"Exported {len(memories)} memories to {output}")

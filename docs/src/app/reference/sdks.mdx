@@ -1,82 +1,161 @@
 # SDK Overview
 
-contexta ships two first-party SDKs: Python (`contexta-client`) and TypeScript (`@contexta/client`). Both are MIT-licensed, async-first, and feature-identical.
+Contexta ships two first-party SDKs: Python (`contexta-client`) and TypeScript (`@contexta/client`). Both are in this repository, both are MIT-licensed, and both expose the same **32 public methods** — the list is asserted against `clients/public-api.manifest.json` by both test suites, so they cannot drift apart silently.
 
 ## Installation
 
+The published packages are not on PyPI or npm yet. Install from this repository:
+
 ```bash
 # Python
-pip install contexta-client
+pip install -e clients/python
 
 # TypeScript
-npm install @contexta/client
-# or
-pnpm add @contexta/client
-# or
-yarn add @contexta/client
+npm install ./clients/typescript
 ```
+
+## Naming
+
+`Contexta` and `AsyncContexta` are the canonical class names in both languages. The historical lowercase `contexta` / `Asynccontexta` still import and work, but emit a deprecation warning in Python and a single `console.warn` in TypeScript. Use the capitalised forms.
 
 ## Configuration
 
-Both SDKs read from environment variables automatically:
+Both SDKs read these automatically:
 
 ```env
-CONTEXTA_API_KEY=mk_live_your_key_here
-CONTEXTA_API_URL=https://api.contexta.dev
+CONTEXTA_API_KEY=mk_live_…
+CONTEXTA_API_URL=http://localhost:8000/v1
+CONTEXTA_ORGANIZATION_ID=…        # required by context() and create_session()
 CONTEXTA_TIMEOUT_MS=30000
 CONTEXTA_MAX_RETRIES=3
 CONTEXTA_TELEMETRY=true
+CONTEXTA_VERIFY_TLS=true
+CONTEXTA_CA_BUNDLE=…
 ```
+
+`CONTEXTA_API_URL` defaults to `https://api.contexta.dev/v1`. **There is no hosted Contexta API** — for a self-hosted install, set it to your own `http://localhost:8000/v1`.
 
 Or pass options directly:
 
 ```python
-contexta = contexta(
-    api_key="mk_live_...",
-    base_url="https://eu.api.contexta.dev",
+from contexta_client import Contexta
+
+m = Contexta(
+    api_key="mk_live_…",
+    base_url="http://localhost:8000/v1",
+    organization_id="…",
     timeout=30.0,
     max_retries=3,
 )
 ```
 
-## Initialization
+```ts
+import { Contexta } from "@contexta/client";
+
+const m = new Contexta({
+  apiKey: "mk_live_…",
+  baseUrl: "http://localhost:8000/v1",
+  organizationId: "…",
+  timeout: 30000,
+  maxRetries: 3,
+});
+```
+
+Note the Python option is `base_url` and the TypeScript option is `baseUrl` — they differ from the constructor argument names the dashboard's setup panel shows, which is a known doc bug in the console.
+
+## Initialisation
 
 ```python
-# From environment (recommended)
-from contexta_client import contexta, Asynccontexta
-m = contexta.from_env()
-am = Asynccontexta.from_env()
+from contexta_client import Contexta, AsyncContexta
 
-# Explicit
-m = contexta(api_key="mk_live_...")
+m = Contexta.from_env()
+am = AsyncContexta.from_env()
 ```
 
 ```ts
-import { contexta } from "@contexta/client";
-const m = contexta.fromEnv();
-// or: new contexta({ apiKey: "mk_live_..." })
+import { Contexta } from "@contexta/client";
+
+const m = Contexta.fromEnv();
+// or: new Contexta({ apiKey: "mk_live_…" })
 ```
 
-## The Thirteen Methods
+Both clients work as context managers, so the offline buffer drains and connections close automatically:
 
-| Method | Description |
-|--------|-------------|
-| `observe` | Ingest a conversation turn |
-| `observe_batch` | Ingest multiple turns at once |
-| `context` | Get token-budgeted context bundle |
-| `retrieve` | Low-level ranked memory search |
-| `explain` | Explainability for one memory |
-| `pin` | Protect a memory from decay |
-| `unpin` | Release protection |
-| `archive` | Soft-hide from retrieval |
-| `restore` | Unarchive a memory |
-| `delete` | Permanently delete |
-| `timeline` | Chronological event log |
-| `register_policy` | Custom extraction policy |
-| `register_schema` | Custom structured schema |
-| `ping` | Liveness check |
+```python
+with Contexta.from_env() as m:
+    …
+```
 
-## Error Handling
+```ts
+import { withContexta } from "@contexta/client";
+
+const prompt = await withContexta({ apiKey }, async (memory) => {
+  const ctx = await memory.context({ userId, organizationId, sessionId });
+  return ctx.toSystemPrompt();
+});
+```
+
+## The 32 methods
+
+### Ingestion
+
+| Method | Endpoint |
+| :--- | :--- |
+| `observe` | `POST /v1/observations` |
+| `observe_batch` | `POST /v1/observations/batch` |
+
+### Recall
+
+| Method | Endpoint |
+| :--- | :--- |
+| `retrieve` | `POST /v1/retrieve` |
+| `retrieve_batch` | `POST /v1/retrieve/batch` |
+| `investigate` | `POST /v1/retrieve/investigate` |
+| `search` | `GET /v1/memories/search` |
+| `hybrid` | `GET /v1/memories/hybrid` |
+| `traverse` | `GET /v1/graph/traverse` |
+| `context` | `GET /v1/memories/context` |
+
+### Memory lifecycle
+
+| Method | Endpoint |
+| :--- | :--- |
+| `get_memory` | `GET /v1/memories/{id}` |
+| `get_many` | `POST /v1/memories/batch-get` |
+| `list_memories` | `GET /v1/memories` |
+| `pin` / `unpin` | `POST /v1/memories/{id}/pin` \| `unpin` |
+| `archive` / `restore` | `POST /v1/memories/{id}/archive` \| `restore` |
+| `delete` | `DELETE /v1/memories/{id}` |
+| `explain` | `GET /v1/memories/{id}/explain` |
+| `feedback` | `POST /v1/memories/{id}/feedback` |
+| `timeline` | `GET /v1/memories/timeline/{user_id}` |
+| `add_rule` | built on `observe` |
+| `reflect` | `POST /v1/memories/reflect` |
+
+### Sessions and health
+
+| Method | Endpoint |
+| :--- | :--- |
+| `create_session` | `POST /v1/sessions` |
+| `get_session` | `GET /v1/sessions/{id}` |
+| `end_session` | `POST /v1/sessions/{id}/end` |
+| `ping` | service root |
+
+### Not working in v1.5
+
+These five methods exist in both SDKs but call endpoints that no longer exist. They will return `404` against a v1.5 server:
+
+| Method | Dead endpoint |
+| :--- | :--- |
+| `list_policies`, `register_policy` | `GET`/`POST /v1/policies` |
+| `register_schema` | `POST /v1/schemas` |
+| `keys rotate` (CLI) | `POST /v1/keys/{id}/rotate` |
+| `usage` (CLI) | `GET /v1/usage` |
+| `projects list`/`create` (CLI) | `GET`/`POST /v1/projects` |
+
+Rotation is create-then-revoke. Usage has no replacement because there is no metering.
+
+## Error handling
 
 ```python
 from contexta_client import (
@@ -85,33 +164,86 @@ from contexta_client import (
     AuthorizationError,
     ValidationError,
     NotFoundError,
+    ConflictError,
     QuotaExceeded,
     RateLimited,
+    ServerError,
 )
-
-try:
-    ctx = contexta.context(user_id="u_123", query="hello")
-except AuthenticationError:
-    print("Check your API key")
-except QuotaExceeded:
-    print("Plan limit reached")
-except RateLimited as e:
-    print(f"Retry in {e.retry_after}s")
 ```
 
-## Auto-Retry
+```ts
+import {
+  contextaError, AuthenticationError, AuthorizationError, ValidationError,
+  NotFoundError, ConflictError, QuotaExceeded, RateLimited, ServerError,
+} from "@contexta/client";
+```
 
-The SDK automatically retries on 5xx and 429 with exponential backoff (1s, 2s, 4s). It honors the `Retry-After` header.
+`QuotaExceeded` is still exported for source compatibility, but nothing in v1.5 ever returns a plan limit — there is no quota.
 
-## Edge Runtime Support (TypeScript)
+## Retries and durability
 
-The TypeScript SDK works in:
-- Node 20+
-- Vercel Edge Runtime
-- Cloudflare Workers
-- Bun, Deno
-- Browser (with CORS configured)
+Both clients:
+
+- send an `Idempotency-Key` on every write,
+- retry `429`, `5xx`, and network failures with exponential backoff, honouring `Retry-After` (Python: `retry_after or 2 ** attempt`; TypeScript: `min(1000 * 2 ** attempt + jitter, 30_000)`),
+- fall back to a durable on-disk queue (`~/.contexta/buffer.jsonl` in Python) when the network is down.
+
+```python
+m.flush()   # drain the offline queue; returns entries replayed
+m.close()   # release connections; safe to call twice
+```
+
+```ts
+const replayed = await memory.flush();
+memory.close();
+```
+
+## TLS
+
+Certificate verification is on by default and disabling it is an explicit opt-in, never implicit. To trust the optional self-signed local gateway, supply its CA:
+
+```python
+m = Contexta(api_key="…", ca_bundle_path="./certs/cert.pem")
+```
+
+```ts
+const memory = new Contexta({ apiKey, tls: { caPath: "./certs/cert.pem" } });
+```
+
+Supplying both a CA bundle and `verify_tls=False` raises a `ValueError` in Python rather than silently weakening verification.
+
+## Runtimes
+
+The TypeScript SDK runs on Node 18+, Vercel Edge Runtime, Cloudflare Workers, Bun, Deno, and modern browsers, with **zero required dependencies** — native `fetch`, `crypto`, and `AbortSignal.timeout`. `undici` is an optional peer dependency used only for custom TLS configuration on Node; anywhere `undici` is unavailable, or if you already have a TLS-configured `fetch`, pass `fetch` instead.
 
 ## Telemetry
 
-Default-on, opt-out via `CONTEXTA_TELEMETRY=false` or `contexta({ telemetry: false })`. We send anonymized usage data — no keys, no content, no user IDs.
+Default-on, opt-out via `CONTEXTA_TELEMETRY=false` or `telemetry: false`.
+
+To be precise about what that means: it controls a `User-Agent` version header (`contexta-python/<version>` or `contexta-sdk-ts/<version>`) and local per-endpoint counters. **Nothing is sent to a Contexta service**, because there is no Contexta service. No keys, no content, and no user IDs leave your process.
+
+## Adapters
+
+**Python** — OpenAI, Anthropic, LangChain, LlamaIndex:
+
+```python
+from contexta_client.adapters.openai import contextaMemory, contextaAssistantRunner
+from contexta_client.adapters.anthropic import contextaMemory, contextaChat
+from contexta_client.adapters.langchain import contextaChatHistory
+from contexta_client.adapters.llamaindex import contextaChatMemory
+```
+
+**TypeScript** — OpenAI, Anthropic, LangChain, Vercel AI:
+
+```ts
+import { contextaMemory, contextaAssistantRunner } from "@contexta/client/adapters/openai";
+import { contextaMemory } from "@contexta/client/adapters/anthropic";
+import { contextaChatHistory } from "@contexta/client/adapters/langchain";
+import { contextaMemory } from "@contexta/client/adapters/vercel-ai";
+```
+
+Each adapter takes the client plus a `user_id`, because `GET /v1/memories/context` requires `user_id`, `organization_id`, and `session_id`:
+
+```python
+memory = contextaMemory(m, user_id=user_id, token_budget=2000)
+```

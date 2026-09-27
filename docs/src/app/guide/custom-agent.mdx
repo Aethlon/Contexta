@@ -1,42 +1,36 @@
 # Custom Agent Loop
 
-If you're not using a framework, you only need three SDK calls per turn.
+No framework? You only need three SDK calls per turn: `context()`, your LLM, `observe()`.
 
-## The Core Pattern
+## The pattern
 
 ```python
-from contexta_client import contexta
+from contexta_client import Contexta
 from openai import OpenAI
 
-contexta = contexta.from_env()
+client = Contexta.from_env()
 llm = OpenAI()
 
-def agent_turn(
-    user_message: str,
-    user_id: str,
-    session_id: str,
-) -> str:
+def agent_turn(user_message: str, session_id: str) -> str:
     # 1. FETCH context before generation
-    ctx = contexta.context(
-        user_id=user_id,
+    ctx = client.context(
+        user_id=ACTOR_UUID,
         session_id=session_id,
-        query=user_message,
         token_budget=1500,
     )
 
-    # 2. CALL the LLM with context
-    response = llm.chat.completions.create(
+    # 2. CALL the LLM with that context as the system prompt
+    reply = llm.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": ctx.to_system_prompt()},
             {"role": "user", "content": user_message},
         ],
-    )
-    reply = response.choices[0].message.content
+    ).choices[0].message.content
 
     # 3. OBSERVE the turn
-    contexta.observe(
-        user_id=user_id,
+    client.observe(
+        user_id=ACTOR_UUID,
         session_id=session_id,
         messages=[
             {"role": "user", "content": user_message},
@@ -47,41 +41,36 @@ def agent_turn(
     return reply
 ```
 
-That's it. Three SDK calls: `context()`, LLM, `observe()`.
+`context()` takes `user_id`, `session_id`, and optionally `organization_id`. **There is no `query` parameter** — if your integration passes one, the server drops it. For a query-shaped answer, use `retrieve()` instead.
 
-## TypeScript Version
+## TypeScript
 
 ```ts
-import { contexta } from "@contexta/client";
+import { Contexta } from "@contexta/client";
 import OpenAI from "openai";
 
-const contexta = contexta.fromEnv();
+const client = Contexta.fromEnv();
 const openai = new OpenAI();
 
-async function agentTurn(
-  userMessage: string,
-  userId: string,
-  sessionId: string,
-): Promise<string> {
-  const ctx = await contexta.context({
-    userId,
+async function agentTurn(userMessage: string, sessionId: string): Promise<string> {
+  const ctx = await client.context({
+    userId: ACTOR_UUID,
+    organizationId: ORGANIZATION_ID,
     sessionId,
-    query: userMessage,
     tokenBudget: 1500,
   });
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: ctx.toSystemPrompt() },
-      { role: "user", content: userMessage },
-    ],
-  });
+  const reply =
+    (await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: ctx.toSystemPrompt() },
+        { role: "user", content: userMessage },
+      ],
+    })).choices[0]?.message?.content ?? "";
 
-  const reply = response.choices[0]?.message?.content ?? "";
-
-  await contexta.observe({
-    userId,
+  await client.observe({
+    userId: ACTOR_UUID,
     sessionId,
     messages: [
       { role: "user", content: userMessage },
@@ -93,52 +82,31 @@ async function agentTurn(
 }
 ```
 
-## Context Object
+In TypeScript, `userId`, `organizationId`, and `sessionId` are all **required** on `context()`.
 
-The `Context` object returned by `context()` has multiple render methods:
+## The `Context` object
+
+`context()` returns something with four render methods:
 
 ```python
-ctx = contexta.context(user_id="u_123", query=user_message)
-
-# For system prompts
-ctx.to_system_prompt()
-
-# For structured chat (role/content pairs)
-ctx.to_messages()
-
-# For debugging
-ctx.to_markdown()
-
-# Raw dict
-ctx.to_dict()
+ctx.to_system_prompt()               # a system-prompt string
+ctx.to_messages()                    # [{role, content}, ...]
+ctx.to_markdown()                    # human-readable dump, for debugging
+ctx.to_dict()                        # the raw response
 ```
 
-The default system prompt format:
-
-```
-contexta Memory:
-─ User profile ─
-{...}
-
-─ Active projects ─
-{...}
-
-─ Preferences ─
-{...}
-
-─ Goals ─
-{...}
-
-─ Recent events ─
-{...}
-
-─ Relevant context ─
-{...}
+```ts
+ctx.toSystemPrompt();
+ctx.toMessages();
+ctx.toMarkdown();
+ctx.toDict();
 ```
 
-## Custom Template
+The default system prompt is sectioned by heading — user profile, rules, active projects, preferences, goals, recent events, relevant context — with empty sections omitted.
 
-Override the system prompt format:
+### Custom template (Python only)
+
+`to_system_prompt()` takes an optional template string:
 
 ```python
 ctx.to_system_prompt(template="""
@@ -150,27 +118,77 @@ ctx.to_system_prompt(template="""
 """)
 ```
 
-## Full Agent Class
+The TypeScript `toSystemPrompt()` takes **no argument**.
+
+## Use `flush()` and `close()`
+
+Writes retry with backoff and queue to disk when the network is down, so an outage does not lose a turn:
 
 ```python
-class contextaAgent:
-    def __init__(self, api_key: str | None = None):
-        self.contexta = contexta(api_key=api_key or os.environ["CONTEXTA_API_KEY"])
+client.flush()   # drain the offline queue; returns entries replayed
+client.close()   # release connections; safe to call twice
+```
+
+```ts
+await client.flush();
+client.close();
+```
+
+Or use the client as a context manager / `withContexta()` and get both automatically.
+
+## A small agent class
+
+```python
+import os
+
+from contexta_client import Contexta
+from openai import OpenAI
+
+
+class ContextaAgent:
+    def __init__(self, api_key: str | None = None, user_id: str | None = None):
+        self.client = Contexta(
+            api_key=api_key or os.environ["CONTEXTA_API_KEY"],
+            base_url=os.environ.get("CONTEXTA_API_URL", "http://localhost:8000/v1"),
+            organization_id=os.environ.get("CONTEXTA_ORGANIZATION_ID"),
+        )
+        self.user_id = user_id or os.environ["CONTEXTA_ACTOR_ID"]
         self.llm = OpenAI()
 
-    def run(self, user_id: str, message: str) -> str:
-        ctx = self.contexta.context(user_id=user_id, query=message)
-        response = self.llm.chat.completions.create(
+    def run(self, message: str, session_id: str) -> str:
+        ctx = self.client.context(
+            user_id=self.user_id,
+            session_id=session_id,
+            token_budget=1500,
+        )
+        reply = self.llm.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": ctx.to_system_prompt()},
                 {"role": "user", "content": message},
             ],
+        ).choices[0].message.content
+
+        self.client.observe(
+            user_id=self.user_id,
+            session_id=session_id,
+            messages=[
+                {"role": "user", "content": message},
+                {"role": "assistant", "content": reply},
+            ],
         )
-        reply = response.choices[0].message.content
-        self.contexta.observe(user_id=user_id, messages=[
-            {"role": "user", "content": message},
-            {"role": "assistant", "content": reply},
-        ])
         return reply
+```
+
+## If you want the agent to write rules too
+
+`add_rule()` stores a decay-exempt behavioural directive, implemented on top of `observe()`:
+
+```python
+client.add_rule(
+    user_id=ACTOR_UUID,
+    rule="Never suggest deploying on a Friday",
+    title="Deployment rule",
+    tags=["process"],
+)
 ```

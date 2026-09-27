@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from typing import Optional
-
 import typer
 
 from contexta_client.cli.commands.login import _get_client

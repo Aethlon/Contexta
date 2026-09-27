@@ -1,0 +1,188 @@
+{
+  "stats": {
+    "sessions": 12,
+    "chunks": 84,
+    "extracted": 3,
+    "stored": 3,
+    "skipped": 0,
+    "discarded": 0,
+    "failures": 9,
+    "total_ms": 97940.04999999999,
+    "max_ms": 16137.22,
+    "embedded": 3,
+    "embed_failed": 0,
+    "embed_errors": []
+  },
+  "per_session": [
+    {
+      "session_key": "s2",
+      "session_id": "a29f0fa7-8a1e-408a-8652-af953a954661",
+      "domain": "conversation",
+      "chunks": 17,
+      "ingest_ms": 9699.43,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "session_key": "commit_be6f5ca3",
+      "session_id": "f345a393-d094-4ec2-8ece-40b5a49734ee",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 16137.22,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ',' delimiter: line 1 column 776 (char 775)"
+    },
+    {
+      "session_key": "commit_09e01394",
+      "session_id": "5816204b-06d1-48dc-ba64-94df05a08227",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 8424.39,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ',' delimiter: line 1 column 692 (char 691)"
+    },
+    {
+      "session_key": "s3",
+      "session_id": "b9278465-ecd4-4c80-bd1d-f088f4d131a5",
+      "domain": "record",
+      "chunks": 2,
+      "ingest_ms": 2894.47,
+      "extracted": 1,
+      "stored": 1,
+      "skipped": 0,
+      "discarded": 0,
+      "timings": {
+        "cortex_ms": 0.16,
+        "extraction_ms": 2624.08,
+        "deduplication_ms": 229.72,
+        "entity_graph_ms": 0.77,
+        "persistence_ms": 26.67,
+        "total_ms": 2888.3,
+        "redaction_ms": 5.23
+      }
+    },
+    {
+      "session_key": "s5",
+      "session_id": "e61baa1a-12fc-4c90-9540-cb744ba3db53",
+      "domain": "record",
+      "chunks": 20,
+      "ingest_ms": 2666.54,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "session_key": "commit_f0919ab8",
+      "session_id": "c116ea88-f993-4727-8d1c-2696de1bcd51",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 5579.06,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ',' delimiter: line 1 column 803 (char 802)"
+    },
+    {
+      "session_key": "commit_43bba6d5",
+      "session_id": "a24cc39e-0bc8-4653-84b3-8483b646ab5b",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 3789.19,
+      "extracted": 1,
+      "stored": 1,
+      "skipped": 0,
+      "discarded": 0,
+      "timings": {
+        "cortex_ms": 0.15,
+        "extraction_ms": 3767.0,
+        "deduplication_ms": 6.47,
+        "entity_graph_ms": 0.5,
+        "persistence_ms": 7.57,
+        "total_ms": 3786.04,
+        "redaction_ms": 3.04
+      }
+    },
+    {
+      "session_key": "s4",
+      "session_id": "3db11205-c1b8-45d1-a805-9c6358d1836a",
+      "domain": "conversation",
+      "chunks": 4,
+      "ingest_ms": 15596.63,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Extra data: line 1 column 1178 (char 1177)"
+    },
+    {
+      "session_key": "s6",
+      "session_id": "e66391df-873b-432b-84db-262e01fd9777",
+      "domain": "record",
+      "chunks": 5,
+      "ingest_ms": 13713.05,
+      "extracted": 1,
+      "stored": 1,
+      "skipped": 0,
+      "discarded": 0,
+      "timings": {
+        "cortex_ms": 0.21,
+        "extraction_ms": 13683.26,
+        "deduplication_ms": 7.08,
+        "entity_graph_ms": 0.36,
+        "persistence_ms": 6.77,
+        "total_ms": 13709.97,
+        "redaction_ms": 8.47
+      }
+    },
+    {
+      "session_key": "commit_85f67925",
+      "session_id": "bd0e1017-5a7d-4ebf-b4ea-d4618cb3b779",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 12510.02,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Extra data: line 1 column 965 (char 964)"
+    },
+    {
+      "session_key": "s8",
+      "session_id": "d8c96487-9ac4-4d4f-b286-a7cddc79cd85",
+      "domain": "conversation",
+      "chunks": 23,
+      "ingest_ms": 3132.54,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "session_key": "s7",
+      "session_id": "6d367b8c-7b1d-4027-8bb6-b94e3374c995",
+      "domain": "record",
+      "chunks": 8,
+      "ingest_ms": 3797.51,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting value: line 1 column 1 (char 0)"
+    }
+  ],
+  "stored_memories": [
+    {
+      "id": "a846432e-0c49-4adb-a3a7-dc7e8546718b",
+      "session_id": "b9278465-ecd4-4c80-bd1d-f088f4d131a5",
+      "type": "event",
+      "title": "Contract record (draft, superseded): [PERSON_1] value 172,000 USD.",
+      "content": "[PERSON_1] acknowledged the incident report queue.",
+      "importance": 0.5,
+      "confidence": 1.0,
+      "state": "active",
+      "valid_from": "2026-01-11T12:00:00",
+      "valid_to": null
+    },
+    {
+      "id": "88da0e66-9c60-450b-bd44-f53e1f26e00b",
+      "session_id": "a24cc39e-0bc8-4653-84b3-8483b646ab5b",
+      "type": "event",
+      "title": "User Interaction - Task Completion",
+      "content": "User completed a task successfully.",
+      "importance": 0.5,
+      "confidence": 1.0,
+      "state": "active",
+      "valid_from": "2026-01-15T10:00:00",
+      "valid_to": null
+    },
+    {
+      "id": "424e34b0-9cf4-452d-aa97-97b9f5d6319c",
+      "session_id": "e66391df-873b-432b-84db-262e01fd9777",
+      "type": "event",
+      "title": "Contract record (draft, superseded): [PERSON_4] acknowledged the incident report queue.",
+      "content": "[PERSON_4] acknowledged the incident report queue.",
+      "importance": 0.5,
+      "confidence": 1.0,
+      "state": "active",
+      "valid_from": "2026-01-17T15:00:00",
+      "valid_to": null
+    }
+  ]
+}

@@ -19,10 +19,10 @@ func New(rdb *redis.Client) *RateLimiter {
 }
 
 var tierLimits = map[string]struct{ RPS, Burst int }{
-	"hobby":     {10, 20},
-	"solo_pro":  {50, 100},
-	"team":      {250, 500},
-	"scale":     {1000, 2000},
+	"hobby":    {10, 20},
+	"solo_pro": {50, 100},
+	"team":     {250, 500},
+	"scale":    {1000, 2000},
 }
 
 const luaScript = `

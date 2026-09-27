@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 import logging
-
+from collections.abc import Mapping
+from contextlib import suppress
+from dataclasses import dataclass, field
+from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from contexta.core.retrieval.agentic_engine import AgenticRetrievalEngine
@@ -24,63 +30,849 @@ from contexta.services.embedding import EmbeddingService
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+_SCOPE_HEADERS = {
+    "memory_user_id": (
+        "x-memory-user-id",
+        "x-contexta-memory-user-id",
+        "X-Mem-Memory-User-Id",
+    ),
+    "agent_id": (
+        "x-agent-id",
+        "x-contexta-agent-id",
+        "X-Mem-Agent-Id",
+        "x-mem-agent-id",
+    ),
+    "project_id": (
+        "x-project-id",
+        "x-contexta-project-id",
+        "X-Mem-Project-Id",
+        "x-mem-project-id",
+    ),
+    "session_id": (
+        "x-session-id",
+        "x-contexta-session-id",
+        "X-Mem-Session-Id",
+        "x-mem-session-id",
+    ),
+}
+_SCOPE_QUERY_NAMES = {
+    "memory_user_id": ("memory_user_id",),
+    "agent_id": ("agent_id",),
+    "project_id": ("project_id",),
+    "session_id": ("session_id",),
+}
+
+
+class ScopedRetrievalQuery(RetrievalQuery):
+    user_id: UUID | None = None
+    memory_user_id: UUID | None = None
+    organization_id: UUID | None = None
+    agent_id: str | UUID | None = Field(default=None, min_length=1, max_length=255)
+    project_id: str | UUID | None = Field(default=None, min_length=1, max_length=255)
+    session_id: UUID | None = None
+
+
+class BatchRetrievalQuery(BaseModel):
+    queries: list[ScopedRetrievalQuery]
+
+
+class InvestigateRetrievalQuery(BaseModel):
+    query_text: str = Field(..., min_length=1)
+    user_id: UUID | None = None
+    memory_user_id: UUID | None = None
+    organization_id: UUID | None = None
+    agent_id: str | UUID | None = Field(default=None, min_length=1, max_length=255)
+    project_id: str | UUID | None = Field(default=None, min_length=1, max_length=255)
+    session_id: UUID | None = None
+    max_hops: int = Field(default=2, ge=0, le=5)
+    limit: int = Field(default=15, gt=0, le=100)
+
+
+@dataclass(frozen=True)
+class _RetrievalScope:
+    organization_id: UUID
+    user_id: UUID
+    memory_user_id: str | None
+    agent_id: str | None
+    project_id: str | None
+    session_id: UUID | None
+
+
+@dataclass
+class _ScopeState:
+    memory_ids: set[UUID] = field(default_factory=set)
+    entity_ids: set[UUID] = field(default_factory=set)
+
+
+def _as_uuid(value: Any, field: str) -> UUID | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, UUID):
+        return value
+    try:
+        return UUID(str(value))
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"{field} must be a UUID.",
+        ) from exc
+
+
+def _try_uuid(value: Any) -> UUID | None:
+    if value is None or value == "":
+        return None
+    try:
+        return UUID(str(value))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def _state_uuid(request: Request, field: str) -> UUID | None:
+    value = getattr(request.state, field, None)
+    try:
+        return _as_uuid(value, field)
+    except HTTPException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authenticated tenant context is invalid.",
+        ) from exc
+
+
+def _verified_identity(request: Request) -> bool:
+    state = request.state
+    return bool(
+        getattr(state, "auth_verified", False)
+        or (
+            getattr(state, "authenticated", False)
+            and getattr(state, "api_key_id", None)
+        )
+    )
+
+
+def _compatibility_identity(request: Request) -> bool:
+    state = request.state
+    return bool(
+        getattr(state, "auth_compatibility", False)
+        or (
+            getattr(state, "authenticated", False)
+            and not getattr(state, "auth_verified", False)
+            and not getattr(state, "api_key_id", None)
+        )
+    )
+
+
+def _reject_identity_mismatch(
+    field: str,
+    supplied: UUID | None,
+    authoritative: UUID | None,
+) -> None:
+    if supplied is not None and authoritative is not None and supplied != authoritative:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden: {field} does not match authenticated identity.",
+        )
+
+
+def _resolve_identity(
+    request: Request,
+    organization_id: Any,
+    user_id: Any,
+) -> tuple[UUID, UUID]:
+    supplied_org = _as_uuid(organization_id, "organization_id")
+    supplied_user = _as_uuid(user_id, "user_id")
+    state_org = _state_uuid(request, "organization_id")
+    state_actor = _state_uuid(request, "actor_id")
+
+    if _verified_identity(request):
+        if state_org is None or state_actor is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authenticated tenant context is invalid.",
+            )
+        _reject_identity_mismatch("organization_id", supplied_org, state_org)
+        _reject_identity_mismatch("user_id", supplied_user, state_actor)
+        return state_org, state_actor
+
+    if getattr(request.state, "auth_test_fallback", False) and not getattr(
+        request.state,
+        "auth_header_present",
+        False,
+    ):
+        if supplied_org is None or supplied_user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required.",
+            )
+        return supplied_org, supplied_user
+
+    if _compatibility_identity(request):
+        _reject_identity_mismatch("organization_id", supplied_org, state_org)
+        _reject_identity_mismatch("user_id", supplied_user, state_actor)
+        if state_org is None or state_actor is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required.",
+            )
+        return state_org, state_actor
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required.",
+    )
+
+
+def _scope_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    normalized = _try_uuid(text)
+    return str(normalized) if normalized is not None else text
+
+
+def _header_value(request: Request, names: tuple[str, ...], field: str) -> str | None:
+    values: set[str] = set()
+    for name in names:
+        for value in request.headers.getlist(name):
+            normalized = _scope_text(value)
+            if normalized is not None:
+                values.add(normalized)
+    if not values:
+        return None
+    if len(values) != 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field} headers disagree.",
+        )
+    return next(iter(values))
+
+
+def _query_value(request: Request, names: tuple[str, ...], field: str) -> str | None:
+    values: set[str] = set()
+    for name in names:
+        for value in request.query_params.getlist(name):
+            normalized = _scope_text(value)
+            if normalized is not None:
+                values.add(normalized)
+    if not values:
+        return None
+    if len(values) != 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field} query parameters disagree.",
+        )
+    return next(iter(values))
+
+
+def _scope_value(
+    request: Request,
+    payload: Any,
+    field: str,
+) -> str | None:
+    values: list[str] = []
+    body_value = _scope_text(getattr(payload, field, None))
+    if body_value is not None:
+        values.append(body_value)
+    header_value = _header_value(request, _SCOPE_HEADERS[field], field)
+    if header_value is not None:
+        values.append(header_value)
+    query_value = _query_value(request, _SCOPE_QUERY_NAMES[field], field)
+    if query_value is not None:
+        values.append(query_value)
+    state_value = _scope_text(getattr(request.state, field, None))
+    if state_value is not None:
+        values.append(state_value)
+    if len(set(values)) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden: {field} does not match authenticated scope.",
+        )
+    return values[0] if values else None
+
+
+def _scope_for(request: Request, payload: Any) -> _RetrievalScope:
+    organization_id, user_id = _resolve_identity(
+        request,
+        getattr(payload, "organization_id", None),
+        getattr(payload, "user_id", None),
+    )
+    session_value = _scope_value(request, payload, "session_id")
+    session_id = _as_uuid(session_value, "session_id") if session_value is not None else None
+    return _RetrievalScope(
+        organization_id=organization_id,
+        user_id=user_id,
+        memory_user_id=_scope_value(request, payload, "memory_user_id"),
+        agent_id=_scope_value(request, payload, "agent_id"),
+        project_id=_scope_value(request, payload, "project_id"),
+        session_id=session_id,
+    )
+
+
+def _authoritative_query(query: Any, scope: _RetrievalScope) -> Any:
+    return query.model_copy(
+        update={
+            "organization_id": scope.organization_id,
+            "user_id": scope.user_id,
+            "memory_user_id": scope.memory_user_id,
+            "agent_id": scope.agent_id,
+            "project_id": scope.project_id,
+            "session_id": scope.session_id,
+        }
+    )
+
+
+def _memory_value(memory: Any, field: str) -> Any:
+    if isinstance(memory, Mapping):
+        return memory.get(field)
+    return getattr(memory, field, None)
+
+
+def _add_scope_value(values: set[str], value: Any) -> None:
+    if value is None:
+        return
+    if isinstance(value, (list, tuple, set, frozenset)):
+        for item in value:
+            _add_scope_value(values, item)
+        return
+    if isinstance(value, Mapping):
+        for key in ("id", "agent_id", "project_id", "session_id", "agent", "project", "session"):
+            if key in value:
+                _add_scope_value(values, value[key])
+        return
+    text = _scope_text(value)
+    if text is not None:
+        values.add(text)
+
+
+def _has_scope_field(container: Any, field: str) -> bool:
+    short_field = field.removesuffix("_id")
+    if isinstance(container, Mapping):
+        return field in container or short_field in container
+    return hasattr(container, field) or hasattr(container, short_field)
+
+
+def _scope_source(container: Any, field: str) -> tuple[set[str], set[str]]:
+    explicit: set[str] = set()
+    fallback: set[str] = set()
+    short_field = field.removesuffix("_id")
+    found = False
+    if isinstance(container, Mapping):
+        for key in (field, short_field):
+            if key in container:
+                found = True
+                _add_scope_value(explicit, container[key])
+    else:
+        for key in (field, short_field):
+            value = getattr(container, key, None)
+            if value is not None:
+                found = True
+                _add_scope_value(explicit, value)
+    if found:
+        return explicit, fallback
+    if isinstance(container, Mapping):
+        if "id" in container:
+            _add_scope_value(fallback, container["id"])
+    else:
+        _add_scope_value(fallback, getattr(container, "id", None))
+    return set(), fallback
+
+
+def _memory_scope_sources(memory: Any, field: str) -> tuple[list[set[str]], set[str]]:
+    sources: list[set[str]] = []
+    fallback: set[str] = set()
+    direct = _memory_value(memory, field)
+    if _has_scope_field(memory, field):
+        values: set[str] = set()
+        _add_scope_value(values, direct)
+        sources.append(values)
+    structured = _memory_value(memory, "structured_data")
+    if isinstance(structured, Mapping):
+        values, generic = _scope_source(structured, field)
+        if _has_scope_field(structured, field):
+            sources.append(values)
+        fallback.update(generic)
+        for container_name in ("scope", "metadata", "context", "attributes"):
+            values, generic = _scope_source(structured.get(container_name), field)
+            if _has_scope_field(structured.get(container_name), field):
+                sources.append(values)
+            fallback.update(generic)
+    for container_name in ("scope", "metadata", "context", "attributes"):
+        values, generic = _scope_source(_memory_value(memory, container_name), field)
+        if _has_scope_field(_memory_value(memory, container_name), field):
+            sources.append(values)
+        fallback.update(generic)
+    prefixes = (f"{field.removesuffix('_id')}:", f"{field}:")
+    tags = _memory_value(memory, "tags") or []
+    if isinstance(tags, str):
+        tags = [tags]
+    tag_values: set[str] = set()
+    for tag in tags:
+        tag_text = str(tag)
+        for prefix in prefixes:
+            if tag_text.startswith(prefix):
+                tag_values.add(_scope_text(tag_text[len(prefix) :]) or "")
+    if tag_values:
+        sources.append(tag_values)
+    return sources, fallback
+
+
+def _memory_scope_values(memory: Any, field: str) -> set[str]:
+    sources, fallback = _memory_scope_sources(memory, field)
+    values = set(fallback)
+    for source in sources:
+        values.update(source)
+    values.discard("")
+    return values
+
+
+def _memory_scope_matches(memory: Any, field: str, requested: str) -> bool:
+    sources, fallback = _memory_scope_sources(memory, field)
+    if sources:
+        return all(requested in source for source in sources)
+    return requested in fallback
+
+
+def _memory_in_scope(memory: Any, scope: _RetrievalScope) -> bool:
+    if memory is None:
+        return False
+    try:
+        organization_id = _try_uuid(_memory_value(memory, "organization_id"))
+        user_id = _try_uuid(_memory_value(memory, "user_id"))
+        if organization_id != scope.organization_id or user_id != scope.user_id:
+            return False
+        for field, requested in (
+            ("memory_user_id", scope.memory_user_id),
+            ("agent_id", scope.agent_id),
+            ("project_id", scope.project_id),
+            ("session_id", str(scope.session_id) if scope.session_id is not None else None),
+        ):
+            if requested is not None and not _memory_scope_matches(memory, field, requested):
+                return False
+        return True
+    except (AttributeError, TypeError, ValueError):
+        return False
+
+
+def _value_sequence(value: Any) -> list[Any]:
+    if value is None or isinstance(value, (str, bytes)):
+        return []
+    if isinstance(value, Mapping):
+        return [value]
+    try:
+        return list(value)
+    except (TypeError, ValueError):
+        return [value]
+
+
+def _filter_records(records: Any, scope: _RetrievalScope) -> list[Any]:
+    return [
+        record
+        for record in _value_sequence(records)
+        if _memory_in_scope(record, scope)
+    ]
+
+
+def _filter_results(results: Any, scope: _RetrievalScope) -> list[Any]:
+    return [
+        result
+        for result in _value_sequence(results)
+        if _memory_in_scope(getattr(result, "memory", None), scope)
+    ]
+
+
+def _record_id(value: Any) -> UUID | None:
+    return _try_uuid(value)
+
+
+def _record_ids(records: list[Any]) -> set[UUID]:
+    identifiers: set[UUID] = set()
+    for record in records:
+        identifier = _record_id(_memory_value(record, "id"))
+        if identifier is not None:
+            identifiers.add(identifier)
+    return identifiers
+
+
+async def _await_if_needed(value: Any) -> Any:
+    if inspect.isawaitable(value):
+        return await value
+    return value
+
+
+class _ScopedMemoryRepository:
+    _READ_METHODS = frozenset(
+        {
+            "get_all",
+            "get_by_id",
+            "get_by_user",
+            "get_by_vector_similarity",
+            "get_by_lexical_similarity",
+            "get_by_session",
+            "get_many_by_ids",
+            "get_current_truths",
+            "get_by_type",
+            "get_by_state",
+            "get_unpinned_by_state",
+        }
+    )
+
+    def __init__(
+        self,
+        repository: Any,
+        scope: _RetrievalScope,
+        state: _ScopeState,
+    ) -> None:
+        self._repository = repository
+        self._scope = scope
+        self._state = state
+
+    def __getattr__(self, name: str) -> Any:
+        target = getattr(self._repository, name)
+        if name in {"touch_accessed", "touch_accessed_many"} and callable(target):
+
+            async def touch(*args: Any, **kwargs: Any) -> Any:
+                if name == "touch_accessed":
+                    raw_id = args[0] if args else kwargs.get("record_id")
+                    identifier = _record_id(raw_id)
+                    if identifier is None or identifier not in self._state.memory_ids:
+                        return 0
+                    call_args = (identifier, *args[1:])
+                    call_kwargs = dict(kwargs)
+                    call_kwargs.pop("record_id", None)
+                    return await _await_if_needed(target(*call_args, **call_kwargs))
+
+                raw_ids = args[0] if args else kwargs.get("record_ids", ())
+                identifiers: list[UUID] = []
+                for value in _value_sequence(raw_ids):
+                    identifier = _record_id(value)
+                    if identifier is not None and identifier in self._state.memory_ids:
+                        identifiers.append(identifier)
+                if not identifiers:
+                    return 0
+                call_args = (identifiers, *args[1:])
+                call_kwargs = dict(kwargs)
+                call_kwargs.pop("record_ids", None)
+                return await _await_if_needed(target(*call_args, **call_kwargs))
+
+            return touch
+        if name not in self._READ_METHODS or not callable(target):
+            return target
+
+        async def filtered(*args: Any, **kwargs: Any) -> Any:
+            result = await _await_if_needed(target(*args, **kwargs))
+            safe = _filter_records(result, self._scope)
+            self._state.memory_ids.update(_record_ids(safe))
+            return safe
+
+        return filtered
+
+
+class _ScopedEntityRepository:
+    _READ_METHODS = frozenset(
+        {
+            "get_all",
+            "get_by_id",
+            "get_by_user",
+            "get_by_type",
+            "get_by_name",
+            "get_by_names",
+        }
+    )
+
+    def __init__(
+        self,
+        repository: Any,
+        scope: _RetrievalScope,
+        state: _ScopeState,
+    ) -> None:
+        self._repository = repository
+        self._scope = scope
+        self._state = state
+
+    def __getattr__(self, name: str) -> Any:
+        target = getattr(self._repository, name)
+        if name not in self._READ_METHODS or not callable(target):
+            return target
+
+        async def filtered(*args: Any, **kwargs: Any) -> Any:
+            supplied_user = kwargs.get("user_id")
+            if supplied_user is None and name in {
+                "get_by_user",
+                "get_by_type",
+                "get_by_name",
+                "get_by_names",
+            }:
+                supplied_user = args[0] if args else None
+            if supplied_user is not None:
+                parsed_user = _try_uuid(supplied_user)
+                if parsed_user is None or parsed_user != self._scope.user_id:
+                    return []
+            result = await _await_if_needed(target(*args, **kwargs))
+            records = [
+                record
+                for record in _value_sequence(result)
+                if _try_uuid(_memory_value(record, "organization_id")) == self._scope.organization_id
+                and _try_uuid(_memory_value(record, "user_id")) == self._scope.user_id
+            ]
+            self._state.entity_ids.update(_record_ids(records))
+            return records
+
+        return filtered
+
+
+class _ScopedLinkRepository:
+    _READ_METHODS = frozenset(
+        {
+            "get_entities_for_memory",
+            "bulk_get_entities_for_memories",
+            "get_memories_for_entity",
+            "bulk_get_memories_for_entities",
+        }
+    )
+
+    def __init__(
+        self,
+        repository: Any,
+        scope: _RetrievalScope,
+        state: _ScopeState,
+        memory_repository: Any | None = None,
+        entity_repository: Any | None = None,
+    ) -> None:
+        self._repository = repository
+        self._scope = scope
+        self._state = state
+        self._memory_repository = memory_repository
+        self._entity_repository = entity_repository
+
+    async def _memory_allowed(self, identifier: UUID | None) -> bool:
+        if identifier is None:
+            return False
+        if identifier in self._state.memory_ids:
+            return True
+        resolver = getattr(self._memory_repository, "get_by_id", None)
+        if not callable(resolver):
+            return False
+        await resolver(identifier)
+        return identifier in self._state.memory_ids
+
+    async def _entity_allowed(self, identifier: UUID | None) -> bool:
+        if identifier is None:
+            return False
+        if identifier in self._state.entity_ids:
+            return True
+        resolver = getattr(self._entity_repository, "get_by_id", None)
+        if not callable(resolver):
+            return False
+        await resolver(identifier)
+        return identifier in self._state.entity_ids
+
+    def __getattr__(self, name: str) -> Any:
+        target = getattr(self._repository, name)
+        if name not in self._READ_METHODS or not callable(target):
+            return target
+
+        async def filtered(*args: Any, **kwargs: Any) -> Any:
+            call_args = list(args)
+            call_kwargs = dict(kwargs)
+            if name in {"get_entities_for_memory", "bulk_get_entities_for_memories"}:
+                raw_ids = call_args[0] if call_args else call_kwargs.get(
+                    "memory_ids" if name == "bulk_get_entities_for_memories" else "memory_id"
+                )
+                if name == "get_entities_for_memory":
+                    raw_ids = (raw_ids,)
+                safe_ids: list[UUID] = []
+                for value in _value_sequence(raw_ids):
+                    identifier = _record_id(value)
+                    if await self._memory_allowed(identifier) and identifier not in safe_ids:
+                        safe_ids.append(identifier)
+                if not safe_ids:
+                    return []
+                if name == "bulk_get_entities_for_memories":
+                    call_args[0] = safe_ids
+                    call_kwargs.pop("memory_ids", None)
+                else:
+                    call_args[0] = safe_ids[0]
+                    call_kwargs.pop("memory_id", None)
+            elif name in {"get_memories_for_entity", "bulk_get_memories_for_entities"}:
+                raw_ids = call_args[0] if call_args else call_kwargs.get(
+                    "entity_ids" if name == "bulk_get_memories_for_entities" else "entity_id"
+                )
+                if name == "get_memories_for_entity":
+                    raw_ids = (raw_ids,)
+                safe_ids = []
+                for value in _value_sequence(raw_ids):
+                    identifier = _record_id(value)
+                    if await self._entity_allowed(identifier) and identifier not in safe_ids:
+                        safe_ids.append(identifier)
+                if not safe_ids:
+                    return []
+                if name == "bulk_get_memories_for_entities":
+                    call_args[0] = safe_ids
+                    call_kwargs.pop("entity_ids", None)
+                else:
+                    call_args[0] = safe_ids[0]
+                    call_kwargs.pop("entity_id", None)
+            result = await _await_if_needed(target(*call_args, **call_kwargs))
+            records = []
+            for record in _value_sequence(result):
+                organization_id = _try_uuid(_memory_value(record, "organization_id"))
+                memory_id = _record_id(_memory_value(record, "memory_id"))
+                entity_id = _record_id(_memory_value(record, "entity_id"))
+                if (
+                    organization_id == self._scope.organization_id
+                    and await self._memory_allowed(memory_id)
+                    and await self._entity_allowed(entity_id)
+                ):
+                    records.append(record)
+            return records
+
+        return filtered
+
+
+class _ScopedEdgeRepository:
+    _READ_METHODS = frozenset(
+        {
+            "get_edges_from",
+            "get_edges_to",
+            "get_neighbors",
+            "bulk_get_neighbors",
+            "get_existing_edges",
+        }
+    )
+
+    def __init__(
+        self,
+        repository: Any,
+        scope: _RetrievalScope,
+        state: _ScopeState,
+        entity_repository: Any | None = None,
+    ) -> None:
+        self._repository = repository
+        self._scope = scope
+        self._state = state
+        self._entity_repository = entity_repository
+
+    async def _entity_allowed(self, identifier: UUID | None) -> bool:
+        if identifier is None:
+            return False
+        if identifier in self._state.entity_ids:
+            return True
+        resolver = getattr(self._entity_repository, "get_by_id", None)
+        if not callable(resolver):
+            return False
+        await resolver(identifier)
+        return identifier in self._state.entity_ids
+
+    def __getattr__(self, name: str) -> Any:
+        target = getattr(self._repository, name)
+        if name not in self._READ_METHODS or not callable(target):
+            return target
+
+        async def filtered(*args: Any, **kwargs: Any) -> Any:
+            raw_id = args[0] if args else kwargs.get("entity_id")
+            identifier = _record_id(raw_id)
+            if not await self._entity_allowed(identifier):
+                return []
+            result = await _await_if_needed(target(*args, **kwargs))
+            records = []
+            for record in _value_sequence(result):
+                organization_id = _try_uuid(_memory_value(record, "organization_id"))
+                source_id = _record_id(_memory_value(record, "source_entity_id"))
+                target_id = _record_id(_memory_value(record, "target_entity_id"))
+                if (
+                    organization_id == self._scope.organization_id
+                    and await self._entity_allowed(source_id)
+                    and await self._entity_allowed(target_id)
+                ):
+                    records.append(record)
+            return records
+
+        return filtered
+
+
+def _retrieval_engine(
+    session: AsyncSession,
+    scope: _RetrievalScope,
+) -> tuple[RetrievalEngine, Any, Any]:
+    state = _ScopeState()
+    memory_repository = _ScopedMemoryRepository(
+        MemoryRepository(session, tenant_id=scope.organization_id),
+        scope,
+        state,
+    )
+    entity_repository = _ScopedEntityRepository(
+        EntityRepository(session, tenant_id=scope.organization_id),
+        scope,
+        state,
+    )
+    link_repository = _ScopedLinkRepository(
+        MemoryEntityLinkRepository(session, tenant_id=scope.organization_id),
+        scope,
+        state,
+        memory_repository=memory_repository,
+        entity_repository=entity_repository,
+    )
+    edge_repository = _ScopedEdgeRepository(
+        EntityEdgeRepository(session, tenant_id=scope.organization_id),
+        scope,
+        state,
+        entity_repository=entity_repository,
+    )
+    engine = RetrievalEngine(
+        memory_repository=memory_repository,
+        link_repository=link_repository,
+        edge_repository=edge_repository,
+        entity_repository=entity_repository,
+    )
+    return engine, entity_repository, edge_repository
+
+
+def _serialize_result(item: Any) -> dict[str, Any]:
+    memory = item.memory
+    return {
+        "memory": {
+            "id": str(memory.id),
+            "user_id": str(memory.user_id),
+            "organization_id": str(memory.organization_id),
+            "memory_type": memory.memory_type,
+            "title": memory.title,
+            "content": memory.content,
+            "structured_data": memory.structured_data,
+            "tags": memory.tags,
+            "is_pinned": memory.is_pinned,
+            "is_archived": memory.is_archived,
+            "memory_state": memory.memory_state,
+            "created_at": memory.created_at.isoformat() if memory.created_at else None,
+        },
+        "score": item.score,
+        "semantic_score": item.semantic_score,
+        "graph_score": item.graph_score,
+        "importance_score": item.importance_score,
+        "recency_score": item.recency_score,
+        "keyword_score": item.keyword_score,
+    }
+
 
 @router.post("/retrieve")
 async def retrieve(
-    query: RetrievalQuery,
+    request: Request,
+    query: ScopedRetrievalQuery,
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """Retrieve memories using hybrid semantic, keyword, recency, importance, and graph scoring."""
-    # 1. Embed query text if provider is configured
+    scope = _scope_for(request, query)
+    scoped_query = _authoritative_query(query, scope)
     embedding_service = EmbeddingService()
-    try:
+    query_embedding = None
+    with suppress(Exception):
         query_embedding = await embedding_service.embed_text(query.query_text)
-    except Exception:  # noqa: BLE001 - graceful fallback to keyword + recency scoring
+    if query_embedding is None:
         logger.warning("Query embedding generation failed, falling back to non-semantic scoring")
-        query_embedding = None
 
-    # 2. Instantiate repositories
-    memory_repo = MemoryRepository(session, tenant_id=query.organization_id)
-    entity_repo = EntityRepository(session, tenant_id=query.organization_id)
-    link_repo = MemoryEntityLinkRepository(session, tenant_id=query.organization_id)
-    edge_repo = EntityEdgeRepository(session, tenant_id=query.organization_id)
-
-    # 3. Execute hybrid retrieval engine
-    engine = RetrievalEngine(
-        memory_repository=memory_repo,
-        link_repository=link_repo,
-        edge_repository=edge_repo,
-        entity_repository=entity_repo,
-    )
-
-    results = await engine.retrieve(query, query_embedding=query_embedding)
-
-    # 4. Serialize results
-    serialized_results = []
-    for item in results:
-        serialized_results.append({
-            "memory": {
-                "id": str(item.memory.id),
-                "user_id": str(item.memory.user_id),
-                "organization_id": str(item.memory.organization_id),
-                "memory_type": item.memory.memory_type,
-                "title": item.memory.title,
-                "content": item.memory.content,
-                "structured_data": item.memory.structured_data,
-                "tags": item.memory.tags,
-                "is_pinned": item.memory.is_pinned,
-                "is_archived": item.memory.is_archived,
-                "memory_state": item.memory.memory_state,
-                "created_at": item.memory.created_at.isoformat() if item.memory.created_at else None,
-            },
-            "score": item.score,
-            "semantic_score": item.semantic_score,
-            "graph_score": item.graph_score,
-            "importance_score": item.importance_score,
-            "recency_score": item.recency_score,
-            "keyword_score": item.keyword_score,
-        })
-
+    engine, _, _ = _retrieval_engine(session, scope)
+    results = await engine.retrieve(scoped_query, query_embedding=query_embedding)
+    serialized_results = [_serialize_result(item) for item in _filter_results(results, scope)]
     return {
         "status": "success",
         "query": query.query_text,
@@ -88,74 +880,37 @@ async def retrieve(
     }
 
 
-from pydantic import BaseModel
-
-
-class BatchRetrievalQuery(BaseModel):
-    queries: list[RetrievalQuery]
-
-
 @router.post("/retrieve/batch")
 async def retrieve_batch(
+    request: Request,
     payload: BatchRetrievalQuery,
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """Concurrently execute multiple memory retrieval queries in parallel."""
-    import asyncio
-
     if not payload.queries:
         return {"status": "success", "count": 0, "batch_results": []}
 
+    scopes = [_scope_for(request, query) for query in payload.queries]
     embedding_service = EmbeddingService()
 
-    # 1. Batch generate embeddings for all queries concurrently
-    async def _safe_embed(q_text: str):
-        try:
-            return await embedding_service.embed_text(q_text)
-        except Exception:
-            return None
+    async def _safe_embed(query_text: str):
+        with suppress(Exception):
+            return await embedding_service.embed_text(query_text)
+        return None
 
-    query_embeddings = await asyncio.gather(*[_safe_embed(q.query_text) for q in payload.queries])
+    query_embeddings = await asyncio.gather(
+        *[_safe_embed(query.query_text) for query in payload.queries]
+    )
 
-    # 2. Execute retrieval queries concurrently
-    async def _execute_single(query: RetrievalQuery, q_emb: list[float] | None):
-        memory_repo = MemoryRepository(session, tenant_id=query.organization_id)
-        entity_repo = EntityRepository(session, tenant_id=query.organization_id)
-        link_repo = MemoryEntityLinkRepository(session, tenant_id=query.organization_id)
-        edge_repo = EntityEdgeRepository(session, tenant_id=query.organization_id)
-
-        engine = RetrievalEngine(
-            memory_repository=memory_repo,
-            link_repository=link_repo,
-            edge_repository=edge_repo,
-            entity_repository=entity_repo,
-        )
-        results = await engine.retrieve(query, query_embedding=q_emb)
-
-        serialized = []
-        for item in results:
-            serialized.append({
-                "memory": {
-                    "id": str(item.memory.id),
-                    "user_id": str(item.memory.user_id),
-                    "organization_id": str(item.memory.organization_id),
-                    "memory_type": item.memory.memory_type,
-                    "title": item.memory.title,
-                    "content": item.memory.content,
-                    "structured_data": item.memory.structured_data,
-                    "tags": item.memory.tags,
-                    "is_pinned": item.memory.is_pinned,
-                    "is_archived": item.memory.is_archived,
-                    "memory_state": item.memory.memory_state,
-                    "created_at": item.memory.created_at.isoformat() if item.memory.created_at else None,
-                },
-                "score": item.score,
-                "semantic_score": item.semantic_score,
-                "graph_score": item.graph_score,
-                "importance_score": item.importance_score,
-                "recency_score": item.recency_score,
-                "keyword_score": item.keyword_score,
-            })
+    async def _execute_single(
+        query: ScopedRetrievalQuery,
+        query_embedding: list[float] | None,
+        scope: _RetrievalScope,
+    ):
+        scoped_query = _authoritative_query(query, scope)
+        engine, _, _ = _retrieval_engine(session, scope)
+        results = await engine.retrieve(scoped_query, query_embedding=query_embedding)
+        serialized = [_serialize_result(item) for item in _filter_results(results, scope)]
         return {
             "query": query.query_text,
             "count": len(serialized),
@@ -163,23 +918,13 @@ async def retrieve_batch(
         }
 
     batch_results = []
-    for q, emb in zip(payload.queries, query_embeddings):
-        res = await _execute_single(q, emb)
-        batch_results.append(res)
-
+    for query, embedding, scope in zip(payload.queries, query_embeddings, scopes):
+        batch_results.append(await _execute_single(query, embedding, scope))
     return {
         "status": "success",
         "count": len(batch_results),
-        "batch_results": list(batch_results),
+        "batch_results": batch_results,
     }
-
-
-class InvestigateRetrievalQuery(BaseModel):
-    query_text: str
-    user_id: UUID
-    organization_id: UUID | None = None
-    max_hops: int = 2
-    limit: int = 15
 
 
 @router.post("/retrieve/investigate")
@@ -189,43 +934,28 @@ async def retrieve_investigate(
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """Execute iterative agentic investigative retrieval (ASMR-style multi-hop memory reasoning)."""
-    org_id = payload.organization_id or UUID(
-        str(getattr(request.state, "organization_id", "00000000-0000-0000-0000-000000000001"))
-    )
-
-    memory_repo = MemoryRepository(session, tenant_id=org_id)
-    entity_repo = EntityRepository(session, tenant_id=org_id)
-    link_repo = MemoryEntityLinkRepository(session, tenant_id=org_id)
-    edge_repo = EntityEdgeRepository(session, tenant_id=org_id)
-
-    engine = RetrievalEngine(
-        memory_repository=memory_repo,
-        link_repository=link_repo,
-        edge_repository=edge_repo,
-        entity_repository=entity_repo,
-    )
-
+    scope = _scope_for(request, payload)
+    engine, entity_repository, edge_repository = _retrieval_engine(session, scope)
     agentic_engine = AgenticRetrievalEngine(
         retrieval_engine=engine,
-        entity_repository=entity_repo,
-        edge_repository=edge_repo,
+        entity_repository=entity_repository,
+        edge_repository=edge_repository,
     )
 
     embedding_service = EmbeddingService()
-    try:
-        q_emb = await embedding_service.embed_text(payload.query_text)
-    except Exception:
-        q_emb = None
+    query_embedding = None
+    with suppress(Exception):
+        query_embedding = await embedding_service.embed_text(payload.query_text)
 
     result = await agentic_engine.investigate(
         query_text=payload.query_text,
-        user_id=payload.user_id,
-        organization_id=org_id,
+        user_id=scope.user_id,
+        organization_id=scope.organization_id,
         max_hops=payload.max_hops,
         limit=payload.limit,
-        query_embedding=q_emb,
+        query_embedding=query_embedding,
     )
-
+    memories = _filter_results(getattr(result, "memories", []), scope)
     return {
         "status": "success",
         "query": result.query,
@@ -233,28 +963,26 @@ async def retrieve_investigate(
         "entities_discovered": result.entities_discovered,
         "investigation_trace": [
             {
-                "step": s.step_number,
-                "action": s.action,
-                "target": s.target,
-                "rationale": s.rationale,
-                "discovered_count": s.discovered_count,
+                "step": step.step_number,
+                "action": step.action,
+                "target": step.target,
+                "rationale": step.rationale,
+                "discovered_count": step.discovered_count,
             }
-            for s in result.investigation_trace
+            for step in result.investigation_trace
         ],
         "temporal_evolution": result.temporal_evolution,
         "synthesized_context": result.synthesized_context,
         "results": [
             {
-                "id": str(r.memory.id),
-                "title": r.memory.title,
-                "content": r.memory.content,
-                "memory_type": r.memory.memory_type,
-                "score": r.score,
-                "is_current": r.memory.valid_to is None,
-                "created_at": r.memory.created_at.isoformat() if r.memory.created_at else None,
+                "id": str(item.memory.id),
+                "title": item.memory.title,
+                "content": item.memory.content,
+                "memory_type": item.memory.memory_type,
+                "score": item.score,
+                "is_current": item.memory.valid_to is None,
+                "created_at": item.memory.created_at.isoformat() if item.memory.created_at else None,
             }
-            for r in result.memories
+            for item in memories
         ],
     }
-
-

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
@@ -65,7 +65,7 @@ export function WindowTitlebar() {
   return (
     <div
       data-tauri-drag-region
-      className="h-9 w-full bg-background/95 border-b border-border/40 select-none flex items-center justify-between px-3 text-xs font-mono text-muted-foreground z-50 sticky top-0 backdrop-blur-md"
+      className="h-9 w-full bg-background/95 border-b border-border select-none flex items-center justify-between px-3 text-xs font-mono text-muted-foreground z-50 sticky top-0 "
     >
       {/* Left: Custom Navigation & App Title */}
       <div className="flex items-center gap-3" data-tauri-drag-region>
@@ -78,7 +78,7 @@ export function WindowTitlebar() {
         </div>
 
         {/* Custom History Navigation Controls */}
-        <div className="flex items-center gap-0.5 ml-2 border-l border-border/40 pl-2.5">
+        <div className="flex items-center gap-0.5 ml-2 border-l border-border pl-2.5">
           <button
             type="button"
             onClick={() => router.back()}
@@ -141,7 +141,7 @@ export function WindowTitlebar() {
           type="button"
           onClick={handleClose}
           title="Close"
-          className="h-full px-3.5 flex items-center justify-center hover:bg-red-500 hover:text-white text-muted-foreground transition-colors cursor-pointer"
+          className="h-full px-3.5 flex items-center justify-center hover:bg-red-500 hover:text-foreground text-muted-foreground transition-colors cursor-pointer"
         >
           <X className="size-3.5" />
         </button>

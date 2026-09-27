@@ -1,0 +1,17 @@
+{
+  "dataset": "C:\\Users\\jenit\\Downloads\\contexta_extreme_200_conversations.csv",
+  "limit": 3,
+  "models": [
+    {
+      "model": "hf.co/LiquidAI/LFM2.5-2.6B-GGUF:Q4_K_M",
+      "count": 3,
+      "json_valid_rate": 0.0,
+      "mean_claims": 0,
+      "mean_complete_claim_rate": 0.0,
+      "mean_evidence_grounded_rate": 0.0,
+      "mean_anchor_coverage": 0.0,
+      "question_claims": 0,
+      "p95_latency_ms": 15026.12
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { contexta, contextaError } from "@contexta/client";
+import { Contexta, contextaError } from "@contexta/client";
 import type { BaseMessage } from "@langchain/core/messages";
 import { BaseChatMessageHistory } from "@langchain/core/chat_history";
 import {
@@ -13,20 +13,30 @@ import {
  * Works as a drop-in with RunnableWithMessageHistory.
  *
  * Usage:
- *   const history = new contextaChatHistory(contextaClient, "session-uuid");
+ *   const history = new contextaChatHistory(contextaClient, userId, organizationId, "session-uuid");
  *   const chain = new RunnableWithMessageHistory({ runnable: llm, getMessageHistory: () => history });
  */
 export class contextaChatHistory extends BaseChatMessageHistory {
   lc_namespace = ["contexta", "langchain"];
 
-  private client: contexta;
+  private client: Contexta;
+  private userId: string;
+  private organizationId: string;
   private sessionId: string;
   private tokenBudget?: number;
   private buffer: BaseMessage[] = [];
 
-  constructor(client: contexta, sessionId: string, tokenBudget?: number) {
+  constructor(
+    client: Contexta,
+    userId: string,
+    organizationId: string,
+    sessionId: string,
+    tokenBudget?: number,
+  ) {
     super();
     this.client = client;
+    this.userId = userId;
+    this.organizationId = organizationId || client.organizationId || "";
     this.sessionId = sessionId;
     this.tokenBudget = tokenBudget;
   }
@@ -34,21 +44,23 @@ export class contextaChatHistory extends BaseChatMessageHistory {
   async getMessages(): Promise<BaseMessage[]> {
     try {
       const ctx = await this.client.context({
-        session_id: this.sessionId,
-        token_budget: this.tokenBudget,
+        userId: this.userId,
+        organizationId: this.organizationId,
+        sessionId: this.sessionId,
+        tokenBudget: this.tokenBudget,
       });
       const memoryMessages: BaseMessage[] = [];
-      if (ctx.user_profile?.name) {
-        memoryMessages.push(new SystemMessage(`User: ${ctx.user_profile.name}`));
+      if (ctx.userProfile) {
+        memoryMessages.push(new SystemMessage(`User: ${JSON.stringify(ctx.userProfile)}`));
       }
       for (const pref of ctx.preferences ?? []) {
-        memoryMessages.push(new SystemMessage(`Preference: ${pref.category}=${pref.value}`));
+        memoryMessages.push(new SystemMessage(`Preference: ${JSON.stringify(pref)}`));
       }
       for (const goal of ctx.goals ?? []) {
-        memoryMessages.push(new SystemMessage(`Goal: ${goal.description}`));
+        memoryMessages.push(new SystemMessage(`Goal: ${JSON.stringify(goal)}`));
       }
-      for (const mem of ctx.relevant_memories ?? []) {
-        memoryMessages.push(new SystemMessage(`[Memory] ${mem.title}: ${mem.content}`));
+      for (const mem of ctx.relevantMemories ?? []) {
+        memoryMessages.push(new SystemMessage(`[Memory] ${mem.memory?.title}: ${mem.memory?.content}`));
       }
       return [...memoryMessages, ...this.buffer];
     } catch {
@@ -79,7 +91,7 @@ export class contextaChatHistory extends BaseChatMessageHistory {
       content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
     }));
     try {
-      await this.client.observe({ session_id: this.sessionId, messages: raw });
+      await this.client.observe({ userId: this.userId, sessionId: this.sessionId, messages: raw });
     } catch (err) {
       console.error("contexta flush failed", err);
     }

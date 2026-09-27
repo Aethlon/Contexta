@@ -233,6 +233,9 @@ async def test_batch_retrieval_endpoint():
                 headers={
                     "x-organization-id": str(org_id),
                     "x-user-id": str(u_id),
+                    # This response clears the 1000-byte GZipMiddleware threshold,
+                    # and ASGITransport hands back the compressed body undecompressed.
+                    "accept-encoding": "identity",
                 },
             )
             assert res.status_code == 200

@@ -1,0 +1,92 @@
+{
+  "meta": {
+    "tag": "final_check_20260926-181933",
+    "ran_at": "2026-09-26T18:20:54.165406+00:00",
+    "answer_model": "gemma3:1b",
+    "rerank": "off",
+    "db_url": "localhost:55433/chimera",
+    "retrieval_limit": 20,
+    "question_source": "C:\\Users\\jenit\\Desktop\\mono-repo\\Memento\\benchmarks\\CHIMERA\\data\\questions.jsonl",
+    "contexta_config": {
+      "engine_mode": "auto",
+      "embedding_provider": "local",
+      "embedding_profile": "offline-qwen3-1024",
+      "embedding_dimensions": 1024,
+      "local_model_server_url": "http://localhost:8001",
+      "llm_model": "contexta-lfm-extract:latest"
+    }
+  },
+  "totals": {
+    "questions": 4,
+    "passed": 0,
+    "failed": 4,
+    "accuracy": 0.0
+  },
+  "latency": {
+    "retrieve_ms": {
+      "p50": 378.06,
+      "p95": 421.86,
+      "p99": 426.94,
+      "mean": 371.7,
+      "min": 302.46,
+      "max": 428.21
+    },
+    "answer_ms": {
+      "p50": 3579.91,
+      "p95": 5564.58,
+      "mean": 3558.87
+    }
+  },
+  "ingestion": {
+    "sessions": 8,
+    "chunks": 47,
+    "memories_extracted": 20,
+    "memories_stored": 18,
+    "skipped": 0,
+    "discarded": 0,
+    "failures": 1,
+    "embeddings_generated": 18,
+    "embedding_failures": 0,
+    "embedding_errors": [],
+    "total_s": 141.87,
+    "mean_session_ms": 17734.08,
+    "max_session_ms": 32741.37
+  },
+  "by_category": {
+    "distractor_density": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 302.46,
+      "retrieve_p95_ms": 302.46
+    },
+    "multi_hop_sessions": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 385.86,
+      "retrieve_p95_ms": 385.86
+    },
+    "negative_recall": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 370.26,
+      "retrieve_p95_ms": 370.26
+    },
+    "temporal_contradiction": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 428.21,
+      "retrieve_p95_ms": 428.21
+    }
+  },
+  "flags": {
+    "hallucinated": 1,
+    "abstained": 2,
+    "leaked": 0,
+    "partial": 0,
+    "errors": 0
+  }
+}

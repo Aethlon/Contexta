@@ -1,10 +1,10 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "contexta-client"
-version = "0.2.0"
+version = "1.5.0"
 description = "Contexta SDK — persistent memory for AI agents"
 readme = "README.md"
 license = {text = "MIT"}
@@ -42,3 +42,6 @@ contexta = "contexta_client.cli.main:app"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["contexta_client*"]
+
+[tool.setuptools.package-data]
+contexta_client = ["py.typed"]

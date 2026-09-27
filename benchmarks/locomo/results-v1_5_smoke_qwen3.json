@@ -1,0 +1,223 @@
+{
+  "summary": {
+    "overall": {
+      "n": 5,
+      "accuracy": 0.4
+    },
+    "retrieval": {
+      "n": 5,
+      "hits": 4,
+      "accuracy": 0.8
+    },
+    "by_category": {
+      "single-hop": {
+        "n": 2,
+        "accuracy": 0.0
+      },
+      "temporal": {
+        "n": 2,
+        "accuracy": 1.0
+      },
+      "multi-hop": {
+        "n": 1,
+        "accuracy": 0.0
+      }
+    }
+  },
+  "stats": {
+    "sessions_processed": 19,
+    "memories_extracted": 419,
+    "memories_stored": 419,
+    "memories_deduped": 0,
+    "entities_created": 218,
+    "extraction_failures": 0,
+    "dream_cycles_run": 1,
+    "knowledge_gaps_identified": 0
+  },
+  "usage": {
+    "prompt_tokens": 8522,
+    "completion_tokens": 2373,
+    "context_tokens": 7838,
+    "questions_count": 5,
+    "calls": 5,
+    "failures": 0
+  },
+  "elapsed_seconds": 1187.1870000000054,
+  "n_conversations": 1,
+  "conversation_offset": 0,
+  "retrieval_limit": 20,
+  "output_tag": "v1_5_smoke_qwen3",
+  "generator_provider": "ollama",
+  "generator_model": "qwen3:4b",
+  "judge_mode": "ollama",
+  "judge_model": "qwen3:4b",
+  "embedding_backend": "model_server",
+  "offline": true,
+  "questions": [
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "gold_answer": "7 May 2023",
+      "generated_answer": "May 7, 2023",
+      "correct": true,
+      "num_retrieved": 20,
+      "judge_rationale": "Deterministic guard accepted answer",
+      "retrieval_hit": true,
+      "retrieved_memory_ids": [
+        "e2dd6a2f-7ab2-49ed-b5d4-92198d9e7f30",
+        "720407b1-e62e-4d52-9e9b-b713246cae80",
+        "629bbab8-9fac-47c8-b9e2-3233999bc96c",
+        "05998afe-1c66-437a-8002-9a724e043943",
+        "859d0b7c-0f33-4ce7-85b2-1b402f235e9f",
+        "7ea2924d-5841-4212-9353-41c07f458bda",
+        "768f3eee-0852-458e-8c53-26569408e8fa",
+        "e6195229-34c1-4096-a4ac-f94bbee3688e",
+        "2389b16f-4797-452c-8b15-94b811151607",
+        "34ed04b2-5ebd-4125-87b4-0e448c251018",
+        "a0d2beb9-82ed-4116-8eb7-f798b3ebb8d9",
+        "68161d75-53a9-4bb1-a1d7-1270d306ca86",
+        "9895f661-df56-4742-8f51-c2e07044d31f",
+        "1a64b329-5e19-4a40-92ca-32b07dddb49f",
+        "33580550-c105-4d07-8bd6-da130429605a",
+        "aa6da20b-d7ff-40f6-b18f-d61e8f76d7fb",
+        "5c3600c5-5747-4a1d-809d-7ea0dbbcba08",
+        "33443253-3e9a-4c29-b082-c22b1e633c1c",
+        "e8727870-d521-4250-a4ed-0f296ea79781",
+        "0a42081c-2b3e-4350-a0be-d3a957d7efa4"
+      ]
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie paint a sunrise?",
+      "gold_answer": 2022,
+      "generated_answer": "January 1, 2022",
+      "correct": true,
+      "num_retrieved": 20,
+      "judge_rationale": "Deterministic guard accepted answer",
+      "retrieval_hit": true,
+      "retrieved_memory_ids": [
+        "10b0b925-92d6-4856-afc3-524572548f68",
+        "18245c65-f1d1-4478-86ea-174e2fb4bd56",
+        "6b5503c2-0df6-48f7-896a-6bdb29f7883f",
+        "49fa3877-73f8-4a93-b877-7ffef1878475",
+        "4a1a8606-f265-46fc-8342-da56984d05e2",
+        "194fe4f2-e913-4e56-9ae7-060ef236bbe2",
+        "c43f844b-74df-4ad2-856c-039f56d4c50d",
+        "1da55747-5e29-4bc4-b330-367b0746b016",
+        "68317ff4-355f-4626-a23d-6eeeec773360",
+        "60d5bce8-0899-44f8-9f36-55be599e15e2",
+        "2d5c0881-56cc-4c92-ba5e-bb5be6e40343",
+        "b2be554a-bf83-4da9-8a7c-226b77764e2e",
+        "a1beff71-c15a-4d3e-a23a-c65fa2411a8a",
+        "4c7e0fa8-7f04-43f0-be02-a9b8b2c5999a",
+        "ddf0e192-5916-4ff1-a5a7-da0803b07284",
+        "6020a9a2-14fd-4943-99ee-3568d83fd476",
+        "12822357-7d70-4d83-b861-c6eb5fdabb95",
+        "a95fe120-815a-4ccb-a2cb-348d30367fc2",
+        "860f7e1a-6ac6-46b5-b077-72a060973f30",
+        "91c4f1df-ac09-490c-99d3-93703e98dd3b"
+      ]
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "multi-hop",
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "gold_answer": "Psychology, counseling certification",
+      "generated_answer": "counseling and mental health",
+      "correct": false,
+      "num_retrieved": 20,
+      "judge_rationale": "Deterministic guard rejected answer: generated answer omits list items: psychology, counseling certification",
+      "retrieval_hit": false,
+      "retrieved_memory_ids": [
+        "7997c5c2-343e-434d-962a-a6911bc8f759",
+        "24781836-02a9-4935-881b-2c7b18ca0bc5",
+        "61bc4367-04e2-4ff3-a403-9d7191dd6720",
+        "0284e82e-8871-4c47-8422-234e3c4a5ad6",
+        "863d4552-ab8d-455b-8bfb-685707eaf833",
+        "11eb10b1-2c1b-40ed-a998-985a7e1f75dd",
+        "53a4bc16-0b39-4f5e-b023-79c52b8cfe98",
+        "0ad7a85b-f9c4-4ab1-9952-d5896bbdc548",
+        "22592f9b-7320-412f-9103-8e045db01ce5",
+        "92a1b71f-3893-4884-84ad-616d028b487f",
+        "54b4610f-1131-4d40-9c0f-54de0583d63c",
+        "4eec775b-5f11-4b5a-a1de-89456afab384",
+        "9479038e-4eac-43aa-abda-0d320515e5ab",
+        "6cfd9821-5616-42ce-95d5-983ea90e6055",
+        "43e1ee98-347c-48ce-bdc5-98cae9cf9ed0",
+        "309adedb-1521-4462-b3b5-e9db1297cfa1",
+        "62b42ec2-afd0-4b25-af09-36fab7687371",
+        "b8edab24-71bb-4dbd-b745-d33cf67a8fd6",
+        "7b1be272-679c-4369-8711-0dffc5b3dede",
+        "789ecb0c-4527-42df-b773-94df8a22ffbd"
+      ]
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What did Caroline research?",
+      "gold_answer": "Adoption agencies",
+      "generated_answer": "Since the question is asking what Caroline researched (past tense), and the memory",
+      "correct": false,
+      "num_retrieved": 20,
+      "judge_rationale": "Deterministic matching rule",
+      "retrieval_hit": true,
+      "retrieved_memory_ids": [
+        "0274ca16-fdc8-4e97-8978-0dbf690cf33f",
+        "93cd6cad-29ae-4447-bf68-b0c1b529c8ff",
+        "0284e82e-8871-4c47-8422-234e3c4a5ad6",
+        "53a4bc16-0b39-4f5e-b023-79c52b8cfe98",
+        "11eb10b1-2c1b-40ed-a998-985a7e1f75dd",
+        "76b4abd7-7bbb-4b17-a16f-3514d998c703",
+        "22592f9b-7320-412f-9103-8e045db01ce5",
+        "7b1be272-679c-4369-8711-0dffc5b3dede",
+        "309adedb-1521-4462-b3b5-e9db1297cfa1",
+        "e99f3471-b4dd-4838-8984-d32b97d7beb4",
+        "30d7c3de-5fc5-4e80-82b7-ef711e0ae34e",
+        "6cfd9821-5616-42ce-95d5-983ea90e6055",
+        "65ffb8ef-b4e7-44c5-9df2-ba304f1b5d1f",
+        "053bf324-6d49-4b51-9777-09a6ec452fbf",
+        "43e1ee98-347c-48ce-bdc5-98cae9cf9ed0",
+        "b8edab24-71bb-4dbd-b745-d33cf67a8fd6",
+        "92a1b71f-3893-4884-84ad-616d028b487f",
+        "1f6025e8-abd0-4c80-bd09-472c339da4b7",
+        "96e02e20-4f02-4c95-91d0-3eebba98a661",
+        "789ecb0c-4527-42df-b773-94df8a22ffbd"
+      ]
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What is Caroline's identity?",
+      "gold_answer": "Transgender woman",
+      "generated_answer": "Transgender",
+      "correct": false,
+      "num_retrieved": 20,
+      "judge_rationale": "<brief one-line explanation> Verdict: CORRECT or INCORRECT",
+      "retrieval_hit": true,
+      "retrieved_memory_ids": [
+        "a1db34fe-5463-4870-b78b-f837c48426ef",
+        "f547af67-cfbe-4137-ab72-4917a53fce3f",
+        "aa6da20b-d7ff-40f6-b18f-d61e8f76d7fb",
+        "22592f9b-7320-412f-9103-8e045db01ce5",
+        "a95fe120-815a-4ccb-a2cb-348d30367fc2",
+        "05998afe-1c66-437a-8002-9a724e043943",
+        "2389b16f-4797-452c-8b15-94b811151607",
+        "5077f5da-e2ad-4c16-9173-24eb13f04fd8",
+        "92c33f35-314b-4857-9855-c7685d94d1a2",
+        "33443253-3e9a-4c29-b082-c22b1e633c1c",
+        "06a1ae72-6bbc-450b-9f77-286c30f735b4",
+        "143ae8d5-1fe3-4907-ba4a-abb2af2a2cce",
+        "53c2bd3d-f0e5-4965-bf8c-8234c370e0b1",
+        "9dc78127-3b3d-40a8-b0d7-9d0cd954c799",
+        "9f037d42-80fd-4792-9ed6-caf5684cd935",
+        "96e02e20-4f02-4c95-91d0-3eebba98a661",
+        "8ec46391-20ff-42c2-bcdc-31ab9b930da1",
+        "848e10b6-6cf2-41c1-ab34-2ae750839c2b",
+        "4c7e0fa8-7f04-43f0-be02-a9b8b2c5999a",
+        "f9472812-ef1e-461a-9dc2-8545cde718a6"
+      ]
+    }
+  ]
+}

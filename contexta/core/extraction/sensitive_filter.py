@@ -13,9 +13,17 @@ import logging
 import re
 from dataclasses import dataclass, field
 
+from contexta.core.extraction.pii_filter import TIER_DIRECT, PiiFilter
+
 logger = logging.getLogger(__name__)
 
 REDACTED = "[REDACTED]"
+
+# Event types produced by the credential filter alone; a hit in these during the
+# secondary scan means a secret reached extracted memory.
+_CREDENTIAL_EVENT_TYPES = frozenset(
+    {"password", "otp", "api_key", "jwt", "bearer_token", "session_cookie", "payment_card"}
+)
 
 
 @dataclass
@@ -34,6 +42,8 @@ class ScanResult:
     contains_sensitive_data: bool
     redacted_content: str
     redaction_events: list[RedactionEvent] = field(default_factory=list)
+    pii_findings: list[object] = field(default_factory=list)
+    pseudonym_map: dict[str, str] = field(default_factory=dict)
 
 
 def _luhn_check(number: str) -> bool:
@@ -431,20 +441,63 @@ class SensitiveDataFilter:
         return result, events
 
 
-def primary_scan(content: str) -> ScanResult:
-    """Perform primary sensitive data scan on observation payload content.
+def redact_all(content: str) -> ScanResult:
+    """Run the credential filter and the PII filter over the same content.
 
-    This is called before enqueuing the observation for extraction.
-    Redacts sensitive data in-place.
+    This is the gate every observation passes through before extraction. Credentials
+    and direct identifiers are erased; person, organisation and place names are
+    replaced with stable pseudonyms so the entity graph keeps working without the
+    real names ever reaching storage.
 
     Args:
         content: Raw observation payload content.
 
     Returns:
-        ScanResult with redacted content and redaction events.
+        ScanResult with redacted content, redaction events, PII findings and the
+        pseudonym mapping applied.
     """
-    filter_instance = SensitiveDataFilter()
-    result = filter_instance.scan_and_redact(content)
+    credential_result = SensitiveDataFilter().scan_and_redact(content)
+    pii_result = PiiFilter().scan(credential_result.redacted_content)
+
+    events = list(credential_result.redaction_events)
+    for finding in pii_result.findings:
+        events.append(
+            RedactionEvent(
+                pattern_type=f"pii:{finding.category}",
+                original_length=finding.length,
+                position=finding.start,
+            )
+        )
+
+    if pii_result.findings:
+        logger.info(
+            "PII scan: redacted %d occurrences across categories %s",
+            len(pii_result.findings),
+            sorted(pii_result.categories()),
+        )
+
+    return ScanResult(
+        contains_sensitive_data=bool(events),
+        redacted_content=pii_result.redacted_content,
+        redaction_events=events,
+        pii_findings=list(pii_result.findings),
+        pseudonym_map=dict(pii_result.pseudonym_map),
+    )
+
+
+def primary_scan(content: str) -> ScanResult:
+    """Perform primary sensitive data scan on observation payload content.
+
+    This is called before enqueuing the observation for extraction.
+    Redacts sensitive data in-place, including personal data.
+
+    Args:
+        content: Raw observation payload content.
+
+    Returns:
+        ScanResult with redacted content and list of redaction events.
+    """
+    result = redact_all(content)
 
     if result.contains_sensitive_data:
         logger.info(
@@ -455,8 +508,34 @@ def primary_scan(content: str) -> ScanResult:
     return result
 
 
+def secondary_redact(content: str) -> tuple[bool, str]:
+    """Re-scan extracted memory content before it is persisted.
+
+    Extraction runs on already-redacted text, so a direct identifier surviving here
+    means the model reconstructed or hallucinated one and the memory must be
+    dropped. A soft identifier is pseudonymized rather than dropped, because
+    discarding every memory that mentions a person would gut the graph.
+
+    Args:
+        content: Extracted memory content.
+
+    Returns:
+        Tuple of (must_discard, redacted_content).
+    """
+    result = redact_all(content)
+    must_discard = any(
+        finding.tier == TIER_DIRECT for finding in result.pii_findings
+    ) or any(
+        event.pattern_type in _CREDENTIAL_EVENT_TYPES
+        and not event.pattern_type.startswith("pii:")
+        for event in result.redaction_events
+    )
+    return must_discard, result.redacted_content
+
+
 def secondary_scan(content: str) -> bool:
     """Perform secondary sensitive data scan on extracted memory content.
+
 
     This is called after LLM extraction. If sensitive data is detected,
     the memory should be discarded and a security event logged.
@@ -467,13 +546,10 @@ def secondary_scan(content: str) -> bool:
     Returns:
         True if sensitive data is detected (memory should be discarded).
     """
-    filter_instance = SensitiveDataFilter()
-    has_sensitive = filter_instance.contains_sensitive_data(content)
-
-    if has_sensitive:
+    must_discard, _ = secondary_redact(content)
+    if must_discard:
         logger.warning(
             "Secondary scan: sensitive data detected in extracted memory. "
             "Memory will be discarded. Security event logged."
         )
-
-    return has_sensitive
+    return must_discard

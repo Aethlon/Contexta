@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
@@ -10,7 +10,7 @@ export function CopyButton({ text }: { text: string }) {
   return (
     <Button
       variant="ghost"
-      className="absolute right-2 top-2 h-8 w-8 p-0 rounded-lg hover:bg-[var(--color-charcoal)]"
+      className="absolute right-2 top-2 h-8 w-8 p-0 rounded-lg hover:bg-[var(--muted)]"
       onClick={async () => {
         await navigator.clipboard.writeText(text);
         setCopied(true);
@@ -19,9 +19,9 @@ export function CopyButton({ text }: { text: string }) {
       type="button"
     >
       {copied ? (
-        <Check className="h-4 w-4 text-[var(--color-smoke)]" strokeWidth={1.2} />
+        <Check className="h-4 w-4 text-[var(--text-secondary)]" strokeWidth={1.2} />
       ) : (
-        <Copy className="h-4 w-4 text-[var(--color-smoke)]" strokeWidth={1.2} />
+        <Copy className="h-4 w-4 text-[var(--text-secondary)]" strokeWidth={1.2} />
       )}
     </Button>
   );

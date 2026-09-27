@@ -1,138 +1,131 @@
-import { Callout } from 'nextra/components'
-
 # Memories
 
-A **memory** is a structured unit of stored intelligence. Each memory contains metadata, content, scores, embeddings, entity links, and lifecycle information.
+A **memory** is a discrete, typed unit of stored intelligence produced by the extractor from one or more observations. Memories are not vectors with a wrapper — each one carries a validity window, a fact slot, provenance, and a lineage trail.
 
-## Memory Lifecycle
+## Storage
 
-```
-Observation → Extraction → Classification → Scoring → Storage → Retrieval → Decay → Archive/Delete
-```
+PostgreSQL with pgvector, in the `memory_record` table. Scoped by `organization_id` and `user_id`.
 
-### 1. Extraction
+| | |
+| :--- | :--- |
+| Offline embedding column | `embedding_1024`, 1024 dimensions, `Qwen/Qwen3-Embedding-0.6B` |
+| Online embedding column | `embedding`, 1536 dimensions, OpenAI `text-embedding-3-small` |
+| Search text | `title + content + tags`, indexed as a `tsvector` with a GIN index |
+| Rows in the `public` schema | 33, down from 57 before revision `020` |
 
-The LLM extracts structured memories from raw observation messages. Each extracted memory gets a type, title, content, entity references, and confidence score.
+Do not mix dimensions. Vectors are never padded or truncated; switching profiles needs a column migration or a volume reset.
 
-```python
-# The extraction is automatic — just submit observations
-contexta.observe(
-    user_id="u_123",
-    messages=[
-        {"role": "user", "content": "I'm building a RAG app with Postgres and want to use pgvector."},
-        {"role": "assistant", "content": "Great choice. I can help with that."},
-    ],
-)
-# contexta extracts: fact("Building a RAG app"), preference("Prefers Postgres")
-```
+## Memory types
 
-### 2. Classification
-
-Memories are classified into types:
+`MemoryType` in `contexta/core/types.py`:
 
 | Type | Example |
-|------|---------|
+| :--- | :--- |
 | `fact` | "User lives in Berlin" |
 | `preference` | "User prefers Postgres over Mongo" |
-| `goal` | "User wants to ship v2 by June" |
-| `project` | "Building a RAG application" |
+| `event` | "Deployed to production on May 12" |
+| `rule` | "Always run the linter before pushing" |
+| `constraint` | "Never deploy on Fridays" |
 | `skill` | "User knows Rust and Python" |
 | `relationship` | "Alice is Bob's manager" |
-| `event` | "Deployed to production on May 12" |
+| `goal` | "User wants to ship v2 by June" |
+| `project` | "Building a RAG application" |
+| `procedural` | "Deploy by running the release script" |
 | `episodic` | "User mentioned frustration with slow CI" |
 | `pattern` | "User tends to prefer typed languages" |
 | `contact` | "Email: user@example.com" |
-| `custom` | User-defined via schemas |
+| `custom` | Reserved |
 
-### 3. Importance Scoring
+The extractor may return a type outside this set; the pipeline normalises known near-misses (`travel` becomes `event`) rather than discarding the memory.
 
-Every memory receives an importance score (0–1):
+## Importance and confidence
 
-```
-importance = f(has_emphasis, impacts_decisions, mention_count, recency)
-```
+`importance` combines emphasis, decision impact, and mention count. `confidence` derives from the source type. Both land on the memory and feed the retrieval quality prior.
 
-- **≥ 0.7** — critical, strongly influences retrieval
-- **0.4 – 0.7** — standard, included in default context
-- **< 0.4** — low value, excluded unless explicitly queried
-- **< 0.1** — rejected, not stored
+A low-value extraction is dropped **before** it costs an embedding and a graph edge.
 
-### 4. Storage
+## Fact slots and truth maintenance
 
-Memories are stored in Postgres with a 1536-dimensional pgvector embedding. Each row is tenant-scoped by `organization_id` and `user_id`.
+This is the part that makes memory *true* rather than merely accumulated.
 
-### 5. Decay
+When the extractor returns a `subject` / `predicate` / `object` triple, the pipeline hashes `subject` + `predicate` (+ `context`) into a structural slot key of the form `sfx1:<sha256>`. Two statements of the same slot therefore share a key.
 
-Unaccessed memories transition through states:
+> The **object** is deliberately excluded from the hash. A slot is "who, about what" — the same subject and predicate stated with a new value is a *correction*, and a correction only supersedes if it reaches the incumbent row, which it can only do if both rows share a key. A partial triple is refused rather than half-keyed, so the slot and its value always arrive together.
 
-| State | Score penalty | Retrieval inclusion |
-|-------|--------------|-------------------|
-| Active | None | Default |
-| Warm | -0.30 | Default |
-| Cold | -0.50 | Only with `include_cold: true` |
-| Archived | Excluded | Only with `include_archived: true` |
+If a correction arrives, `TruthSupersessionService`:
 
-### 6. Pinning and Archiving
+1. claims the slot (the incumbent is closed with `valid_to = now()` *before* the replacement is inserted),
+2. inserts the new row,
+3. records lineage through `memory_version.superseded_by_id`,
+4. writes an audit entry.
 
-```python
-# Pin — protects from decay, stays active forever
-contexta.pin(memory_id="01J...")
+`uq_memory_record_current_fact_slot` — a partial unique index over `(organization_id, user_id, fact_key)` restricted to `valid_to IS NULL` — makes this mandatory rather than conventional. A correction cannot coexist with what it corrects.
 
-# Unpin — resumes normal decay
-contexta.unpin(memory_id="01J...")
+A rephrasing of the same fact is *not* a contradiction: same slot key, so the value is compared and the row is left alone. Only a genuine contradiction supersedes.
 
-# Archive — soft-hide from retrieval, not deleted
-contexta.archive(memory_id="01J...")
+**Legacy keys.** Any extraction with no usable triple — which is every memory written before the triple existed, and any memory whose model omitted it — still gets a bare 64-hex text-hash key. Those are still produced and still supported. Coverage is measurable with `fact_key LIKE 'sfx1:%'`.
 
-# Restore — unarchive, returns to active state
-contexta.restore(memory_id="01J...")
+## Lifecycle
 
-# Delete — hard delete, removes all traces
-contexta.delete(memory_id="01J...")
-```
+| State | Meaning |
+| :--- | :--- |
+| `active` | Current truth. Default. |
+| `warm` | Decayed from active after 30 days without a read. |
+| `cold` | After 90 days. Excluded unless `include_cold: true`. |
+| `archived` | Excluded unless `include_archived: true`. |
 
-### 7. Truth Maintenance
-
-When a new observation contradicts or supersedes existing memories, contexta's truth maintenance engine handles it:
-
-- **Supersession** — new memory marks old one as `valid_to = now()`
-- **Contradiction detected** — both are kept, but the newer one scores higher
-- **Merge** — duplicate content merges, mention count increases
-
-### 8. Explainability
-
-Every memory has an explain endpoint that shows exactly how it was created:
+Thresholds are `CONTEXTA_DECAY_*` settings (30 / 90 / 180 days). Decay follows **read age**: every retrieval hit calls `touch_accessed()`, so a memory that keeps being useful never decays regardless of when it was written.
 
 ```python
-explanation = contexta.explain(memory_id="01J...")
-print(explanation.extraction_source)    # original messages
-print(explanation.scoring_breakdown)    # importance modifiers
-print(explanation.supersession_history) # what this replaced
+memory.pin(memory_id)      # exempt from decay
+memory.unpin(memory_id)    # resume normal decay
+memory.archive(memory_id)  # soft-hide from retrieval
+memory.restore(memory_id)  # back to active
+memory.delete(memory_id)   # hard delete
 ```
 
-## Memory Schema
+## Inspecting one
+
+```bash
+curl http://localhost:8000/v1/memories/$ID -H "Authorization: Bearer $CONTEXTA_API_KEY"
+```
 
 ```json
 {
-  "id": "01J9ZXAB1Q2R3S4T5V6W7X8Y9Z",
-  "memory_type": "preference",
-  "title": "Prefers Postgres",
-  "content": "User prefers Postgres over Mongo for relational data.",
-  "confidence": 0.92,
-  "importance": 0.75,
-  "tags": ["database", "postgres"],
-  "entities": ["entity_postgres"],
+  "id": "…", "memory_type": "fact",
+  "title": "…", "content": "…",
+  "structured_data": {},
+  "source_type": "user_explicit",
+  "confidence": 1.0, "importance": 0.5167, "utility_score": 0.0,
   "memory_state": "active",
-  "is_pinned": false,
-  "created_at": "2026-04-12T18:32:11Z",
-  "last_accessed_at": "2026-04-13T10:15:00Z"
+  "valid_from": "2026-09-27T01:23:46", "valid_to": null,
+  "fact_key": "sfx1:…",
+  "created_at": "…", "updated_at": "…", "last_accessed_at": null
 }
 ```
 
-## Limits per Tier
+`valid_to: null` means current. A superseded memory has it set, and `explain` shows what replaced it:
 
-| Plan | Active memories |
-|------|----------------|
-| Builder | 50,000 |
-| Scale | 250,000 |
-| Dedicated | 2,000,000+ |
+```bash
+curl http://localhost:8000/v1/memories/$ID/explain -H "Authorization: Bearer $CONTEXTA_API_KEY"
+```
+
+```json
+{
+  "memory_id": "…",
+  "source": {"source_type": "user_explicit", "session_id": "…"},
+  "classification": {"memory_type": "fact", "tags": []},
+  "scoring": {"confidence": 1.0, "importance": 0.5167, "utility_score": 0.0},
+  "supersession_history": [
+    {"id": "…", "content": "…", "valid_from": "…", "valid_to": "…", "superseded_by_id": "…"}
+  ]
+}
+```
+
+## Feedback
+
+`POST /v1/memories/{id}/feedback` adjusts `utility_score` and `confidence` on the row in place. The separate `retrieval_feedback` table was dropped in revision `020` because no code read it — the live path mutates `memory_record` directly.
+
+## Custom schemas
+
+There is no custom schema registry. `POST /v1/schemas` and the SDK/CLI schema methods target a removed endpoint and will return `404`. Typed extraction is driven by the extractor's own contract, not by a runtime-registered schema.

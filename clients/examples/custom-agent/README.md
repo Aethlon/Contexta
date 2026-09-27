@@ -16,28 +16,38 @@ pip install contexta-client openai
 
 export CONTEXTA_API_KEY="your-contexta-api-key"
 export CONTEXTA_BASE_URL="https://api.contexta.ai/v1"
+export CONTEXTA_ORGANIZATION_ID="your-organization-id"
 export OPENAI_API_KEY="your-openai-api-key"
 ```
 
 ```python
 import os
-from contexta_client import contexta
+from uuid import uuid4
+
+from contexta_client import Contexta
 from openai import OpenAI
 
-contexta = contexta(api_key=os.environ["CONTEXTA_API_KEY"])
+client = Contexta(api_key=os.environ["CONTEXTA_API_KEY"])
 openai = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-session_id = "custom-agent-demo-1"
+user_id = str(uuid4())
+organization_id = os.environ["CONTEXTA_ORGANIZATION_ID"]
+session_id = str(uuid4())
 
 def chat(message: str) -> str:
     # 1. Fetch contexta context
-    ctx = contexta.context(session_id=session_id, token_budget=1500)
+    ctx = client.context(
+        user_id=user_id,
+        organization_id=organization_id,
+        session_id=session_id,
+        token_budget=1500,
+    )
     context_parts = []
     if ctx.user_profile:
-        context_parts.append(f"User: {ctx.user_profile.name}")
+        context_parts.append(f"User: {ctx.user_profile}")
     for pref in ctx.preferences:
-        context_parts.append(f"Preference: {pref.category}={pref.value}")
+        context_parts.append(f"Preference: {pref}")
     for mem in ctx.relevant_memories:
-        context_parts.append(f"[Memory] {mem.title}: {mem.content}")
+        context_parts.append(f"[Memory] {mem}")
 
     # 2. Call LLM with context injected as system message
     system = "\n".join(context_parts) or "You are a helpful assistant."
@@ -51,7 +61,8 @@ def chat(message: str) -> str:
     reply = response.choices[0].message.content
 
     # 3. Observe the turn
-    contexta.observe(
+    client.observe(
+        user_id=user_id,
         session_id=session_id,
         messages=[
             {"role": "user", "content": message},
@@ -60,8 +71,11 @@ def chat(message: str) -> str:
     )
     return reply
 
-print(chat("Hi! I'm building a web app with Next.js."))
-print(chat("What do you remember about me?"))
+try:
+    print(chat("Hi! I'm building a web app with Next.js."))
+    print(chat("What do you remember about me?"))
+finally:
+    client.close()
 ```
 
 Run the script multiple times — the agent builds a persistent memory of you.

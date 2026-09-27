@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Float, ForeignKey, Text
+from sqlalchemy import Float, ForeignKey, Index, Text, desc
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -37,4 +37,9 @@ class MemoryVersion(Base, UUIDPrimaryKeyMixin):
     valid_to: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         nullable=False, default=lambda: datetime.utcnow()
+    )
+
+    __table_args__ = (
+        # Lineage walk: the full version history of one memory, newest last.
+        Index("ix_version_memory", "memory_id", desc("valid_from")),
     )

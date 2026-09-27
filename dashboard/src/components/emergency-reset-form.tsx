@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -71,7 +71,7 @@ export function EmergencyResetForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-3.5 font-mono">
       {error && (
-        <div className="flex items-start gap-3 rounded border border-red-500/30 bg-red-500/20 p-3 text-xs text-red-300">
+        <div className="flex items-start gap-3 rounded border border-red-500/30 bg-red-500/20 p-3 text-xs tone-red">
           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>
@@ -89,12 +89,12 @@ export function EmergencyResetForm() {
           placeholder="User@aethlon.xyz"
           required
           disabled={isPending}
-          className="w-full rounded border border-border/40 bg-card/60 px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-red-500/40 focus:ring-1 focus:ring-red-500/20 transition-all"
+          className="w-full rounded border border-border bg-card px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-red-500/40 focus:ring-1 focus:ring-red-500/20 transition-all"
         />
       </div>
 
       <div>
-        <label className="block text-[11px] text-red-400 font-medium mb-1">
+        <label className="block text-[11px] tone-red font-medium mb-1">
           Type &ldquo;WIPE&rdquo; to Confirm
         </label>
         <input
@@ -106,7 +106,7 @@ export function EmergencyResetForm() {
           required
           autoComplete="off"
           disabled={isPending}
-          className="w-full rounded border border-red-500/40 bg-red-950/20 px-3.5 py-2.5 text-xs text-red-200 placeholder:text-red-400/40 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/30 transition-all font-bold tracking-widest uppercase"
+          className="w-full rounded border border-red-500/40 bg-red-950/20 px-3.5 py-2.5 text-xs text-red-200 placeholder:tone-red/40 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/30 transition-all font-bold tracking-widest uppercase"
         />
       </div>
 
@@ -141,7 +141,7 @@ export function EmergencyResetForm() {
           placeholder="Set new master password"
           required
           disabled={isPending}
-          className="w-full rounded border border-border/40 bg-card/60 px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+          className="w-full rounded border border-border bg-card px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
         />
       </div>
 
@@ -157,7 +157,7 @@ export function EmergencyResetForm() {
           placeholder="Confirm new master password"
           required
           disabled={isPending}
-          className="w-full rounded border border-border/40 bg-card/60 px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+          className="w-full rounded border border-border bg-card px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
         />
       </div>
 
@@ -165,7 +165,7 @@ export function EmergencyResetForm() {
         <button
           type="submit"
           disabled={isPending}
-          className="w-full flex items-center justify-center gap-2 rounded bg-red-600 hover:bg-red-500 active:scale-[0.99] py-2.5 text-xs font-semibold text-white transition-all shadow-sm cursor-pointer uppercase tracking-wider disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 rounded bg-red-600 hover:bg-red-500 active:scale-[0.99] py-2.5 text-xs font-semibold text-foreground transition-all shadow-sm cursor-pointer uppercase tracking-wider disabled:opacity-50"
         >
           {isPending ? (
             <>

@@ -1,9 +1,12 @@
-import Link from "next/link";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+﻿import Link from "next/link";
+import { ArrowRight, ShieldOff } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ContextaMark } from "@/components/contexta-logo";
 import { SovereignSignInForm } from "@/components/sovereign-sign-in-form";
+import { isAuthRequired } from "@/lib/dashboard-identity";
 import { Suspense } from "react";
+
+export const dynamic = "force-dynamic";
 
 export default async function SignInPage({
   searchParams,
@@ -11,6 +14,61 @@ export default async function SignInPage({
   searchParams: Promise<{ error?: string; success?: string }>;
 }) {
   const params = await searchParams;
+  const authRequired = isAuthRequired();
+
+  // Default configuration: page auth is off. Rendering the credentials form here
+  // would be a dead end, so say so plainly and point at the console instead.
+  if (!authRequired) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
+        <div className="absolute right-6 top-5">
+          <ThemeToggle />
+        </div>
+        <div className="w-full max-w-lg space-y-6 rounded-lg border border-border bg-card p-8 font-mono">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-8 items-center justify-center rounded border border-border bg-secondary/60">
+              <ContextaMark className="size-5" />
+            </div>
+            <span className="text-sm uppercase tracking-widest">contexta</span>
+          </div>
+
+          <div className="inline-flex items-center gap-1.5 rounded border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] tone-amber">
+            <ShieldOff className="size-3.5" />
+            <span>Authentication is disabled</span>
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-xl font-normal tracking-tight">
+              There is no sign-in here
+            </h1>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              This is a self-hosted, single-operator console, so page
+              authentication ships <span className="text-foreground">off</span>.
+              The console authenticates to the Python API with a bootstrap API
+              key, and anyone who can reach this port has the same access as the
+              operator.
+            </p>
+          </div>
+
+          <div className="space-y-1.5 rounded border border-border bg-secondary/25 p-3 text-[11px] text-muted-foreground">
+            <p className="text-foreground">To require a sign-in</p>
+            <p>
+              Set <code className="font-mono text-foreground">CONTEXTA_DASHBOARD_AUTH=on</code>{" "}
+              in the dashboard&apos;s environment and restart it. The credentials
+              form on this page then becomes live, and the organization the
+              console acts on comes from the signed-in account. See{" "}
+              <code className="font-mono text-foreground">dashboard/README.md</code>.
+            </p>
+          </div>
+
+          <Link href="/dashboard" className="nb-btn nb-btn-primary w-full justify-center">
+            <span>Open the console</span>
+            <ArrowRight className="size-3.5" />
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="relative min-h-screen bg-background text-foreground flex flex-col lg:flex-row antialiased selection:bg-zinc-800 selection:text-zinc-200">
@@ -24,11 +82,11 @@ export default async function SignInPage({
         <div>
           {/* Brand Header */}
           <div className="flex items-center gap-2.5 mb-12">
-            <div className="relative flex items-center justify-center w-8 h-8 rounded border border-border/40 bg-secondary/60 text-foreground">
+            <div className="relative flex items-center justify-center w-8 h-8 rounded border border-border bg-secondary/60 text-foreground">
               <ContextaMark className="size-5" />
             </div>
             <span className="text-sm font-mono uppercase tracking-widest text-foreground flex items-center">
-              contexta<span className="text-[10px] text-muted-foreground font-mono ml-1 font-normal">™</span>
+              contexta
             </span>
           </div>
 
@@ -44,32 +102,18 @@ export default async function SignInPage({
 
           {/* Status Banners */}
           {params.error && (
-            <div className="mb-6 flex items-start gap-3 rounded border border-red-500/30 bg-red-500/10 p-3.5 text-xs font-mono text-red-400">
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <div className="mb-6 flex items-start gap-3 rounded border border-red-500/30 bg-red-500/10 p-3.5 text-xs font-mono tone-red">
               <span>{params.error}</span>
             </div>
           )}
           {params.success && (
-            <div className="mb-6 flex items-start gap-3 rounded border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-mono text-emerald-400">
-              <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+            <div className="mb-6 flex items-start gap-3 rounded border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-mono tone-green">
               <span>{params.success}</span>
             </div>
           )}
 
-          {/* Default Credentials Callout */}
-          <div className="mb-6 rounded border border-border/40 bg-secondary/40 p-3 text-xs font-mono text-muted-foreground flex flex-col gap-1.5">
-            <div className="flex items-center justify-between text-[11px] text-foreground font-medium">
-              <span>Sovereign Default Instance</span>
-              <span className="text-[10px] text-emerald-400 uppercase tracking-widest font-mono">Offline-First</span>
-            </div>
-            <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground">
-              <span>Login: <span className="text-foreground select-all">User@aethlon.xyz</span></span>
-              <span>Pass: <span className="text-foreground select-all">password1234</span></span>
-            </div>
-          </div>
-
           {/* Sovereign Auth Form */}
-          <Suspense fallback={<div className="h-40 rounded border border-border/20 bg-card/30 animate-pulse" />}>
+          <Suspense fallback={<div className="h-40 rounded border border-border bg-card/30 animate-pulse" />}>
             <SovereignSignInForm />
           </Suspense>
 
@@ -79,7 +123,7 @@ export default async function SignInPage({
               Forgot master password?{" "}
               <Link
                 href="/emergency-reset"
-                className="text-red-400 hover:text-red-300 hover:underline underline-offset-4 transition-colors font-normal"
+                className="tone-red hover:text-destructive hover:underline underline-offset-4 transition-colors font-normal"
               >
                 Emergency Wipe & Reset
               </Link>
@@ -95,99 +139,48 @@ export default async function SignInPage({
             </div>
           </div>
         </div>
-
-        {/* Footer info */}
-        <div className="pt-8 text-center lg:text-left font-mono">
-          <p className="text-[11px] text-muted-foreground font-light">
-            By continuing, you agree to our{" "}
-            <a href="#" className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">
-              Terms of Service
-            </a>{" "}
-            and{" "}
-            <a href="#" className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">
-              Privacy Policy
-            </a>
-            .
-          </p>
-        </div>
       </div>
 
-      {/* Right Column: Frame with Testimonial */}
+      {/* Right Column: what re-enabling auth actually means */}
       <div className="w-full lg:w-[52%] xl:w-[56%] p-3 sm:p-5 lg:p-6 flex items-center justify-center">
-        <div className="relative w-full h-[520px] lg:h-[calc(100vh-3rem)] rounded-xl overflow-hidden border border-border/40 shadow-2xl flex flex-col items-center justify-center p-6 sm:p-10 bg-card/50">
-          {/* Background Image with muted dark overlay */}
-          <div
-            className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 scale-105 opacity-40"
-            style={{ backgroundImage: "url('/auth-meadow.jpg')" }}
-          />
-
-          {/* Soft atmospheric gradient layer */}
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent pointer-events-none" />
-
-          {/* Floating Testimonial Section */}
-          <div className="relative z-10 flex flex-col items-center max-w-[440px] w-full text-center space-y-4">
-            {/* Overlapping User Avatars */}
-            <div className="flex items-center -space-x-2.5 drop-shadow-md">
-              <div className="w-9 h-9 rounded-full border-2 border-border overflow-hidden bg-secondary">
-                <img
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&h=120&fit=crop&crop=faces"
-                  alt="Avatar 1"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="w-9 h-9 rounded-full border-2 border-border overflow-hidden bg-secondary z-10">
-                <img
-                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&h=120&fit=crop&crop=faces"
-                  alt="Avatar 2"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="w-9 h-9 rounded-full border-2 border-border overflow-hidden bg-secondary z-20">
-                <img
-                  src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&h=120&fit=crop&crop=faces"
-                  alt="Avatar 3"
-                  className="w-full h-full object-cover"
-                />
-              </div>
+        <div className="relative w-full h-auto lg:h-[calc(100vh-3rem)] max-h-[520px] rounded-lg overflow-y-auto border border-border shadow-2xl flex flex-col items-center justify-center p-6 sm:p-10 bg-card font-mono">
+          <div className="relative z-10 flex flex-col items-center max-w-[440px] w-full text-center space-y-5">
+            <div className="flex items-center gap-2 rounded border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[10px] tone-amber">
+              <ShieldOff className="size-3.5" />
+              <span>CONTEXTA_DASHBOARD_AUTH=on</span>
             </div>
-
-            {/* Testimonial Card */}
-            <div className="w-full rounded border border-border/40 bg-card/90 text-foreground backdrop-blur-xl p-6 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.4)] text-left font-mono">
-              <p className="text-xs sm:text-sm font-normal leading-relaxed text-foreground mb-2.5">
-                &ldquo;We just ditched RAG completely and went memory only through Contexta.&rdquo;
-              </p>
-              <p className="text-[11px] text-muted-foreground font-normal leading-relaxed mb-5">
-                Reduced avg response time from 40s → 12s. Using about 40–50% fewer tokens.
-              </p>
-
-              {/* Author */}
-              <div className="flex items-center gap-3 pt-3 border-t border-border/40">
-                <img
-                  src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=faces"
-                  alt="Armin Daryabegi"
-                  className="w-8 h-8 rounded-full object-cover border border-border/40"
-                />
-                <div>
-                  <h4 className="text-xs font-medium text-foreground leading-tight">
-                    Armin Daryabegi
-                  </h4>
-                  <p className="text-[10px] text-muted-foreground">Founder, Chatmin</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Floating Metric Pills */}
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-1 font-mono">
-              <span className="inline-flex items-center rounded border border-border/40 bg-secondary/60 backdrop-blur-md px-3 py-1 text-[10px] font-normal text-muted-foreground shadow-sm">
-                100B+ tokens/mo
-              </span>
-              <span className="inline-flex items-center rounded border border-border/40 bg-secondary/60 backdrop-blur-md px-3 py-1 text-[10px] font-normal text-muted-foreground shadow-sm">
-                &lt;300ms p95 recall
-              </span>
-              <span className="inline-flex items-center rounded border border-border/40 bg-secondary/60 backdrop-blur-md px-3 py-1 text-[10px] font-normal text-muted-foreground shadow-sm">
-                Zero hallucination drift
-              </span>
-            </div>
+            <h2 className="text-base font-medium text-foreground">
+              Page authentication is enabled
+            </h2>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              The dashboard now gates every page behind a NextAuth v5 credentials
+              session. The session&apos;s organization and user ids are what the
+              console sends to the Python API, so the console is scoped to the
+              organization you signed in as.
+            </p>
+            <ul className="w-full space-y-2 text-left text-[11px] text-muted-foreground">
+              <li className="flex gap-2">
+                <span className="tone-green shrink-0">+</span>
+                <span>
+                  Use this when the console is reachable by more than one person,
+                  or from anywhere but localhost.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="tone-red shrink-0">&minus;</span>
+                <span>
+                  An account must exist in the API first. Create one at{" "}
+                  <Link href="/sign-up" className="text-foreground underline">
+                    /sign-up
+                  </Link>
+                  .
+                </span>
+              </li>
+            </ul>
+            <Link href="/dashboard" className="nb-btn nb-btn-secondary">
+              <span>Continue to console</span>
+              <ArrowRight className="size-3.5" />
+            </Link>
           </div>
         </div>
       </div>

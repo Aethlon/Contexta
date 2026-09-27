@@ -1,190 +1,213 @@
 # TypeScript SDK Reference
 
-Full API surface for `@contexta/client`.
+Full API surface for `@contexta/client`, from `clients/typescript` in this repository.
 
 ## Installation
 
 ```bash
-npm install @contexta/client
+npm install ./clients/typescript
 ```
 
-## Class: `contexta`
+The package is not on npm yet.
+
+## Classes
+
+`Contexta` and `AsyncContexta` are the canonical names. The lowercase `contexta` / `Asynccontexta` still work but log a single `console.warn`.
 
 ```ts
-class contexta {
-  static fromEnv(): contexta;
+import { Contexta } from "@contexta/client";
+
+class Contexta {
+  static fromEnv(): Contexta;
 
   constructor(opts: {
     apiKey: string;
-    baseUrl?: string;
-    timeout?: number;
-    maxRetries?: number;
-    telemetry?: boolean;
-    enableBuffer?: boolean;
+    baseUrl?: string;         // default https://api.contexta.dev
+    timeout?: number;         // ms, default 30000
+    maxRetries?: number;      // default 3
+    telemetry?: boolean;      // default true
+    organizationId?: string;
+    tls?: TlsOptions;
+    dispatcher?: unknown;     // pre-built undici.Agent (Node)
+    fetch?: FetchLike;        // custom TLS-configured fetch
   });
-
-  // Observations
-  observe(input: ObserveInput): Promise<ObserveResponse>;
-  observeBatch(input: ObserveInput[]): Promise<BatchObserveResponse>;
-
-  // Retrieval
-  retrieve(input: RetrieveInput): Promise<ScoredMemory[]>;
-  context(input: ContextInput): Promise<Context>;
-
-  // Memory lifecycle
-  getMemory(memoryId: string): Promise<Memory>;
-  explain(memoryId: string): Promise<Explanation>;
-  pin(memoryId: string): Promise<Memory>;
-  unpin(memoryId: string): Promise<Memory>;
-  archive(memoryId: string): Promise<Memory>;
-  restore(memoryId: string): Promise<Memory>;
-  delete(memoryId: string): Promise<void>;
-  timeline(userId: string, limit?: number): Promise<TimelineEvent[]>;
-
-  // Sessions
-  createSession(userId: string, metadata?: Record<string, unknown>): Promise<Session>;
-  endSession(sessionId: string): Promise<Session>;
-
-  // Policies & schemas
-  registerPolicy(input: PolicyInput): Promise<Policy>;
-  listPolicies(): Promise<Policy[]>;
-  registerSchema(input: SchemaInput): Promise<Schema>;
-
-  // Health
-  ping(): Promise<{ status: string; region: string }>;
 }
 ```
 
-## Input Types
+`fromEnv()` reads `CONTEXTA_API_KEY` (required — throws `contextaError` with code `config_error` if absent), `CONTEXTA_API_URL`, `CONTEXTA_TIMEOUT`, `CONTEXTA_MAX_RETRIES`, `CONTEXTA_TELEMETRY`, `CONTEXTA_ORGANIZATION_ID`, `CONTEXTA_CA_BUNDLE`, and `CONTEXTA_VERIFY_TLS`.
+
+For a self-hosted install set `CONTEXTA_API_URL=http://localhost:8000/v1`. The `https://api.contexta.dev` default does not resolve — there is no hosted API.
+
+`AsyncContexta` takes the same config and the same method names, all returning promises.
+
+## Methods
+
+### Ingestion
 
 ```ts
-interface ObserveInput {
-  userId: string;
-  sessionId?: string;
-  messages: Array<{ role: string; content: string }>;
-  metadata?: Record<string, unknown>;
-  policy?: string;
-  idempotencyKey?: string;
-}
+observe(input: ObserveInput): Promise<ObserveResponse>;
+observeBatch(inputs: ObserveInput[]): Promise<BatchObserveResponse>;
+```
 
+`ObserveResponse` is `{ jobId, observationId, status }` — there is no `estimatedProcessingSeconds`.
+
+### Recall
+
+```ts
+retrieve(input: RetrieveInput): Promise<RetrieveResponse>;
+retrieveBatch(queries: RetrieveInput[]): Promise<BatchRetrievalEntry[]>;
+search(input: SearchInput): Promise<VectorSearchResponse>;
+hybrid(input: HybridSearchInput): Promise<HybridSearchResponse>;
+traverse(input: TraverseInput): Promise<TraverseResult>;
+investigate(options: InvestigateInput): Promise<InvestigateResult>;
+context(input: ContextInput): Promise<ContextResult>;
+```
+
+```ts
 interface RetrieveInput {
   userId: string;
+  organizationId: string;   // required
   queryText: string;
   memoryTypes?: string[];
   tags?: string[];
-  limit?: number;
-  graphDepth?: number;
-  includeArchived?: boolean;
+  limit?: number;           // default 20
+  graphDepth?: number;      // default 2
   includeCold?: boolean;
-  rerank?: boolean;
+  includeArchived?: boolean;
 }
 
 interface ContextInput {
   userId: string;
-  sessionId?: string;
-  query?: string;
+  organizationId: string;   // required
+  sessionId: string;        // required
   tokenBudget?: number;
   includeUserModel?: boolean;
-  rerank?: boolean;
-}
-
-interface PolicyInput {
-  name: string;
-  storeRules?: Array<{ memoryTypes: string[]; patterns?: string[] }>;
-  ignoreRules?: Array<{ patterns: string[] }>;
-  priorityWeights?: Record<string, number>;
-}
-
-interface SchemaInput {
-  name: string;
-  fields: Array<{
-    name: string;
-    type: string;
-    required: boolean;
-    values?: string[];
-  }>;
+  numRecentMessages?: number;
+  numRelevantMemories?: number;
+  graphDepth?: number;
 }
 ```
 
-## Response Types
+There is **no `rerank` field and no `query` field** on `ContextInput`. The HTTP retrieval path does not run a cross-encoder; neural reranking is wired only on the MCP path.
+
+`userId` must equal the actor bound to your key and `organizationId` its organization, or the server returns `403`.
+
+### Memory lifecycle
 
 ```ts
-interface ObserveResponse {
-  jobId: string;
+getMemory(memoryId: string): Promise<Memory>;
+getMany(memoryIds: string[]): Promise<MemoryBatchEntry[]>;
+listMemories(options?: ListMemoriesInput): Promise<MemoryListEntry[]>;
+pin(memoryId: string): Promise<MemoryFlag>;
+unpin(memoryId: string): Promise<MemoryFlag>;
+archive(memoryId: string): Promise<MemoryFlag>;
+restore(memoryId: string): Promise<MemoryFlag>;
+delete(memoryId: string): Promise<DeleteResult>;
+explain(memoryId: string): Promise<Explanation>;
+feedback(memoryId: string, options: FeedbackInput): Promise<FeedbackResult>;
+timeline(userId: string): Promise<TimelineResponse>;
+addRule(options: AddRuleInput): Promise<ObserveResponse>;
+reflect(options: ReflectInput): Promise<ReflectResult>;
+```
+
+### Sessions and health
+
+```ts
+createSession(input: CreateSessionInput): Promise<Session>;
+getSession(sessionId: string): Promise<Session>;
+endSession(sessionId: string): Promise<EndSessionResult>;
+ping(): Promise<{ status: string; version: string }>;
+```
+
+### Removed endpoints — these throw
+
+```ts
+listPolicies(): Promise<Policy[]>;      // GET /v1/policies   -> 404
+registerPolicy(input): Promise<Policy>; // POST /v1/policies  -> 404
+registerSchema(input): Promise<Schema>; // POST /v1/schemas   -> 404
+```
+
+Still present for source compatibility. Calling them against a v1.5 server throws `NotFoundError`.
+
+## Response types
+
+```ts
+interface RetrieveResponse {
   status: string;
-  estimatedProcessingSeconds?: number;
-}
-
-interface BatchObserveResponse {
-  jobs: Array<{ jobId: string; status: string }>;
-}
-
-interface Context {
-  userProfile: UserProfile | null;
-  activeProjects: Project[];
-  preferences: Preference[];
-  goals: Goal[];
-  recentEvents: Event[];
-  relevantMemories: ScoredMemory[];
-  tokenUsage: TokenUsage;
-  cacheHit: boolean;
-  requestId: string;
-
-  toSystemPrompt(template?: string): string;
-  toMessages(): Array<{ role: string; content: string }>;
-  toMarkdown(): string;
-  toDict(): Record<string, unknown>;
+  query: string;
+  results: ScoredMemory[];
 }
 
 interface ScoredMemory {
-  memoryId: string;
-  memoryType: string;
-  title: string;
-  content: string;
+  memory: Memory;            // the record is nested under `memory`
   score: number;
-  scoreBreakdown: Record<string, number>;
-  tags: string[];
-  createdAt: string;
+  semanticScore: number;
+  graphScore: number;
+  importanceScore: number;
+  recencyScore: number;
+  keywordScore: number;
 }
 
 interface Explanation {
-  memory: Memory;
-  extractionSource: Array<{ role: string; content: string }>;
-  scoringBreakdown: Record<string, number>;
-  supersessionHistory: Array<Record<string, unknown>>;
+  memoryId: string;
+  source: { sourceType: string; sessionId: string | null };
+  classification: { memoryType: string; tags: string[] };
+  scoring: ScoreBreakdown;
+  supersessionHistory: SupersessionEntry[];
 }
 
 interface Memory {
   id: string;
+  userId: string;
+  organizationId: string;
   memoryType: string;
   title: string;
   content: string;
   confidence: number;
   importance: number;
+  utilityScore: number;
   tags: string[];
   memoryState: "active" | "warm" | "cold" | "archived";
   isPinned: boolean;
   isArchived: boolean;
+  factKey: string | null;
+  validFrom: string | null;
+  validTo: string | null;    // null means current
   createdAt: string;
   lastAccessedAt: string | null;
 }
 ```
 
-## Error Handling
+There is no `scoreBreakdown` object on `ScoredMemory` — the breakdown is flat siblings. `GET /v1/memories/hybrid` still returns the older nested shape, mapped by `hybrid()` into `HybridSearchResponse`.
+
+## `ContextResult`
+
+```ts
+class ContextResult {
+  userProfile; rules; activeProjects; preferences; goals;
+  recentEvents; relevantMemories; tokenUsage; cacheHit; requestId;
+
+  toSystemPrompt(): string;
+  toMessages(): Array<{ role: string; content: string }>;
+  toMarkdown(): string;
+  toDict(): Record<string, unknown>;
+}
+```
+
+Unlike the Python `Context`, `toSystemPrompt()` here takes **no template argument**.
+
+`cacheHit` is currently always `false` and `requestId` falls back to the literal `"01J"` when no `x-request-id` header was sent. Neither is meaningful.
+
+## Error handling
 
 ```ts
 import {
-  contextaError,
-  AuthenticationError,
-  AuthorizationError,
-  NotFoundError,
-  ValidationError,
-  QuotaExceeded,
-  RateLimited,
+  contextaError, AuthenticationError, AuthorizationError, ValidationError,
+  NotFoundError, ConflictError, QuotaExceeded, RateLimited, ServerError,
 } from "@contexta/client";
 
 try {
-  const ctx = await contexta.context({ userId: "u_123", query: "hello" });
+  const ctx = await memory.context({ userId, organizationId, sessionId });
 } catch (err) {
   if (err instanceof AuthenticationError) {
     console.error("Check your API key");
@@ -194,6 +217,52 @@ try {
 }
 ```
 
-## Edge Runtime
+`QuotaExceeded` is exported for source compatibility but nothing in v1.5 returns a plan limit.
 
-The SDK works in Vercel Edge, Cloudflare Workers, Bun, and Deno with no polyfills needed. It uses native `fetch`, `crypto`, and `URL`.
+## Retries, buffering, TLS
+
+Every write carries an `Idempotency-Key`. `429`, `5xx`, and network failures retry with `min(1000 * 2 ** attempt + jitter, 30_000)`, honouring `Retry-After`. When the network is down, writes queue to a durable on-disk buffer.
+
+```ts
+const replayed = await memory.flush();  // drain the queue
+memory.close();                         // safe to call twice
+```
+
+`withContexta()` is the equivalent of Python's `with Contexta(...)`:
+
+```ts
+import { withContexta } from "@contexta/client";
+
+const systemPrompt = await withContexta({ apiKey }, async (memory) => {
+  const ctx = await memory.context({ userId, organizationId, sessionId });
+  return ctx.toSystemPrompt();
+});
+```
+
+Certificate verification is on by default. To trust the optional self-signed gateway:
+
+```ts
+const memory = new Contexta({ apiKey, tls: { caPath: "./certs/cert.pem" } });
+// or inline PEM:
+const memory = new Contexta({ apiKey, tls: { ca: "<PEM string>" } });
+```
+
+Disabling verification is explicit and logs a one-time warning:
+
+```ts
+const memory = new Contexta({ apiKey, tls: { rejectUnauthorized: false } });
+```
+
+Custom TLS on Node needs a `dispatcher` built from `undici` (an optional peer dependency). Where `undici` is unavailable, or if you already have a TLS-configured `fetch`, pass `fetch` instead and the SDK uses it as-is.
+
+## Runtimes
+
+Node 18+, Vercel Edge Runtime, Cloudflare Workers, Bun, Deno, and modern browsers. **Zero required dependencies** — native `fetch`, `crypto`, and `AbortSignal.timeout`.
+
+## Telemetry
+
+`CONTEXTA_TELEMETRY=false` or `telemetry: false`. It controls a `User-Agent` version header (`contexta-sdk-ts/<version>`) and local counters. Nothing is sent anywhere.
+
+## License
+
+MIT (the SDK package). The Contexta engine itself is dual-licensed; see [Licensing](/licensing).

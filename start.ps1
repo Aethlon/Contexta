@@ -171,7 +171,14 @@ if ($action -eq 'start') {
     Write-Host '  * MCP Server (SSE):      http://localhost:8765/sse' -ForegroundColor White
     Write-Host '  * Local Model Server:   http://localhost:8001' -ForegroundColor White
     Write-Host '-------------------------------------------------------------' -ForegroundColor DarkGray
-    Write-Host 'Default Dashboard Login: User@aethlon.xyz / password1234' -ForegroundColor Cyan
+    if ($env:CONTEXTA_DASHBOARD_AUTH -eq 'on') {
+        Write-Host 'Dashboard auth: enabled (sign-in required)' -ForegroundColor Cyan
+    }
+    else {
+        Write-Host 'Dashboard auth: off - open the console directly.' -ForegroundColor Cyan
+        Write-Host '  It is unauthenticated: do not expose this to an untrusted network.' -ForegroundColor DarkGray
+        Write-Host '  Set CONTEXTA_DASHBOARD_AUTH=on to require a sign-in.' -ForegroundColor DarkGray
+    }
     Write-Host ''
 }
 elseif ($action -eq 'dev') {

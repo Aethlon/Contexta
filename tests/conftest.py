@@ -10,7 +10,7 @@ os.environ["CONTEXTA_CELERY_RESULT_BACKEND"] = "cache+memory://"
 
 import uuid
 from datetime import UTC
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -67,8 +67,11 @@ def override_db_dependency():
     """Overrides the FastAPI database session dependency with a mock session."""
     mock_session = AsyncMock()
 
-    # Configure default results for execute queries to prevent common test crashes
-    mock_result = AsyncMock()
+    # Configure default results for execute queries to prevent common test crashes.
+    # The result is a MagicMock, not an AsyncMock: a SQLAlchemy Result is
+    # synchronous, so `execute()` must resolve to an object whose `.scalars()` and
+    # `.scalar_one_or_none()` are plain values rather than coroutines.
+    mock_result = MagicMock()
     mock_result.scalars.return_value.all.return_value = []
     mock_result.scalar_one_or_none.return_value = None
     mock_session.execute.return_value = mock_result

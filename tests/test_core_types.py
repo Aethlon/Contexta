@@ -19,6 +19,8 @@ class TestMemoryType:
             "FACT", "PREFERENCE", "GOAL", "PROJECT", "SKILL",
             "RELATIONSHIP", "EVENT", "EPISODIC", "PATTERN",
             "CONTACT", "CUSTOM", "PROCEDURAL", "RULE",
+            # CONSTRAINT is mapped from the extractor's "requirement" label.
+            "CONSTRAINT",
         }
         assert {m.name for m in MemoryType} == expected
 

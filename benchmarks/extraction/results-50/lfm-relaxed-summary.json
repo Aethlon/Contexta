@@ -1,0 +1,9 @@
+{
+  "model": "hf.co/LiquidAI/LFM2.5-350M-GGUF:Q4_K_M",
+  "count": 50,
+  "json_valid_rate": 1.0,
+  "mean_claims": 1.2,
+  "mean_complete_claim_rate": 0.0,
+  "mean_evidence_grounded_rate": 0.693334,
+  "mean_anchor_coverage": 0.14743589743589744
+}

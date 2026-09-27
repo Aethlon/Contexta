@@ -6,6 +6,10 @@ is superseded.
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Sequence
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from contexta.models.version import MemoryVersion
@@ -28,3 +32,23 @@ class MemoryVersionRepository:
         self._session.add(record)
         await self._session.flush()
         return record
+
+    async def list_by_memory(
+        self,
+        memory_id: uuid.UUID,
+        *,
+        limit: int = 100,
+    ) -> Sequence[MemoryVersion]:
+        """Versions of one memory, newest first.
+
+        Callers must have already resolved `memory_id` through a tenant-scoped
+        repository; `memory_version` carries no organization_id of its own.
+        """
+        statement = (
+            select(MemoryVersion)
+            .where(MemoryVersion.memory_id == memory_id)
+            .order_by(MemoryVersion.created_at.desc())
+            .limit(limit)
+        )
+        result = await self._session.execute(statement)
+        return result.scalars().all()

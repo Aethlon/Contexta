@@ -5,27 +5,46 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/contexta/gateway/internal/auth"
 	"github.com/contexta/gateway/internal/ratelimit"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 type Server struct {
 	Verifier    *auth.Verifier
 	RateLimiter *ratelimit.RateLimiter
-	DataPlane   string
 	PythonAPI   string
 	proxy       *Proxy
+	Cache       *RetrievalCache
 }
 
-func New(verifier *auth.Verifier, rl *ratelimit.RateLimiter, dataPlane, pythonAPI string) *Server {
+func New(verifier *auth.Verifier, rl *ratelimit.RateLimiter, pythonAPI string) *Server {
 	return &Server{
 		Verifier:    verifier,
 		RateLimiter: rl,
-		DataPlane:   dataPlane,
 		PythonAPI:   pythonAPI,
 		proxy:       &Proxy{},
+	}
+}
+
+// SetCache attaches the retrieval response cache. Without it the gateway is a
+// plain proxy, so this is safe to leave unset.
+func (s *Server) SetCache(client RedisClient, ttl time.Duration) {
+	if client == nil {
+		return
+	}
+	if ttl <= 0 {
+		ttl = 30 * time.Second
+	}
+	s.Cache = &RetrievalCache{redis: client, ttl: ttl}
+}
+
+// cached wraps a proxy handler with the response cache and single-flight.
+func (s *Server) cached(handler http.HandlerFunc) http.HandlerFunc {
+	wrapped := CachedProxy(handler, s.Cache)
+	return func(w http.ResponseWriter, r *http.Request) {
+		wrapped.ServeHTTP(w, r)
 	}
 }
 
@@ -60,23 +79,36 @@ func (s *Server) RegisterRoutes(r chi.Router) {
 		r.Use(s.scopeMiddleware)
 		r.Use(s.internalHeadersMiddleware)
 
+		// The gateway is a stateless edge: every application route is reverse
+		// proxied to the Python API, which is the sole data path. The Go layer
+		// holds no storage, no staging tables, and no retrieval implementation.
+		// The Python API exposes these same paths, so no prefix rewriting is
+		// needed for /v1 (unlike the /api/v1 aliases below).
 		r.Route("/v1", func(r chi.Router) {
-			r.Post("/observations", s.proxy.ReverseProxy(s.DataPlane))
-			r.Post("/observations/batch", s.proxy.ReverseProxy(s.DataPlane))
-			r.Post("/retrieve", s.proxy.ReverseProxy(s.DataPlane))
-			r.Get("/context", s.proxy.ReverseProxy(s.DataPlane))
-			r.Post("/sessions", s.proxy.ReverseProxy(s.DataPlane))
-			r.Post("/sessions/{id}/end", s.proxy.ReverseProxy(s.DataPlane))
-			r.Get("/sessions/inspect/{user_id}", s.proxy.ReverseProxy(s.DataPlane))
+			r.Post("/observations", s.proxy.ReverseProxy(s.PythonAPI))
+			r.Post("/observations/batch", s.proxy.ReverseProxy(s.PythonAPI))
+			// Read paths go through the edge cache: identical recall queries inside
+			// the TTL are served from Redis, and concurrent duplicates are coalesced
+			// into a single upstream request so the model server sees one embedding
+			// call instead of N.
+			r.Post("/retrieve", s.cached(s.proxy.ReverseProxy(s.PythonAPI)))
+			r.Post("/retrieve/batch", s.cached(s.proxy.ReverseProxy(s.PythonAPI)))
+			// Upstream has no GET /v1/context handler; the implemented context
+			// bundle lives at GET /v1/memories/context. Kept registered so the
+			// gateway route table stays stable, but it answers 404 upstream.
+			r.Get("/context", s.proxy.ReverseProxy(s.PythonAPI))
+			r.Post("/sessions", s.proxy.ReverseProxy(s.PythonAPI))
+			r.Post("/sessions/{id}/end", s.proxy.ReverseProxy(s.PythonAPI))
+			r.Get("/sessions/inspect/{user_id}", s.proxy.ReverseProxy(s.PythonAPI))
 
 			r.Route("/memories/{id}", func(r chi.Router) {
-				r.Get("/", s.proxy.ReverseProxy(s.DataPlane))
-				r.Post("/pin", s.proxy.ReverseProxy(s.DataPlane))
-				r.Post("/unpin", s.proxy.ReverseProxy(s.DataPlane))
-				r.Post("/archive", s.proxy.ReverseProxy(s.DataPlane))
-				r.Post("/restore", s.proxy.ReverseProxy(s.DataPlane))
-				r.Delete("/", s.proxy.ReverseProxy(s.DataPlane))
-				r.Get("/explain", s.proxy.ReverseProxy(s.DataPlane))
+				r.Get("/", s.proxy.ReverseProxy(s.PythonAPI))
+				r.Post("/pin", s.proxy.ReverseProxy(s.PythonAPI))
+				r.Post("/unpin", s.proxy.ReverseProxy(s.PythonAPI))
+				r.Post("/archive", s.proxy.ReverseProxy(s.PythonAPI))
+				r.Post("/restore", s.proxy.ReverseProxy(s.PythonAPI))
+				r.Delete("/", s.proxy.ReverseProxy(s.PythonAPI))
+				r.Get("/explain", s.proxy.ReverseProxy(s.PythonAPI))
 			})
 		})
 

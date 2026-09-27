@@ -1,93 +1,101 @@
 # Anthropic Claude Integration
 
-Claude doesn't have an Assistants API — you manage your own session IDs. contexta's Anthropic adapter wraps the context/observe lifecycle.
+Claude has no Assistants API — you manage session IDs yourself. Contexta's Anthropic adapter wraps the context/observe lifecycle around that.
 
 ## Installation
 
+The adapter ships **inside** the `contexta-client` package in this repository. There is no separate `contexta-anthropic` distribution, and the import path is `contexta_client.adapters.anthropic` (not `CONTEXTA_anthropic`).
+
 ```bash
-pip install contexta-client contexta-anthropic
+pip install -e clients/python
+pip install anthropic
 ```
 
-## Basic Usage
+```ts
+npm install ./clients/typescript @anthropic-ai/sdk
+```
+
+## Python
 
 ```python
 from anthropic import Anthropic
-from CONTEXTA_anthropic import contextaMemory
+from contexta_client import Contexta
+from contexta_client.adapters.anthropic import contextaMemory, contextaChat
 
 claude = Anthropic()
-memory = contextaMemory.from_env()
+client = Contexta.from_env()
+memory = contextaMemory(client, user_id=ACTOR_UUID, token_budget=1500)
+```
 
+`contextaMemory(client, user_id, token_budget=None)`. No `from_env()` on the adapter.
+
+```python
 user_message = "What database do I prefer?"
 
-# 1. Fetch context
-context = memory.context_for(
-    user_id="u_123",
-    query=user_message,
-    token_budget=1500,
-)
+# Returns a list of {"role", "content"} blocks, not a single string
+context_blocks = memory.context_for(session_id)
 
-# 2. Call Claude with context as system prompt
 response = claude.messages.create(
     model="claude-3-7-sonnet-20250219",
-    system=context.to_system_prompt(),
+    system="\n".join(b["content"] for b in context_blocks),
     messages=[{"role": "user", "content": user_message}],
     max_tokens=1024,
 )
 
-# 3. Observe the conversation turn
-memory.observe(
-    user_id="u_123",
-    session_id="s_456",
-    messages=[
-        {"role": "user", "content": user_message},
-        {"role": "assistant", "content": response.content[0].text},
-    ],
-)
+memory.observe(session_id, [
+    {"role": "user", "content": user_message},
+    {"role": "assistant", "content": response.content[0].text},
+])
 ```
 
-## With contextaChat Helper
+Method names are `context_for(session_id)` and `observe(session_id, messages)`. There is no `context_for(user_id=..., query=..., token_budget=...)` — the adapter is already bound to its `user_id` and token budget, and it takes a **session id**, not a query. `context_for` returns `[]` if the fetch fails, so a Contexta outage degrades the prompt rather than breaking the turn.
+
+### `contextaChat` — buffered turns
 
 ```python
-from CONTEXTA_anthropic import contextaChat
-
 chat = contextaChat(
-    user_id="u_123",
-    session_id="s_456",
+    client,
+    user_id=ACTOR_UUID,
+    session_id=session_id,
 )
 
-response = chat.send("What database do I prefer?")
-# Context auto-injected, observation auto-saved
+chat.add("user", user_message)
+chat.add("assistant", response.content[0].text)
+chat.flush()          # or let auto_flush handle it
+
+context_blocks = chat.get_context()
 ```
+
+With `auto_flush=True` (the default) the buffer is flushed automatically on each `assistant` turn via `turn(role, content)`. `add()` only buffers; call `flush()` yourself if you turn that off.
 
 ## TypeScript
 
 ```ts
 import Anthropic from "@anthropic-ai/sdk";
-import { contexta } from "@contexta/client";
-import { contextaMemory } from "@contexta/anthropic";
+import { Contexta } from "@contexta/client";
+import { contextaMemory } from "@contexta/client/adapters/anthropic";
 
 const claude = new Anthropic();
-const memory = new contextaMemory(contexta.fromEnv());
+const client = Contexta.fromEnv();
+const memory = new contextaMemory(client, { userId: ACTOR_UUID, tokenBudget: 1500 });
 
-const ctx = await memory.contextFor({
-  userId: "u_123",
-  query: userMessage,
-  tokenBudget: 1500,
-});
+const blocks = await memory.contextFor(sessionId);
 
 const response = await claude.messages.create({
   model: "claude-3-7-sonnet-20250219",
-  system: ctx.toSystemPrompt(),
+  system: blocks.map((b) => b.content).join("\n"),
   messages: [{ role: "user", content: userMessage }],
   max_tokens: 1024,
 });
 
-await memory.observe({
-  userId: "u_123",
-  sessionId: "s_456",
-  messages: [
-    { role: "user", content: userMessage },
-    { role: "assistant", content: response.content[0].text },
-  ],
-});
+await memory.observe(sessionId, [
+  { role: "user", content: userMessage },
+  { role: "assistant", content: response.content[0].text },
+]);
 ```
+
+The TypeScript adapter takes an options object and uses camelCase method names (`contextFor`, not `context_for`). There is no TypeScript `contextaChat` helper — buffer the turns yourself and call `observe`.
+
+## Gotcha
+
+The adapter's `user_id` must equal the actor bound to your API key, or `GET /v1/memories/context` returns `403`. Pass the same UUID you minted the key with.

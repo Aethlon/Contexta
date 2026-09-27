@@ -1,34 +1,36 @@
 # LangChain Integration
 
-contexta implements LangChain's `BaseChatMessageHistory` interface for LCEL chains.
+Contexta implements LangChain's `BaseChatMessageHistory` for LCEL chains, so it drops into `RunnableWithMessageHistory`.
 
 ## Installation
 
+The adapter ships **inside** the `contexta-client` package in this repository. There is no separate `contexta-langchain` distribution, and the import path is `contexta_client.adapters.langchain` (not `CONTEXTA_langchain`).
+
 ```bash
-pip install contexta-client contexta-langchain langchain langchain-openai
+pip install -e clients/python
+pip install "langchain>=0.3"
 ```
 
-## LCEL Usage
+## Python
 
 ```python
 from langchain.schema import AIMessage, HumanMessage
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema.output_parser import StrOutputParser
 from langchain.schema.runnable import RunnableWithMessageHistory
-from CONTEXTA_langchain import contextaChatHistory
 
-from contexta_client import contexta
+from contexta_client import Contexta
+from contexta_client.adapters.langchain import contextaChatHistory
 
-contexta = contexta.from_env()
+client = Contexta.from_env()
+```
 
-# Define chain with contexta context
-def get_context(user_id: str, query: str):
-    ctx = contexta.context(user_id=user_id, query=query, token_budget=1500)
-    return ctx.to_system_prompt()
+`contextaChatHistory(client, user_id, session_id, token_budget=None)`. It raises `ImportError` at construction if `langchain>=0.3` is not importable.
 
+```python
 chain = (
     ChatPromptTemplate.from_messages([
-        ("system", "{CONTEXTA_context}"),
+        ("system", "{contexta_context}"),
         MessagesPlaceholder(variable_name="history"),
         ("human", "{input}"),
     ])
@@ -36,10 +38,19 @@ chain = (
     | StrOutputParser()
 )
 
+def get_context(session_id: str) -> str:
+    ctx = client.context(
+        user_id=ACTOR_UUID,
+        session_id=session_id,
+        token_budget=1500,
+    )
+    return ctx.to_system_prompt()
+
 with_history = RunnableWithMessageHistory(
     chain,
     lambda session_id: contextaChatHistory(
-        user_id=session_id,
+        client,
+        user_id=ACTOR_UUID,
         session_id=session_id,
     ),
     input_messages_key="input",
@@ -49,37 +60,37 @@ with_history = RunnableWithMessageHistory(
 result = with_history.invoke(
     {
         "input": "What database do I prefer?",
-        "CONTEXTA_context": get_context("u_123", "What database do I prefer?"),
+        "contexta_context": get_context(session_id),
     },
-    config={"configurable": {"session_id": "u_123"}},
+    config={"configurable": {"session_id": session_id}},
 )
 ```
 
-## Legacy Memory API
+`get_context` takes a **session id**, not a query text. `GET /v1/memories/context` has no `query` parameter, so if your integration is passing one, it is being dropped by the server.
 
-LangChain's deprecated `Memory` API is also supported:
+### Legacy memory API
 
-```python
-from CONTEXTA_langchain import contextaMemory
-
-memory = contextaMemory(
-    user_id="u_123",
-    session_id="s_456",
-)
-```
+`contextaMemoryLegacy(client, user_id, session_id, memory_key="chat_history", token_budget=None)` wraps the same `contextaChatHistory` and exposes a `buffer` property for LangChain's deprecated `Memory` interface.
 
 ## TypeScript
 
 ```ts
-import { contexta } from "@contexta/client";
-import { contextaChatHistory } from "@contexta/langchain";
+import { Contexta } from "@contexta/client";
+import { contextaChatHistory } from "@contexta/client/adapters/langchain";
 
-const contexta = contexta.fromEnv();
+const client = Contexta.fromEnv();
 
-const history = new contextaChatHistory({
-  userId: "u_123",
-  sessionId: "s_456",
-});
-
-// Use in your LCEL chain or RunnableWithMessageHistory
+const history = new contextaChatHistory(
+  client,
+  ACTOR_UUID,          // userId
+  ORGANIZATION_ID,     // organizationId — positional, unlike Python
+  sessionId,
+  1500,                // tokenBudget
+);
 ```
+
+The TypeScript constructor is **positional** and takes five arguments including `organizationId`; the Python constructor takes four and reads the organization from the client. That asymmetry is real, not a doc error.
+
+## Gotcha
+
+`user_id` must equal the actor bound to your API key. The adapter cannot know it, so pass the same UUID you minted the key with or every history load returns `403`.

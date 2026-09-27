@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional
 
 import typer
 import yaml
@@ -36,7 +35,7 @@ def show_policy(
 
 def create_policy(
     name: str = typer.Option(..., "--name", help="Policy name"),
-    file: Optional[Path] = typer.Option(None, "--file", "-f", help="YAML/JSON file"),
+    file: Path | None = typer.Option(None, "--file", "-f", help="YAML/JSON file"),
     profile: str = typer.Option("default", "--profile", help="Profile name"),
 ) -> None:
     """Register a policy from a YAML/JSON file or inline."""

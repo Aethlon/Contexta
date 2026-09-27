@@ -28,7 +28,15 @@ class FakeMemoryRepository:
 
 
 def settings() -> Settings:
-    return Settings(embedding_dimensions=3, embedding_provider="deterministic")
+    # An unparseable redis_url makes the query-embedding cache a no-op through its
+    # own fail-open path. Left at the default it reads a live Redis, so a vector
+    # cached by an earlier test for the same text would satisfy a later test
+    # without ever calling the provider it is asserting on.
+    return Settings(
+        embedding_dimensions=3,
+        embedding_provider="deterministic",
+        redis_url="disabled://",
+    )
 
 
 def memory() -> MemoryRecord:
@@ -54,7 +62,17 @@ async def test_generate_and_store_updates_embedding() -> None:
 
     assert stored is True
     assert record.embedding == [0.1, 0.2, 0.3]
-    assert repo.updates == [(record.id, {"embedding": [0.1, 0.2, 0.3]})]
+    # The vector is stored with the profile that produced it, so a later
+    # incompatible profile is refused instead of compared across models.
+    assert repo.updates[0][0] == record.id
+    assert repo.updates[0][1]["embedding"] == [0.1, 0.2, 0.3]
+    assert repo.updates[0][1] == {
+        "embedding": [0.1, 0.2, 0.3],
+        "embedding_profile": "deterministic",
+        "embedding_model": "Qwen/Qwen3-Embedding-0.6B",
+        "embedding_version": "qwen3-embedding-0.6b-v1",
+        "embedding_dimensions": 3,
+    }
 
 
 async def test_embedding_failure_degrades_gracefully_and_enqueues_retry() -> None:

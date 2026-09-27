@@ -1,24 +1,21 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { signIn, signOut } from "@/lib/auth";
-import { AuthError } from "next-auth";
-import { contextaFetch, getSession } from "@/lib/auth-helpers";
+import { revalidatePath } from "next/cache";
+import { signOut } from "@/lib/auth";
+import {
+  contextaFetch,
+  readErrorDetail,
+  resolveOperatorIdentity,
+} from "@/lib/auth-helpers";
+import { TENANT_COOKIE, type TenantOverride } from "@/lib/dashboard-identity";
 
-export async function signInAction(formData: FormData) {
-  const email = String(formData.get("email") ?? "");
-  const password = String(formData.get("password") ?? "");
-  try {
-    await signIn("credentials", { email, password, redirectTo: "/dashboard" });
-  } catch (e) {
-    if (e instanceof AuthError) {
-      const message = e.type === "CredentialsSignin"
-        ? "Invalid email or password"
-        : "Authentication failed";
-      redirect(`/sign-in?error=${encodeURIComponent(message)}`);
-    }
-    throw e;
-  }
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function looksLikeUuid(value: string): boolean {
+  return UUID_RE.test(value.trim());
 }
 
 export async function signUpAction(formData: FormData) {
@@ -42,15 +39,7 @@ export async function signUpAction(formData: FormData) {
       body: JSON.stringify({ email, password }),
     });
     if (!res.ok) {
-      let message = "Sign up failed. Please try again.";
-      try {
-        const body = await res.json();
-        if (body?.detail) message = body.detail;
-      } catch {
-        const text = await res.text();
-        if (text) message = text;
-      }
-      return { error: message };
+      return { error: await readErrorDetail(res, "Sign up failed. Please try again.") };
     }
   } catch {
     return { error: "Unable to connect to backend. Please try again." };
@@ -61,19 +50,108 @@ export async function signUpAction(formData: FormData) {
 
 export async function signOutAction() {
   await signOut({ redirect: false });
-  redirect("/");
+  redirect("/dashboard");
+}
+
+/**
+ * Point the console at a different organization / actor / bootstrap key.
+ *
+ * Stored in a cookie rather than env so the operator can switch tenant from the
+ * UI without editing the deployment. The API re-checks every header we send, so
+ * a mismatch surfaces as a 403 instead of reading another tenant's rows.
+ */
+export async function setTenantAction(formData: FormData) {
+  const orgId = String(formData.get("org_id") ?? "").trim();
+  const userId = String(formData.get("user_id") ?? "").trim();
+  const apiKey = String(formData.get("api_key") ?? "").trim();
+  const mode = String(formData.get("mode") ?? "override");
+
+  if (mode === "reset") {
+    const store = await cookies();
+    store.delete(TENANT_COOKIE);
+    revalidatePath("/", "layout");
+    return { ok: true, cleared: true };
+  }
+
+  if (orgId && !looksLikeUuid(orgId)) {
+    return { error: "Organization ID must be a UUID." };
+  }
+  if (userId && !looksLikeUuid(userId)) {
+    return { error: "User ID must be a UUID." };
+  }
+  if (!orgId && !userId && !apiKey) {
+    return { error: "Provide an organization ID, a user ID, or an API key." };
+  }
+
+  const override: TenantOverride = {};
+  if (orgId) override.org_id = orgId;
+  if (userId) override.user_id = userId;
+  if (apiKey) override.api_key = apiKey;
+
+  const store = await cookies();
+  store.set(TENANT_COOKIE, encodeURIComponent(JSON.stringify(override)), {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 365,
+  });
+
+  revalidatePath("/", "layout");
+  return { ok: true, cleared: false };
+}
+
+/**
+ * Ask the API which organization the current identity actually resolves to.
+ * This is the operator-facing proof that the console is pointed somewhere real.
+ */
+export async function probeTenantAction() {
+  const identity = await resolveOperatorIdentity();
+  if (!identity.resolved) {
+    return {
+      ok: false,
+      resolvedOrgId: null,
+      keyCount: 0,
+      error:
+        "No organization resolved. Set CONTEXTA_DASHBOARD_API_KEY (or use the tenant panel below) before the console can read data.",
+    };
+  }
+  try {
+    const res = await contextaFetch("/v1/keys");
+    if (!res.ok) {
+      return {
+        ok: false,
+        resolvedOrgId: null,
+        keyCount: 0,
+        error: await readErrorDetail(res, `API returned ${res.status}.`),
+      };
+    }
+    const keys = (await res.json()) as Array<{ organization_id?: string }>;
+    const resolvedOrgId =
+      keys.find((k) => typeof k?.organization_id === "string")?.organization_id ??
+      null;
+    return { ok: true, resolvedOrgId, keyCount: keys.length, error: null };
+  } catch (err) {
+    return {
+      ok: false,
+      resolvedOrgId: null,
+      keyCount: 0,
+      error: err instanceof Error ? err.message : "Could not reach the API.",
+    };
+  }
 }
 
 export async function createApiKeyAction(formData: FormData) {
   const name = String(formData.get("name") ?? "");
   const scopesRaw = String(formData.get("scopes") ?? "read,write");
-  const scopes = scopesRaw.split(",").map((s) => s.trim()).filter(Boolean);
+  const scopes = scopesRaw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
-  const session = await getSession();
-  if (!session) {
-    return { error: "Not authenticated." };
+  const identity = await resolveOperatorIdentity();
+  if (!identity.orgId || !identity.userId) {
+    return { error: "No organization/actor resolved for this console." };
   }
-
   if (!name) {
     return { error: "Key name is required." };
   }
@@ -84,20 +162,12 @@ export async function createApiKeyAction(formData: FormData) {
       body: JSON.stringify({
         name,
         scopes,
-        organization_id: session.user.org_id,
-        actor_id: session.user.id,
+        organization_id: identity.orgId,
+        actor_id: identity.userId,
       }),
     });
     if (!res.ok) {
-      let message = "Failed to create API key.";
-      try {
-        const body = await res.json();
-        if (body?.detail) message = body.detail;
-      } catch {
-        const text = await res.text();
-        if (text) message = text;
-      }
-      return { error: message };
+      return { error: await readErrorDetail(res, "Failed to create API key.") };
     }
     return { data: await res.json() };
   } catch {
@@ -124,7 +194,6 @@ export async function revokeApiKeyAction(keyId: string): Promise<boolean> {
   }
 }
 
-
 export async function listMemoriesAction(params?: {
   memory_type?: string;
   state?: string;
@@ -145,16 +214,27 @@ export async function listMemoriesAction(params?: {
   }
 }
 
+export async function deleteMemoryAction(memoryId: string) {
+  try {
+    const res = await contextaFetch(`/v1/memories/${memoryId}`, {
+      method: "DELETE",
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function getMemoriesAction(query?: string, limit = 50) {
   try {
-    const session = await getSession();
+    const identity = await resolveOperatorIdentity();
     const res = await contextaFetch("/v1/retrieve", {
       method: "POST",
       body: JSON.stringify({
         query_text: query ?? "",
         limit,
-        user_id: session?.user.id,
-        organization_id: session?.user.org_id,
+        user_id: identity.userId ?? undefined,
+        organization_id: identity.orgId ?? undefined,
       }),
     });
     if (!res.ok) return [];
@@ -181,9 +261,9 @@ export async function getAuditLogAction(limit = 10) {
 
 export async function getGraphAction() {
   try {
-    const session = await getSession();
-    if (!session?.user.id) return { nodes: [], edges: [] };
-    const res = await contextaFetch(`/v1/entities/graph/${session.user.id}`);
+    const identity = await resolveOperatorIdentity();
+    if (!identity.userId) return { nodes: [], edges: [] };
+    const res = await contextaFetch(`/v1/entities/graph/${identity.userId}`);
     if (!res.ok) return { nodes: [], edges: [] };
     return await res.json();
   } catch {
@@ -191,56 +271,56 @@ export async function getGraphAction() {
   }
 }
 
-export async function signInWithGoogleAction() {
-  const { signIn } = await import("@/lib/auth");
-  await signIn("google", { redirectTo: "/dashboard" });
-}
-
-export async function signInWithGitHubAction() {
-  const { signIn } = await import("@/lib/auth");
-  await signIn("github", { redirectTo: "/dashboard" });
+/**
+ * The real v1.5 record: the `structured_data.fact` triple, its validity window,
+ * and the supersession lineage from the truth engine (MemoryVersion.valid_to /
+ * superseded_by_id). Loaded on expand so the list view stays one query.
+ */
+export async function getMemoryDetailAction(memoryId: string) {
+  try {
+    const [detailRes, explainRes] = await Promise.all([
+      contextaFetch(`/v1/memories/${memoryId}`),
+      contextaFetch(`/v1/memories/${memoryId}/explain`),
+    ]);
+    if (!detailRes.ok) return null;
+    const detail = await detailRes.json();
+    const explain = explainRes.ok ? await explainRes.json() : null;
+    return { detail, lineage: explain?.supersession_history ?? null };
+  } catch {
+    return null;
+  }
 }
 
 export async function getEngineStatusAction() {
+  const offlineFallback = {
+    node_online: false,
+    current_mode: "offline",
+    active_engine: "local_qwen",
+    local_model_server: {
+      status: "offline",
+      embedding_model: {
+        name: "Qwen/Qwen3-Embedding-0.6B",
+        avg_latency_ms: 0,
+      },
+      reranker_model: {
+        name: "Qwen/Qwen3-Reranker-0.6B",
+        avg_latency_ms: 0,
+      },
+      ram_usage_mb: 0,
+    },
+    cloud_providers: {
+      fully_configured: false,
+      llm: { provider: "openai", configured: false },
+      embedding: { provider: "openai", configured: false },
+    },
+  };
   try {
     const res = await contextaFetch("/v1/system/engine-status");
-    if (!res.ok) {
-      return {
-        node_online: false,
-        current_mode: "offline",
-        active_engine: "local_qwen",
-        local_model_server: {
-          status: "offline",
-          embedding_model: { name: "Qwen/Qwen3-Embedding-0.6B", avg_latency_ms: 0 },
-          reranker_model: { name: "Qwen/Qwen3-Reranker-0.6B", avg_latency_ms: 0 },
-          ram_usage_mb: 0,
-        },
-        cloud_providers: {
-          fully_configured: false,
-          llm: { provider: "openai", configured: false },
-          embedding: { provider: "openai", configured: false },
-        },
-      };
-    }
+    if (!res.ok) return offlineFallback;
     const data = await res.json();
     return { ...data, node_online: true };
   } catch {
-    return {
-      node_online: false,
-      current_mode: "offline",
-      active_engine: "local_qwen",
-      local_model_server: {
-        status: "offline",
-        embedding_model: { name: "Qwen/Qwen3-Embedding-0.6B", avg_latency_ms: 0 },
-        reranker_model: { name: "Qwen/Qwen3-Reranker-0.6B", avg_latency_ms: 0 },
-        ram_usage_mb: 0,
-      },
-      cloud_providers: {
-        fully_configured: false,
-        llm: { provider: "openai", configured: false },
-        embedding: { provider: "openai", configured: false },
-      },
-    };
+    return offlineFallback;
   }
 }
 
@@ -251,14 +331,9 @@ export async function setEngineModeAction(mode: "offline" | "online" | "auto") {
       body: JSON.stringify({ mode }),
     });
     if (!res.ok) {
-      let detail = "Failed to update engine mode";
-      try {
-        const body = await res.json();
-        if (body?.detail) detail = body.detail;
-      } catch {
-        // ignore
-      }
-      return { error: detail };
+      return {
+        error: await readErrorDetail(res, "Failed to update engine mode"),
+      };
     }
     return await res.json();
   } catch (err: any) {
@@ -280,11 +355,17 @@ export async function validateProvidersAction(payload: {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      return { valid: false, errors: ["Backend validation endpoint returned an error."] };
+      return {
+        valid: false,
+        errors: [await readErrorDetail(res, "Backend validation failed.")],
+      };
     }
     return await res.json();
   } catch (err: any) {
-    return { valid: false, errors: [err?.message || "Could not reach backend."] };
+    return {
+      valid: false,
+      errors: [err?.message || "Could not reach backend."],
+    };
   }
 }
 
@@ -294,32 +375,34 @@ export async function ingestObservationAction(input: {
   messages: Array<{ role: string; content: string }>;
 }) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return { error: "Not authenticated" };
+    const identity = await resolveOperatorIdentity();
+    if (!identity.orgId) {
+      return { error: "No organization resolved for this console." };
     }
 
-    const userId = input.userId || session.user.id;
-    const orgId = session.user.org_id || "00000000-0000-0000-0000-000000000001";
-    const sessionId = input.sessionId || crypto.randomUUID();
+    const userId = input.userId || identity.userId;
+    if (!userId) {
+      return {
+        error:
+          "No actor resolved. Set a user ID in the tenant panel, or configure CONTEXTA_DASHBOARD_USER_ID.",
+      };
+    }
 
     const res = await contextaFetch("/v1/observations", {
       method: "POST",
       body: JSON.stringify({
         user_id: userId,
-        organization_id: orgId,
-        session_id: sessionId,
+        organization_id: identity.orgId,
+        session_id: input.sessionId || crypto.randomUUID(),
         messages: input.messages,
       }),
     });
 
     if (!res.ok) {
-      const errText = await res.text();
-      return { error: errText || "Failed to ingest observation" };
+      return { error: await readErrorDetail(res, "Failed to ingest observation") };
     }
 
-    const data = await res.json();
-    return { data };
+    return { data: await res.json() };
   } catch (err: any) {
     return { error: err?.message || "Failed to connect to backend" };
   }
@@ -335,13 +418,21 @@ export async function resetPasswordAction(formData: FormData) {
     redirect("/reset-password?error=" + encodeURIComponent("All fields are required."));
   }
   if (newPassword.length < 8) {
-    redirect("/reset-password?error=" + encodeURIComponent("New password must be at least 8 characters."));
+    redirect(
+      "/reset-password?error=" +
+        encodeURIComponent("New password must be at least 8 characters."),
+    );
   }
   if (newPassword !== confirmPassword) {
     redirect("/reset-password?error=" + encodeURIComponent("Passwords do not match."));
   }
   if (newPassword === currentPassword) {
-    redirect("/reset-password?error=" + encodeURIComponent("New password must be different from current default password."));
+    redirect(
+      "/reset-password?error=" +
+        encodeURIComponent(
+          "New password must be different from current default password.",
+        ),
+    );
   }
 
   let errorMessage: string | null = null;
@@ -354,16 +445,8 @@ export async function resetPasswordAction(formData: FormData) {
         new_password: newPassword,
       }),
     });
-
     if (!res.ok) {
-      errorMessage = "Failed to update master password.";
-      try {
-        const body = await res.json();
-        if (body?.detail) errorMessage = body.detail;
-      } catch {
-        const text = await res.text();
-        if (text) errorMessage = text;
-      }
+      errorMessage = await readErrorDetail(res, "Failed to update master password.");
     }
   } catch {
     errorMessage = "Unable to connect to Contexta backend.";
@@ -373,14 +456,18 @@ export async function resetPasswordAction(formData: FormData) {
     redirect("/reset-password?error=" + encodeURIComponent(errorMessage));
   }
 
-  // Terminate session so user must authenticate with their new master password
   try {
     await signOut({ redirect: false });
   } catch {
-    // Ignore signOut errors if session expired
+    // Ignore signOut errors if the session had already expired.
   }
 
-  redirect("/sign-in?success=" + encodeURIComponent("Master password updated successfully. Sign in with your new credentials."));
+  redirect(
+    "/sign-in?success=" +
+      encodeURIComponent(
+        "Master password updated successfully. Sign in with your new credentials.",
+      ),
+  );
 }
 
 export async function emergencyWipeAction(formData: FormData) {
@@ -393,13 +480,23 @@ export async function emergencyWipeAction(formData: FormData) {
     redirect("/emergency-reset?error=" + encodeURIComponent("All fields are required."));
   }
   if (confirmation !== "WIPE") {
-    redirect("/emergency-reset?error=" + encodeURIComponent("You must type 'WIPE' to confirm permanent cryptographic shredding."));
+    redirect(
+      "/emergency-reset?error=" +
+        encodeURIComponent(
+          "You must type 'WIPE' to confirm permanent cryptographic shredding.",
+        ),
+    );
   }
   if (newPassword.length < 8) {
-    redirect("/emergency-reset?error=" + encodeURIComponent("New password must be at least 8 characters."));
+    redirect(
+      "/emergency-reset?error=" +
+        encodeURIComponent("New password must be at least 8 characters."),
+    );
   }
   if (newPassword !== confirmPassword) {
-    redirect("/emergency-reset?error=" + encodeURIComponent("Passwords do not match."));
+    redirect(
+      "/emergency-reset?error=" + encodeURIComponent("Passwords do not match."),
+    );
   }
 
   let errorMessage: string | null = null;
@@ -412,16 +509,11 @@ export async function emergencyWipeAction(formData: FormData) {
         new_password: newPassword,
       }),
     });
-
     if (!res.ok) {
-      errorMessage = "Failed to perform emergency wipe.";
-      try {
-        const body = await res.json();
-        if (body?.detail) errorMessage = body.detail;
-      } catch {
-        const text = await res.text();
-        if (text) errorMessage = text;
-      }
+      errorMessage = await readErrorDetail(
+        res,
+        "Failed to perform emergency wipe.",
+      );
     }
   } catch {
     errorMessage = "Unable to connect to Contexta backend.";
@@ -434,57 +526,14 @@ export async function emergencyWipeAction(formData: FormData) {
   try {
     await signOut({ redirect: false });
   } catch {
-    // Ignore
+    // Ignore.
   }
 
-  redirect("/sign-in?success=" + encodeURIComponent("Vault shredded and password reset. Authenticate with your new password."));
+  redirect(
+    "/sign-in?success=" +
+      encodeURIComponent(
+        "Vault shredded and password reset. Authenticate with your new password.",
+      ),
+  );
 }
 
-export async function completeOnboardingAction(formData: FormData) {
-  const session = await getSession();
-  if (!session) {
-    redirect("/sign-in?error=" + encodeURIComponent("Not authenticated. Please sign in again."));
-  }
-
-  const isSkip = formData.get("skip") === "true";
-  const name = isSkip ? (session.user.name || "User") : String(formData.get("name") ?? "").trim() || "User";
-  const age = isSkip ? undefined : String(formData.get("age") ?? "").trim() || undefined;
-  const favoriteColor = isSkip ? undefined : String(formData.get("favoriteColor") ?? "").trim() || undefined;
-  const companionRole = isSkip ? undefined : String(formData.get("companionRole") ?? "").trim() || undefined;
-  const preferences = isSkip ? undefined : String(formData.get("preferences") ?? "").trim() || undefined;
-
-  let errorMessage: string | null = null;
-  try {
-    const res = await contextaFetch("/v1/auth/onboarding", {
-      method: "POST",
-      body: JSON.stringify({
-        user_id: session.user.id,
-        organization_id: session.user.org_id,
-        name,
-        age,
-        favorite_color: favoriteColor,
-        companion_role: companionRole,
-        preferences,
-      }),
-    });
-
-    if (!res.ok) {
-      errorMessage = "Failed to save personal profile.";
-      try {
-        const body = await res.json();
-        if (body?.detail) errorMessage = body.detail;
-      } catch {
-        const text = await res.text();
-        if (text) errorMessage = text;
-      }
-    }
-  } catch {
-    errorMessage = "Unable to reach Contexta backend.";
-  }
-
-  if (errorMessage) {
-    redirect("/onboarding?error=" + encodeURIComponent(errorMessage));
-  }
-
-  redirect("/dashboard");
-}

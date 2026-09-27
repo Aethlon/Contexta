@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ export function Tabs({ tabs }: { tabs: { label: string; content: React.ReactNode
   const [active, setActive] = React.useState(0);
   return (
     <div className="space-y-6">
-      <div className="flex gap-8 relative border-b border-[var(--color-graphite)]/50 pb-2">
+      <div className="flex gap-8 relative border-b border-[var(--border)]/50 pb-2">
         {tabs.map((tab, index) => (
           <div
             key={tab.label}
@@ -22,15 +22,15 @@ export function Tabs({ tabs }: { tabs: { label: string; content: React.ReactNode
             className={cn(
               "cursor-pointer text-sm transition-colors relative z-10 pb-2 select-none",
               active === index
-                ? "text-[var(--color-ghost)] font-normal"
-                : "text-[var(--color-smoke)] font-light hover:text-[var(--color-ghost)]/80",
+                ? "text-[var(--foreground)] font-normal"
+                : "text-[var(--text-secondary)] font-light hover:text-[var(--foreground)]/80",
             )}
           >
             {tab.label}
             {active === index && (
               <motion.div
                 layoutId="activeTabIndicator"
-                className="absolute -bottom-[1px] left-0 right-0 h-[1.5px] bg-[var(--color-ghost)]"
+                className="absolute -bottom-[1px] left-0 right-0 h-[1.5px] bg-[var(--foreground)]"
                 transition={springStiff}
               />
             )}

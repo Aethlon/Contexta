@@ -16,6 +16,7 @@ class MemoryType(str, Enum):
     EPISODIC = "episodic"
     PROCEDURAL = "procedural"
     RULE = "rule"
+    CONSTRAINT = "constraint"
     PATTERN = "pattern"
     CONTACT = "contact"
     CUSTOM = "custom"

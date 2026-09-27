@@ -1,0 +1,208 @@
+{
+  "stats": {
+    "sessions": 14,
+    "chunks": 86,
+    "extracted": 3,
+    "stored": 3,
+    "skipped": 0,
+    "discarded": 0,
+    "failures": 11,
+    "total_ms": 132373.16999999998,
+    "max_ms": 20309.86,
+    "embedded": 0,
+    "embed_failed": 3,
+    "embed_errors": [
+      "cab62a9e-e701-4508-8004-df7673f2808b: provider returned failure",
+      "e1e06751-0adf-44d0-b9e4-bd1b37c21ac4: provider returned failure",
+      "27c40205-f0df-490d-ae3b-5edd05e74602: provider returned failure"
+    ]
+  },
+  "per_session": [
+    {
+      "session_key": "s2",
+      "session_id": "22538adb-ec85-4b41-bc6c-fd725750b6c0",
+      "domain": "conversation",
+      "chunks": 17,
+      "ingest_ms": 4051.46,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "session_key": "commit_be6f5ca3",
+      "session_id": "2ade5e32-94de-4774-bdce-87018ec5e879",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 10851.4,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ',' delimiter: line 1 column 1145 (char 1144)"
+    },
+    {
+      "session_key": "commit_09e01394",
+      "session_id": "6d9a052b-209c-4f3c-b9e5-59f178d012fb",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 20309.86,
+      "error": "AttributeError: 'list' object has no attribute 'get'"
+    },
+    {
+      "session_key": "s3",
+      "session_id": "f5d39522-9bf4-4c39-990c-ca78d28acb84",
+      "domain": "record",
+      "chunks": 2,
+      "ingest_ms": 12948.55,
+      "error": "AttributeError: 'list' object has no attribute 'get'"
+    },
+    {
+      "session_key": "s5",
+      "session_id": "64c9e394-9764-403d-b3a3-4991373a74e1",
+      "domain": "record",
+      "chunks": 20,
+      "ingest_ms": 2873.68,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "session_key": "commit_f0919ab8",
+      "session_id": "1f18f035-b7fe-4e2e-8668-0730ee20fdf6",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 9382.85,
+      "extracted": 1,
+      "stored": 1,
+      "skipped": 0,
+      "discarded": 0,
+      "timings": {
+        "cortex_ms": 0.18,
+        "extraction_ms": 9108.64,
+        "deduplication_ms": 238.91,
+        "entity_graph_ms": 0.53,
+        "persistence_ms": 25.4,
+        "total_ms": 9378.83,
+        "redaction_ms": 3.4
+      }
+    },
+    {
+      "session_key": "s4",
+      "session_id": "ff49a2f4-1160-4b81-831d-a92d7334fa8b",
+      "domain": "conversation",
+      "chunks": 4,
+      "ingest_ms": 13591.48,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ',' delimiter: line 1 column 1175 (char 1174)"
+    },
+    {
+      "session_key": "s6",
+      "session_id": "75231b92-0fac-4960-8c0a-9fea93d39efb",
+      "domain": "record",
+      "chunks": 5,
+      "ingest_ms": 10394.26,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ',' delimiter: line 1 column 517 (char 516)"
+    },
+    {
+      "session_key": "commit_43bba6d5",
+      "session_id": "139f16aa-ffac-4af8-be1d-e7a8b0d32584",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 12607.93,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Invalid \\escape: line 1 column 455 (char 454)"
+    },
+    {
+      "session_key": "s7",
+      "session_id": "15a392ea-29fc-42c0-8e08-ac5962de69ce",
+      "domain": "record",
+      "chunks": 8,
+      "ingest_ms": 3049.75,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "session_key": "commit_85f67925",
+      "session_id": "c10c3f64-a933-4395-8157-cb3d1a6ac760",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 5702.69,
+      "extracted": 1,
+      "stored": 1,
+      "skipped": 0,
+      "discarded": 0,
+      "timings": {
+        "cortex_ms": 0.12,
+        "extraction_ms": 4599.21,
+        "deduplication_ms": 16.4,
+        "entity_graph_ms": 0.58,
+        "persistence_ms": 20.01,
+        "total_ms": 4640.52,
+        "redaction_ms": 2.21
+      }
+    },
+    {
+      "session_key": "s8",
+      "session_id": "8fb3946d-dce7-40ac-a833-822bad4da12e",
+      "domain": "conversation",
+      "chunks": 23,
+      "ingest_ms": 4788.29,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "session_key": "commit_ac7f6506",
+      "session_id": "2b9ffbf9-4f28-4655-bb95-ff5073fce120",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 11160.72,
+      "extracted": 1,
+      "stored": 1,
+      "skipped": 0,
+      "discarded": 0,
+      "timings": {
+        "cortex_ms": 0.28,
+        "extraction_ms": 11123.37,
+        "deduplication_ms": 12.65,
+        "entity_graph_ms": 0.86,
+        "persistence_ms": 12.78,
+        "total_ms": 11155.72,
+        "redaction_ms": 3.66
+      }
+    },
+    {
+      "session_key": "commit_7dd12bb0",
+      "session_id": "140c8509-8913-4493-a41f-fd2a4d9dd52d",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 10660.25,
+      "error": "AttributeError: 'list' object has no attribute 'get'"
+    }
+  ],
+  "stored_memories": [
+    {
+      "id": "cab62a9e-e701-4508-8004-df7673f2808b",
+      "session_id": "1f18f035-b7fe-4e2e-8668-0730ee20fdf6",
+      "type": "event",
+      "title": "LGBTQ support group meeting",
+      "content": "A LGBTQ support group meeting was held. Participants discussed various issues and concerns related to the community.",
+      "importance": 0.5,
+      "confidence": 1.0,
+      "state": "active",
+      "valid_from": "2026-01-15T10:00:00",
+      "valid_to": null
+    },
+    {
+      "id": "e1e06751-0adf-44d0-b9e4-bd1b37c21ac4",
+      "session_id": "c10c3f64-a933-4395-8157-cb3d1a6ac760",
+      "type": "event",
+      "title": "Meeting with LGBTQ support group",
+      "content": "I had a meeting with an LGBTQ support group about promoting inclusivity.",
+      "importance": 0.5,
+      "confidence": 1.0,
+      "state": "active",
+      "valid_from": "2026-01-17T10:00:00",
+      "valid_to": null
+    },
+    {
+      "id": "27c40205-f0df-490d-ae3b-5edd05e74602",
+      "session_id": "2b9ffbf9-4f28-4655-bb95-ff5073fce120",
+      "type": "fact",
+      "title": "Commit c_ac7f6506 on function_51 (add): def function_51(x): return x * 2",
+      "content": "Commit c_ac7f6506 on function_51 (add): def function_51(x): return x * 2",
+      "importance": 0.45,
+      "confidence": 1.0,
+      "state": "active",
+      "valid_from": "2026-01-21T10:00:00",
+      "valid_to": null
+    }
+  ]
+}

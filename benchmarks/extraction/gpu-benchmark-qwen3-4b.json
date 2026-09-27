@@ -1,0 +1,137 @@
+{
+  "records": [
+    {
+      "wall_ms": 8166.76,
+      "load_ms": 316.82,
+      "time_to_first_token_ms": 199.51,
+      "prompt_tokens": 272,
+      "output_tokens": 477,
+      "prompt_tokens_per_second": 1363.34,
+      "output_tokens_per_second": 68.83,
+      "client_wall_ms": 10229.9,
+      "conversation_id": "conv_001",
+      "claims": 4
+    },
+    {
+      "wall_ms": 7172.59,
+      "load_ms": 651.83,
+      "time_to_first_token_ms": 51.72,
+      "prompt_tokens": 275,
+      "output_tokens": 406,
+      "prompt_tokens_per_second": 5317.61,
+      "output_tokens_per_second": 69.74,
+      "client_wall_ms": 7178.01,
+      "conversation_id": "conv_002",
+      "claims": 3
+    },
+    {
+      "wall_ms": 5229.47,
+      "load_ms": 332.78,
+      "time_to_first_token_ms": 75.24,
+      "prompt_tokens": 312,
+      "output_tokens": 278,
+      "prompt_tokens_per_second": 4146.79,
+      "output_tokens_per_second": 67.22,
+      "client_wall_ms": 5235.48,
+      "conversation_id": "conv_003",
+      "claims": 2
+    },
+    {
+      "wall_ms": 7411.31,
+      "load_ms": 434.7,
+      "time_to_first_token_ms": 66.21,
+      "prompt_tokens": 297,
+      "output_tokens": 393,
+      "prompt_tokens_per_second": 4485.93,
+      "output_tokens_per_second": 63.13,
+      "client_wall_ms": 7418.23,
+      "conversation_id": "conv_004",
+      "claims": 3
+    },
+    {
+      "wall_ms": 10686.02,
+      "load_ms": 568.43,
+      "time_to_first_token_ms": 68.28,
+      "prompt_tokens": 299,
+      "output_tokens": 521,
+      "prompt_tokens_per_second": 4378.96,
+      "output_tokens_per_second": 56.16,
+      "client_wall_ms": 10692.08,
+      "conversation_id": "conv_005",
+      "claims": 4
+    },
+    {
+      "wall_ms": 13304.17,
+      "load_ms": 316.51,
+      "time_to_first_token_ms": 75.87,
+      "prompt_tokens": 326,
+      "output_tokens": 622,
+      "prompt_tokens_per_second": 4296.71,
+      "output_tokens_per_second": 51.92,
+      "client_wall_ms": 13309.05,
+      "conversation_id": "conv_006",
+      "claims": 5
+    },
+    {
+      "wall_ms": 11408.61,
+      "load_ms": 338.53,
+      "time_to_first_token_ms": 53.55,
+      "prompt_tokens": 269,
+      "output_tokens": 464,
+      "prompt_tokens_per_second": 5022.97,
+      "output_tokens_per_second": 44.96,
+      "client_wall_ms": 11419.07,
+      "conversation_id": "conv_007",
+      "claims": 4
+    },
+    {
+      "wall_ms": 14240.57,
+      "load_ms": 464.52,
+      "time_to_first_token_ms": 69.01,
+      "prompt_tokens": 291,
+      "output_tokens": 508,
+      "prompt_tokens_per_second": 4216.6,
+      "output_tokens_per_second": 39.25,
+      "client_wall_ms": 14246.43,
+      "conversation_id": "conv_008",
+      "claims": 4
+    },
+    {
+      "wall_ms": 21955.58,
+      "load_ms": 363.03,
+      "time_to_first_token_ms": 72.75,
+      "prompt_tokens": 317,
+      "output_tokens": 696,
+      "prompt_tokens_per_second": 4357.33,
+      "output_tokens_per_second": 33.39,
+      "client_wall_ms": 21961.82,
+      "conversation_id": "conv_009",
+      "claims": 5
+    },
+    {
+      "wall_ms": 13127.2,
+      "load_ms": 325.7,
+      "time_to_first_token_ms": 53.27,
+      "prompt_tokens": 269,
+      "output_tokens": 352,
+      "prompt_tokens_per_second": 5049.27,
+      "output_tokens_per_second": 29.06,
+      "client_wall_ms": 13133.13,
+      "conversation_id": "conv_010",
+      "claims": 3
+    }
+  ],
+  "summary": {
+    "runs": 10,
+    "warm_wall_mean_ms": 11270.23,
+    "warm_wall_median_ms": 11047.32,
+    "warm_wall_p95_ms": 14240.57,
+    "ttft_mean_ms": 78.54,
+    "output_tps_mean": 52.37,
+    "output_tps_min": 29.06,
+    "output_tokens_mean": 471.7,
+    "prompt_tokens_mean": 292.7,
+    "projected_sequential_50_minutes": 9.39,
+    "projected_sequential_200_minutes": 37.57
+  }
+}

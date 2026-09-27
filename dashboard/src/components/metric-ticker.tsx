@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from "react";
 import { motion } from "framer-motion";
@@ -12,21 +12,21 @@ interface Metric {
 
 const METRICS: Metric[] = [
   { label: "38ms", value: 38, suffix: " p95 recall", color: "text-blue-400" },
-  { label: "2,650", value: 2650, suffix: " rec/s ingest", color: "text-emerald-400" },
+  { label: "2,650", value: 2650, suffix: " rec/s ingest", color: "tone-green" },
   { label: "98.8%", value: 98.8, suffix: " MRR@10", color: "text-purple-400" },
   { label: "$0.00", value: 0, suffix: " local egress", color: "text-cyan-400" },
-  { label: "50K", value: 50000, suffix: " memory scale", color: "text-indigo-400" },
+  { label: "50K", value: 50000, suffix: " memory scale", color: "tone-blue" },
   { label: "2-hop", value: 2, suffix: " graph traversal", color: "text-violet-400" },
-  { label: "0.00%", value: 0, suffix: " memory drift", color: "text-emerald-400" },
+  { label: "0.00%", value: 0, suffix: " memory drift", color: "tone-green" },
   { label: "SOC2", value: 2, suffix: " enclave isolation", color: "text-rose-400" },
 ];
 
 const METRICS_ROW_2: Metric[] = [
   { label: "HNSW", value: 16, suffix: " M=16 ef=64", color: "text-blue-400" },
   { label: "RRF", value: 60, suffix: " k=60 fusion", color: "text-cyan-400" },
-  { label: "BM25", value: 100, suffix: " lexical match", color: "text-sky-400" },
-  { label: "Qwen 2.5", value: 7, suffix: "B local engine", color: "text-emerald-400" },
-  { label: "FastEmbed", value: 384, suffix: " ONNX dims", color: "text-amber-400" },
+  { label: "BM25", value: 100, suffix: " lexical match", color: "tone-blue" },
+  { label: "LFM2.5", value: 1.2, suffix: "B fine-tuned extractor", color: "tone-green" },
+  { label: "Qwen3-Emb", value: 1024, suffix: " native dims", color: "tone-amber" },
   { label: "asyncpg", value: 100, suffix: " concurrent pool", color: "text-violet-400" },
 ];
 
@@ -47,14 +47,14 @@ function MetricPill({ metric }: { metric: Metric }) {
 
   return (
     <motion.div
-      className="group inline-flex items-center gap-3 px-4 py-2 rounded-full bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] hover:border-white/[0.14] transition-all duration-300 cursor-default"
+      className="group inline-flex items-center gap-3 px-4 py-2 rounded-full bg-accent hover:bg-accent border border-border hover:border-[color:var(--ring)] transition-all duration-300 cursor-default"
       whileHover={{ scale: 1.02 }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{ willChange: "transform" }}
     >
       <motion.div
-        className="flex items-center justify-center w-6 h-6 rounded-full bg-white/[0.04]"
+        className="flex items-center justify-center w-6 h-6 rounded-full bg-accent"
         animate={{ scale: isHovered ? 1.15 : 1 }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
       >
@@ -65,7 +65,7 @@ function MetricPill({ metric }: { metric: Metric }) {
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         />
       </motion.div>
-      <span className={`text-sm font-medium text-white ${metric.color} transition-colors`}>
+      <span className={`text-sm font-medium text-foreground ${metric.color} transition-colors`}>
         {metric.label}
       </span>
       <span className="text-sm font-mono text-[#6B7280] hidden sm:inline">
@@ -78,7 +78,7 @@ function MetricPill({ metric }: { metric: Metric }) {
 export function MetricTicker() {
   return (
     <section
-      className="relative w-full py-8 overflow-hidden select-none border-y border-white/[0.04] bg-white/[0.015] backdrop-blur-xl"
+      className="relative w-full py-8 overflow-hidden select-none border-y border-border bg-accent "
       aria-label="Key metrics"
     >
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[100px] bg-blue-500/[0.02] rounded-full blur-[100px] pointer-events-none" />

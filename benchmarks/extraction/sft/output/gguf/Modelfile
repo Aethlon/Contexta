@@ -1,0 +1,18 @@
+FROM ./contexta-lfm-extract-q4_k_m.gguf
+
+TEMPLATE """{{- if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}
+{{ .Content }}<|im_end|>
+{{ end }}<|im_start|>assistant
+"""
+
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
+PARAMETER temperature 0
+# Extraction prompts reach ~8k tokens (system prompt + schema + a multi-turn
+# observation). The previous 4096 made Ollama reject them with
+# "request (8281 tokens) exceeds the available context size (4096 tokens)",
+# which silently degraded extraction to the heuristic fallback. The base model
+# declares a 128k context, so 16384 is ample headroom.
+PARAMETER num_ctx 16384

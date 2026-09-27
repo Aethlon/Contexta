@@ -1,0 +1,28 @@
+{
+  "dataset": "C:\\Users\\jenit\\Downloads\\contexta_extreme_200_conversations.csv",
+  "limit": 2,
+  "models": [
+    {
+      "model": "hf.co/LiquidAI/LFM2.5-350M-GGUF:Q4_K_M",
+      "count": 2,
+      "json_valid_rate": 0.0,
+      "mean_claims": 0,
+      "mean_complete_claim_rate": 0.0,
+      "mean_evidence_grounded_rate": 0.0,
+      "mean_anchor_coverage": 0.0,
+      "question_claims": 0,
+      "p95_latency_ms": 279.67
+    },
+    {
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "count": 2,
+      "json_valid_rate": 1.0,
+      "mean_claims": 3.5,
+      "mean_complete_claim_rate": 1.0,
+      "mean_evidence_grounded_rate": 1.0,
+      "mean_anchor_coverage": 1.0,
+      "question_claims": 0,
+      "p95_latency_ms": 6665.56
+    }
+  ]
+}

@@ -71,9 +71,9 @@ Letta is an agent framework with built-in memory (MemGPT lineage) — **adjacent
 | Scale | $2,999/mo | High-volume production; low-margin relationship tier |
 | Enterprise | $5k–$25k+/mo | Dedicated infra, VPC peering, BAA, SOC 2 reporting, custom regions |
 
-Overage model (from business planning; rates match `docs/src/app/pricing/page.mdx`): observations $0.002 each, retrievals $0.0001 each, reranks $0.003 each, storage $0.50 per 1k memories/mo.
-
-> ⚠️ Alignment flag: `docs/src/app/pricing/page.mdx` still lists the older Builder $29 / Scale $99 / Dedicated $299+ structure. Align it with the launch plan (Free/Hobby/Solo Pro/Team/Scale/Enterprise) before it ships.
+> **Superseded as of v1.5.** This section describes a planned hosted offering. **No hosted Contexta exists**, and the engine has no metering, quota, or billing code to meter — revision `020` dropped the 18 remaining billing tables. The `docs/src/app/pricing/page.mdx` it pointed at has been removed and replaced with `docs/src/app/licensing/page.mdx`, which documents the actual dual licence: Apache 2.0 for personal, hobbyist, non-commercial self-hosting, and internal development; a paid commercial licence for business environments, production enterprise, and any use where Contexta powers a commercial product or SaaS.
+>
+> The pricing and unit-economics reasoning is retained above as a record of the position that was taken, not as a description of anything that exists.
 
 ## 4. How Contexta Differs
 
@@ -85,7 +85,7 @@ Overage model (from business planning; rates match `docs/src/app/pricing/page.md
 | Token-aware context planner (budget across projects/goals/facts/episodic/preferences/relationships) | **Shipped** (`contexta/core/context/planner.py`) | ✗ | Partial | Partial |
 | Tenant isolation | API tenant middleware + org-scoped repos + cross-tenant tests (`contexta/api/middleware/tenant.py`, `tests/`); **Postgres RLS: roadmap** | Per-project | Per-project | Per-user |
 | Hybrid retrieval, cluster-aware | **Shipped**: semantic + keyword + graph + importance + recency; semantic clustering (min 3 members) feeds cluster-aware planning | Graph on Pro | Graph | ✗ |
-| Sub-100ms p99 @ 1M memories/tenant | **Target** (roadmap benchmark; Go data-plane already claims <10ms read/write path per `README.md`) | Unverified | Unverified | n/a |
+| Sub-100ms p99 @ 1M memories/tenant | **Target** (roadmap benchmark; the retired Go data-plane previously claimed a <10ms read/write path — no benchmark for the current Python-only path exists) | Unverified | Unverified | n/a |
 | BYOK + platform fee pricing | **Shipped** (decision of record) | ✗ (credits/requests) | ✗ (credits) | ✗ (BYOK but framework-bound) |
 | Adapters | **Shipped**: OpenAI, Anthropic, LangChain, LlamaIndex (Python); OpenAI, Anthropic, LangChain, Vercel AI (TypeScript) — see `clients/` | OpenAI/LangChain | LangChain | Built-in |
 

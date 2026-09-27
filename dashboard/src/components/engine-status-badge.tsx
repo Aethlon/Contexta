@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { Cpu, Cloud, Zap, CheckCircle2, AlertCircle, Loader2, ArrowRight, Settings } from "lucide-react";
+import { Cpu, Cloud, Zap, Loader2, Settings } from "lucide-react";
 import Link from "next/link";
 import { getEngineStatusAction } from "@/app/actions";
 
@@ -47,9 +47,6 @@ export function EngineStatusBadge() {
       const data = await getEngineStatusAction();
       if (mounted && data) {
         setTelemetry(data);
-        if (data.node_online !== false) {
-          fetch("/api/sync", { method: "POST" }).catch(() => {});
-        }
       }
     }
     load();
@@ -93,21 +90,21 @@ export function EngineStatusBadge() {
 
   const mode = telemetry.current_mode;
   const isOnline = telemetry.node_online !== false;
-  let badgeColor = "bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20";
+  let accent = "var(--accent-yellow)";
   let modeLabel = "Hybrid (Auto)";
   let Icon = Zap;
 
   if (!isOnline) {
-    badgeColor = "bg-red-500/10 text-red-300 border-red-500/30 hover:bg-red-500/20";
-    modeLabel = "Node Offline (:8000)";
+    accent = "var(--destructive)";
+    modeLabel = "Node Offline";
     Icon = Zap;
   } else if (mode === "offline") {
-    badgeColor = "bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20";
-    modeLabel = "Offline (Qwen3)";
+    accent = "var(--accent-green)";
+    modeLabel = "Offline · Qwen3";
     Icon = Cpu;
   } else if (mode === "online") {
-    badgeColor = "bg-blue-500/10 text-blue-300 border-blue-500/30 hover:bg-blue-500/20";
-    modeLabel = "Online (Cloud)";
+    accent = "var(--accent-blue)";
+    modeLabel = "Online · Cloud";
     Icon = Cloud;
   }
 
@@ -116,65 +113,60 @@ export function EngineStatusBadge() {
       <button
         type="button"
         onClick={() => setDropdownOpen(!dropdownOpen)}
-        className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-mono transition-all duration-200 cursor-pointer ${badgeColor}`}
+        className="flex h-7 items-center gap-1.5 rounded-md border border-border bg-card px-2 text-[13px] font-medium text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground cursor-pointer"
         title="Click to view engine telemetry"
       >
-        <span className="relative flex h-2 w-2">
-          {isOnline && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-75"></span>}
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-current"></span>
-        </span>
-        <Icon className="h-3.5 w-3.5" />
-        <span>{modeLabel}</span>
+        <span className="size-1.5 shrink-0 rounded-full" style={{ background: accent }} />
+        <Icon className="size-3.5" strokeWidth={1.75} />
+        <span className="hidden sm:inline">{modeLabel}</span>
       </button>
 
-      {/* Non-intrusive Dropdown Popover */}
+      {/* Dropdown popover */}
       {dropdownOpen && (
-        <div className="absolute right-0 top-full mt-2.5 w-80 rounded-xl border border-border/60 bg-card/95 backdrop-blur-2xl shadow-2xl p-4 z-50 font-mono text-xs space-y-3 animate-fade-in">
+        <div
+          className="absolute right-0 top-full z-50 mt-1.5 w-80 rounded-lg border border-border bg-popover p-3 text-[13px] shadow-[var(--shadow-overlay)] animate-fade-in"
+          role="dialog"
+        >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-border/30 pb-2.5">
+          <div className="flex items-center justify-between border-b border-border pb-2.5">
             <div className="flex items-center gap-2">
-              <Cpu className="h-4 w-4 text-emerald-400" />
-              <span className="font-medium text-foreground tracking-tight">Contexta Sovereign Engine</span>
+              <Cpu className="size-4" strokeWidth={1.75} style={{ color: accent }} />
+              <span className="font-medium text-foreground">Sovereign Engine</span>
             </div>
             <span
-              className={`text-[9px] px-2 py-0.5 rounded uppercase font-mono ${
-                isOnline
-                  ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
-                  : "bg-red-500/10 border border-red-500/20 text-red-400"
-              }`}
+              className="rounded-full border px-2 py-0.5 text-[11px] font-medium"
+              style={{
+                color: accent,
+                borderColor: `color-mix(in srgb, ${accent} 35%, transparent)`,
+                background: `color-mix(in srgb, ${accent} 10%, transparent)`,
+              }}
             >
               {isOnline ? "Healthy" : "Offline"}
             </span>
           </div>
 
           {/* Telemetry Stats */}
-          <div className="space-y-2 text-[11px]">
-            <div className="flex items-center justify-between py-1 border-b border-border/20">
-              <span className="text-muted-foreground">Brain API Port</span>
-              <span className="text-foreground font-mono">http://localhost:8000</span>
-            </div>
-            <div className="flex items-center justify-between py-1 border-b border-border/20">
-              <span className="text-muted-foreground">Embedding</span>
-              <span className="text-foreground font-mono truncate max-w-[170px]" title="Qwen/Qwen3-Embedding-0.6B">
-                Qwen3-Embedding (0.6B)
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-1 border-b border-border/20">
-              <span className="text-muted-foreground">Reranker</span>
-              <span className="text-foreground font-mono truncate max-w-[170px]" title="Qwen/Qwen3-Reranker-0.6B">
-                Qwen3-Reranker (0.6B)
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-1 border-b border-border/20">
-              <span className="text-muted-foreground">Storage</span>
-              <span className="text-emerald-400 flex items-center gap-1 font-mono">
-                <CheckCircle2 className="h-3 w-3" /> pgvector + Redis
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-1">
-              <span className="text-muted-foreground">MCP Protocol</span>
-              <span className="text-foreground font-mono">:8765/sse</span>
-            </div>
+          <div className="space-y-0.5 py-1.5">
+            {[
+              ["API", "http://localhost:8000"],
+              ["Embedding", "Qwen3-Embedding (0.6B)"],
+              ["Reranker", "Qwen3-Reranker (0.6B)"],
+              ["Storage", "pgvector + Redis"],
+              ["MCP", ":8765/sse"],
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                className="flex items-center justify-between gap-3 rounded px-1 py-1 hover:bg-accent"
+              >
+                <span className="shrink-0 text-muted-foreground">{label}</span>
+                <span
+                  className="truncate font-mono text-xs text-foreground"
+                  title={value}
+                >
+                  {value}
+                </span>
+              </div>
+            ))}
           </div>
 
           {/* Action Button */}
@@ -183,38 +175,39 @@ export function EngineStatusBadge() {
               type="button"
               onClick={handleLaunchEngine}
               disabled={isLaunching}
-              className="w-full py-2 px-3 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 text-xs font-mono transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="nb-btn nb-btn-secondary mt-1 w-full"
             >
               {isLaunching ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>Launching Engine...</span>
+                  <Loader2 className="size-4 animate-spin" />
+                  <span>Launching Engine…</span>
                 </>
               ) : (
                 <>
-                  <Zap className="h-3.5 w-3.5" />
-                  <span>Launch Engine in Background</span>
+                  <Zap className="size-4" strokeWidth={1.75} />
+                  <span>Launch Engine</span>
                 </>
               )}
             </button>
           )}
 
-          {/* Footer Link to Settings */}
-          <div className="pt-1 border-t border-border/30 flex items-center justify-between text-[11px]">
+          {/* Footer */}
+          <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-[13px]">
             <Link
               href="/dashboard/settings"
               onClick={() => setDropdownOpen(false)}
-              className="text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              className="flex items-center gap-1 text-muted-foreground transition-colors hover:text-foreground"
             >
-              <Settings className="h-3 w-3" />
-              <span>Full Engine Settings</span>
+              <Settings className="size-3.5" strokeWidth={1.75} />
+              <span>Engine settings</span>
             </Link>
             <Link
               href="/dashboard/mcp"
               onClick={() => setDropdownOpen(false)}
-              className="text-emerald-400 hover:underline flex items-center gap-0.5"
+              className="transition-colors hover:text-foreground"
+              style={{ color: accent }}
             >
-              <span>MCP &rarr;</span>
+              <span>MCP →</span>
             </Link>
           </div>
         </div>

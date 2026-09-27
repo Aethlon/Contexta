@@ -10,7 +10,9 @@ from difflib import SequenceMatcher
 from typing import Protocol
 
 from contexta.core.schemas import ExtractedMemory, ObservationPayload
+from contexta.core.truth.service import fact_value
 from contexta.core.types import MemoryType
+from contexta.models.version import MemoryVersion
 
 
 class DeduplicationRepository(Protocol):
@@ -33,6 +35,13 @@ class DeduplicationRepository(Protocol):
         values: dict,
     ) -> int:
         """Update an existing memory record."""
+        ...
+
+
+class VersionWriterProtocol(Protocol):
+    """Version sink used to preserve a record before it is overwritten."""
+
+    async def create(self, record: MemoryVersion) -> MemoryVersion:
         ...
 
 
@@ -71,21 +80,41 @@ class MemoryDeduplicator:
         self,
         repository: DeduplicationRepository,
         similarity_provider: SimilarityProvider | None = None,
+        *,
+        version_repository: VersionWriterProtocol | None = None,
     ) -> None:
         self._repository = repository
         self._similarity = similarity_provider or SequenceMatcherSimilarity()
+        self._versions = version_repository
 
     async def deduplicate(
         self,
         payload: ObservationPayload,
         memory: ExtractedMemory,
+        *,
+        fact_key: str | None = None,
     ) -> DeduplicationResult:
         """Deduplicate a memory against same-user, same-tenant, same-type records."""
+        now = datetime.now(UTC).replace(tzinfo=None)
+
+        if fact_key is not None:
+            incumbent = await self._slot_incumbent(payload, memory, fact_key)
+            if incumbent is not None:
+                return await self._deduplicate_within_slot(incumbent, memory, now)
+
         candidates = await self._repository.get_by_type(
             payload.user_id,
             memory.memory_type,
             limit=100,
         )
+        # A repository that does not filter cannot be trusted to hand back only
+        # current rows, and merging into a superseded one hides the new evidence
+        # from every read.
+        candidates = [
+            candidate
+            for candidate in candidates
+            if getattr(candidate, "valid_to", None) is None
+        ]
         best_candidate, best_similarity = await self._find_best_match(
             memory,
             candidates,
@@ -95,7 +124,6 @@ class MemoryDeduplicator:
             return DeduplicationResult(action="store", memory=memory)
 
         existing_id = best_candidate.id
-        now = datetime.now(UTC)
 
         if best_similarity > self.DUPLICATE_THRESHOLD:
             await self._repository.update_by_id(existing_id, {"updated_at": now})
@@ -106,6 +134,7 @@ class MemoryDeduplicator:
             )
 
         if best_similarity >= self.MERGE_THRESHOLD:
+            await self._snapshot_pre_merge(best_candidate, now)
             merged_values = self._merge_values(best_candidate, memory, now)
             await self._repository.update_by_id(existing_id, merged_values)
             return DeduplicationResult(
@@ -115,6 +144,76 @@ class MemoryDeduplicator:
             )
 
         return DeduplicationResult(action="store", memory=memory, similarity=best_similarity)
+
+    async def _slot_incumbent(
+        self,
+        payload: ObservationPayload,
+        memory: ExtractedMemory,
+        fact_key: str,
+    ) -> object | None:
+        """The current row already holding this fact slot, if it can be asked.
+
+        A slot lookup, not a scan of the type window: the window is bounded and
+        the incumbent is older than the incoming memory, so it is exactly the row
+        such a window drops first.
+        """
+        query = getattr(self._repository, "get_current_by_fact_key", None)
+        if query is None:
+            return None
+        rows = await query(fact_key, user_id=payload.user_id, memory_type=memory.memory_type)
+        for row in rows:
+            if getattr(row, "valid_to", None) is None:
+                return row
+        return None
+
+    async def _deduplicate_within_slot(
+        self,
+        incumbent: object,
+        memory: ExtractedMemory,
+        now: datetime,
+    ) -> DeduplicationResult:
+        """Decide a memory whose fact slot is already occupied.
+
+        The slot outranks the text. Character similarity would keep the older
+        value current for a high-overlap edit ("My salary is 100k." against
+        "My salary is 120k." scores above the duplicate threshold), which is
+        exactly the stale-truth failure this slot exists to prevent, and one slot
+        may only have one current row. So the same assertion is discarded here
+        rather than stored as a second current row, and a different one is stored
+        for truth maintenance to supersede the incumbent with.
+        """
+        if fact_value(incumbent) == fact_value(memory):
+            await self._repository.update_by_id(incumbent.id, {"updated_at": now})
+            return DeduplicationResult(
+                action="discard",
+                existing_id=incumbent.id,
+                similarity=1.0,
+            )
+        return DeduplicationResult(action="store", memory=memory)
+
+    async def _snapshot_pre_merge(self, existing: object, merged_at: datetime) -> None:
+        """Preserve the pre-merge state of a record that is about to be rewritten.
+
+        A merge overwrites title, content and structured_data in place, so
+        without a `MemoryVersion` the previous wording is unrecoverable and the
+        change is invisible to truth maintenance, which reads lineage from
+        versions. `superseded_by_id` stays null: the record continues, it is not
+        replaced.
+        """
+        if self._versions is None:
+            return
+        valid_from = getattr(existing, "valid_from", None)
+        await self._versions.create(
+            MemoryVersion(
+                memory_id=existing.id,
+                superseded_by_id=None,
+                content=str(getattr(existing, "content", "") or ""),
+                structured_data=getattr(existing, "structured_data", None),
+                importance=float(getattr(existing, "importance", 0.0) or 0.0),
+                valid_from=valid_from if valid_from is not None else merged_at,
+                valid_to=merged_at,
+            )
+        )
 
     async def _find_best_match(
         self,
@@ -165,6 +264,15 @@ class MemoryDeduplicator:
         return {
             "title": str(getattr(existing, "title", "")) or incoming.title,
             "content": content,
+            "search_text": " ".join(
+                part
+                for part in (
+                    str(getattr(existing, "title", "")) or incoming.title,
+                    content,
+                    " ".join(tags),
+                )
+                if part
+            ),
             "structured_data": structured_data,
             "tags": tags,
             "updated_at": updated_at,

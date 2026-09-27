@@ -29,6 +29,23 @@ class AuditRepository(TenantScopedRepository["AuditLog"]):
     ) -> None:
         super().__init__(session=session, tenant_id=tenant_id, model=AuditLog)
 
+    async def list_recent(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> Sequence[AuditLog]:
+        """Retrieve the tenant's audit entries, newest first, with pagination."""
+        stmt = (
+            select(self._model)
+            .order_by(self._model.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        stmt = self._scope_select(stmt)
+        result = await self._session.execute(stmt)
+        return result.scalars().all()
+
     async def get_by_actor(
         self,
         actor_id: uuid.UUID,

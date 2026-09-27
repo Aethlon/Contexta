@@ -1,109 +1,112 @@
-import { Callout } from 'nextra/components'
-
 # Observations
 
-An **observation** is a raw input to contexta — a conversation turn or event that the engine processes to extract and store memories.
+An **observation** is the raw unit of input to Contexta: a conversation turn or tool event, submitted for asynchronous memory extraction.
 
-## Format
+## Accepted shape
 
 ```json
 {
+  "user_id": "…",
+  "organization_id": "…",
   "session_id": "33333333-3333-4333-8333-333333333333",
   "messages": [
     {"role": "user", "content": "I prefer Postgres over Mongo"},
     {"role": "assistant", "content": "Noted, I'll prefer Postgres."}
   ],
-  "metadata": {"agent": "coding-agent", "version": "1.4.0"},
-  "policy": "coding-agent"
+  "occurred_at": "2026-09-20T09:00:00Z",
+  "observed_at": "2026-09-20T09:00:02Z",
+  "timezone": "Europe/London",
+  "metadata": {"agent": "coding-agent"}
 }
 ```
 
-- `messages` — array of `{role, content}` pairs. Roles: `user`, `assistant`, `tool`.
-- `session_id` — optional. Auto-created if omitted.
-- `metadata` — opaque JSON, max 4 KB.
-- `policy` — registered policy name or omitted for default.
+`user_id`, `organization_id`, `session_id`, and `messages` are required. `user_id` must equal the actor bound to your API key and `organization_id` must equal its organization; a mismatch is a `403`.
+
+### Temporal fields
+
+| Field | Meaning |
+| :--- | :--- |
+| `occurred_at` | When the thing happened |
+| `observed_at` | When Contexta saw it |
+| `event_at`, `event_start`, `event_end` | An explicit event window |
+| `temporal_precision` | How exact the time is (`exact`, `day`, `month`, …) — alias `precision` accepted |
+| `temporal_basis` | Where the time came from — alias `basis` accepted |
+| `timezone` | IANA zone used to resolve relative expressions — alias `event_timezone` accepted |
+| `source_start`, `source_end`, `source_span` | Span within the source — `span` accepted as an alias |
+| `source_id`, `message_id`, `source_message_id` | Provenance pointers |
+
+The point of keeping these apart is that expressions like *"yesterday"* and *"next month"* can be grounded without inventing a reference date. When Contexta cannot resolve a time, it records `unknown` rather than guessing.
+
+## What happens after you send it
+
+```bash
+curl -X POST http://localhost:8000/v1/observations \
+  -H "Authorization: Bearer $CONTEXTA_API_KEY" \
+  -H "Content-Type: application/json" -d '{ … }'
+```
+
+`202 Accepted` with `{"job_id", "observation_id", "status": "accepted"}` — and only *after* the observation, its source turns, and an outbox event are committed. The nine-stage pipeline then runs: redact, extract, dedup, score, graph, reconcile, embed.
+
+### Status
+
+```bash
+curl http://localhost:8000/v1/observations/$JOB_ID -H "Authorization: Bearer $CONTEXTA_API_KEY"
+```
+
+```json
+{
+  "job_id": "…", "observation_id": "…",
+  "status": "completed",
+  "attempt_count": 1,
+  "outbox_status": "published",
+  "last_error": null,
+  "created_at": "…", "updated_at": "…", "completed_at": "…"
+}
+```
+
+Also available as `/v1/observations/status/{id}` and `/v1/observations/{id}/status`.
 
 ## Idempotency
 
-All observation writes accept an `Idempotency-Key` header. The SDK generates UUIDv7 keys automatically. Replays of the same key return the original response.
+Send `Idempotency-Key` (or `X-Idempotency-Key`), or an `idempotency_key` field in the body, up to 255 characters. A replay with a different payload returns `409`. Both SDKs generate a key automatically on every write.
 
-```python
-contexta.observe(
-    user_id="u_123",
-    messages=[...],
-    idempotency_key="my-stable-key",  # optional
-)
+## Batches
+
+`POST /v1/observations/batch` takes up to **100** observations, as a bare array or `{"observations": [...]}`.
+
+```json
+{
+  "jobs": [{"job_id": "…", "observation_id": "…", "status": "accepted"}],
+  "errors": [{"field": "[1].messages", "message": "Field required"}],
+  "status": "accepted"
+}
 ```
 
-## Batch Submissions
-
-Submit up to 50 observations in a single call:
-
-```python
-contexta.observe_batch([
-    {"user_id": "u_123", "messages": [...]},
-    {"user_id": "u_456", "messages": [...]},
-])
-```
-
-Each observation in a batch gets its own `job_id` and processes independently.
-
-## Policies
-
-Policies control what gets extracted from observations:
-
-```python
-contexta.register_policy(
-    name="support-agent",
-    store_rules=[
-        {"memory_types": ["preference", "fact", "contact"]},
-    ],
-    ignore_rules=[
-        {"patterns": [r"^(thanks|hi|hello)\b"]},
-    ],
-    priority_weights={"preference": 0.9},
-)
-```
-
-Built-in policies: `default`, `minimal`, `verbose`. Register custom policies per project.
+Invalid items are reported with index-qualified field paths; valid items still ingest.
 
 ## Redaction
 
-contexta automatically detects and redacts sensitive patterns (API keys, tokens, secrets) before extraction. The redaction engine runs before any LLM call.
+A **fail-closed** gate runs at the head of the pipeline, before extraction. It scrubs API keys, JWTs, bearer tokens, passwords, OTPs, session cookies, and card numbers, replacing matches with `[REDACTED]`. Both the HTTP route and the orchestrator run it, and redaction is idempotent, so double-running it is a no-op.
 
-<Callout type="info">
-Redaction is always-on. You cannot disable it. If you need to observe raw sensitive data, hash it before sending.
-</Callout>
+The fail-closed part matters: if the gate itself errors, the observation is **rejected**. It never degrades into "no redaction".
 
-## Processing Pipeline
+```json
+{"user": "my key is sk-abcdefghijklmnopqrstuvwxyz123456"}
+```
 
-When you submit an observation:
-
-1. **Sensitive filter** — redact secrets
-2. **LLM extraction** — extract structured memories
-3. **Deduplication** — merge with existing memories via truth maintenance
-4. **Entity resolution** — link entities to knowledge graph
-5. **Classification** — assign memory type
-6. **Importance scoring** — compute 0–1 importance
-7. **Embedding** — generate vector embedding
-8. **Storage** — persist to Postgres + pgvector
-
-The full pipeline runs asynchronously. You get an `accepted` response immediately.
+lands as `my key is [REDACTED]`.
 
 ## Limits
 
 | Dimension | Constraint |
-|-----------|-----------|
-| Body size | 1 MB max |
-| Messages per observation | 100 max |
-| Batch size | 50 max |
-| Processing latency | ~3s p95 |
+| :--- | :--- |
+| Body size | 1 MiB (`CONTEXTA_MAX_OBSERVATION_SIZE_BYTES`) |
+| Batch size | 100 observations |
+| Overlarge body | `422` `{"detail": "Payload exceeds maximum allowed size.", "errors": [...]}` |
+| Malformed JSON | `422` `{"detail": "Invalid JSON payload."}` |
+| Empty/invalid batch | `422` with the failing index |
+| Storage unavailable | `503` |
 
-## Error Codes
+## Policy
 
-| Code | Meaning |
-|------|---------|
-| `PAYLOAD_TOO_LARGE` | Body exceeds 1 MB |
-| `INVALID_MESSAGES` | Messages array is empty or malformed |
-| `UNKNOWN_POLICY` | Referenced policy not found |
-| `RATE_LIMITED` | Per-key RPS exceeded |
+`policy` is recorded on the observation as an opaque string. **There is no policy registry to register into** — `POST /v1/policies` and the SDK/CLI policy methods target an endpoint that no longer exists and will return `404`. See the [API reference](/reference/api#endpoints-that-do-not-exist).

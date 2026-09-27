@@ -1,0 +1,75 @@
+{
+  "meta": {
+    "tag": "smoke_20260925-195255",
+    "ran_at": "2026-09-25T19:53:16.869723+00:00",
+    "answer_model": "gemma3:1b",
+    "rerank": "off",
+    "db_url": "localhost:55433/chimera",
+    "retrieval_limit": 20,
+    "question_source": "C:\\Users\\jenit\\Desktop\\mono-repo\\Memento\\benchmarks\\CHIMERA\\data\\questions.jsonl",
+    "contexta_config": {
+      "engine_mode": "offline",
+      "embedding_provider": "local",
+      "embedding_profile": "offline-qwen3-1024",
+      "embedding_dimensions": 1024,
+      "local_model_server_url": "http://localhost:8001",
+      "llm_model": "deepseek-chat"
+    }
+  },
+  "totals": {
+    "questions": 2,
+    "passed": 0,
+    "failed": 2,
+    "accuracy": 0.0
+  },
+  "latency": {
+    "retrieve_ms": {
+      "p50": 0.0,
+      "p95": 0.0,
+      "p99": 0.0,
+      "mean": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "answer_ms": {
+      "p50": 3813.02,
+      "p95": 6191.02,
+      "mean": 3813.02
+    }
+  },
+  "ingestion": {
+    "sessions": 4,
+    "chunks": 21,
+    "memories_extracted": 19,
+    "memories_stored": 18,
+    "skipped": 0,
+    "discarded": 1,
+    "failures": 2,
+    "total_s": 21.18,
+    "mean_session_ms": 5294.32,
+    "max_session_ms": 9626.96
+  },
+  "by_category": {
+    "multi_hop_sessions": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 0.0,
+      "retrieve_p95_ms": 0.0
+    },
+    "temporal_contradiction": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 0.0,
+      "retrieve_p95_ms": 0.0
+    }
+  },
+  "flags": {
+    "hallucinated": 0,
+    "abstained": 1,
+    "leaked": 0,
+    "partial": 0,
+    "errors": 2
+  }
+}

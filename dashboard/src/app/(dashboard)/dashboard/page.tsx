@@ -1,162 +1,186 @@
-import { Terminal, Cpu, Clock, Network, Lock } from "lucide-react";
+﻿import { Terminal, Database, Network, Cpu, TriangleAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { requireSession } from "@/lib/auth-helpers";
-import { listMemoriesAction, getAuditLogAction } from "@/app/actions";
-import { ActivityBarChart } from "@/components/dashboard/activity-bar-chart";
+import { resolveOperatorIdentity } from "@/lib/dashboard-identity";
+import {
+  listMemoriesAction,
+  getAuditLogAction,
+  getGraphAction,
+  probeTenantAction,
+} from "@/app/actions";
+import { PipelineStrip } from "@/components/dashboard/pipeline-strip";
 import { MiniGraphPreview } from "@/components/dashboard/mini-graph-preview";
-import { OverviewInteractivePanel } from "@/components/dashboard/overview-interactive-panel";
 import Link from "next/link";
 
 export const revalidate = 0;
 
 export default async function DashboardPage() {
-  const session = await requireSession();
-  const [memories, audit] = await Promise.all([
+  const identity = await resolveOperatorIdentity();
+  const [memories, audit, graph, probe] = await Promise.all([
     listMemoriesAction({ limit: 10 }),
     getAuditLogAction(10),
+    getGraphAction(),
+    probeTenantAction(),
   ]);
 
-  const memoryCount = (memories as any[])?.length ?? 0;
+  const memoryRows = (memories as any[]) ?? [];
+  const auditRows = (audit as any[]) ?? [];
+  const graphNodes = (graph as any)?.nodes ?? [];
+  const graphEdges = (graph as any)?.edges ?? [];
+  const activeCount = memoryRows.filter(
+    (m: any) => (m.memory_state ?? "active") === "active",
+  ).length;
 
   const metrics = [
     {
-      label: "Encrypted Facts",
-      value: memoryCount > 0 ? `${memoryCount}` : "0",
-      delta: "AES-v1 On-Disk Vault",
-      icon: Lock,
-      badge: "Encrypted",
-      badgeColor: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+      label: "Memories",
+      value: String(memoryRows.length),
+      delta: `${activeCount} current · rest superseded/archived`,
+      icon: Database,
     },
     {
-      label: "System Uptime",
-      value: "99.99%",
-      delta: "Sovereign • Offline-First",
-      icon: Clock,
-      badge: "Local Engine",
-      badgeColor: "text-sky-400 bg-sky-500/10 border-sky-500/20",
-    },
-    {
-      label: "Graph Entities",
-      value: "24+",
-      delta: "Multi-Hop Traversal",
+      label: "Graph entities",
+      value: String(graphNodes.length),
+      delta: `${graphEdges.length} resolved edges`,
       icon: Network,
-      badge: "Synthesized",
-      badgeColor: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
     },
     {
-      label: "Recall Latency",
-      value: "<42ms",
-      delta: "Hybrid RRF + Neural Rerank",
+      label: "Recall layers",
+      value: "3",
+      delta: "vector + lexical + graph, RRF fused",
       icon: Cpu,
-      badge: "Qwen3 0.6B",
-      badgeColor: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+    },
+    {
+      label: "Audit entries",
+      value: String(auditRows.length),
+      delta: "most recent reads and writes",
+      icon: Terminal,
     },
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in font-mono">
-      {/* Top Welcome Header */}
-      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end border-b border-border/40 pb-6">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-normal">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Sovereign Local Enclave Active
-            </span>
-            <Badge>Memory Control Plane</Badge>
-          </div>
-          <h2 className="text-xl font-normal tracking-tight text-foreground">
-            Personal Knowledge Core
-          </h2>
-          <p className="max-w-2xl text-xs text-muted-foreground font-sans leading-relaxed">
-            Autonomous memory intelligence, real-time entity synthesis, and AES-encrypted local storage. Offline-first by default.
+    <div className="animate-fade-in space-y-8">
+      {/* Page header */}
+      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+        <div>
+          <h1 className="nb-page-title">Memory Console</h1>
+          <p className="nb-page-subtitle max-w-2xl">
+            Ingest observations, inspect what the truth engine kept, and read it
+            back through hybrid retrieval. Offline-first by default.
           </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="rounded border border-border/40 bg-secondary/50 px-3 py-1.5 text-xs text-muted-foreground">
-            <span>Operator:</span>
-            <span className="ml-2 font-normal text-foreground">{session.user.email}</span>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span
+              className="nb-badge"
+              style={{
+                color: "var(--accent-green)",
+                borderColor: "color-mix(in srgb, var(--accent-green) 30%, transparent)",
+                background: "color-mix(in srgb, var(--accent-green) 8%, transparent)",
+              }}
+            >
+              <span
+                className="size-1.5 rounded-full"
+                style={{ background: "var(--accent-green)" }}
+              />
+              org {identity.orgId ? identity.orgId.slice(0, 8) : "unresolved"}
+            </span>
+            <Badge>{identity.authRequired ? "Signed in" : "Auth off"}</Badge>
           </div>
-          <Link
-            href="/dashboard/mcp"
-            className="flex items-center gap-1.5 rounded border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 text-xs text-emerald-300 transition-colors"
-          >
-            <Terminal className="h-3.5 w-3.5" />
-            <span>Connect MCP &rarr;</span>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Link href="/dashboard/mcp" className="nb-btn nb-btn-secondary">
+            <Terminal className="size-4" strokeWidth={1.75} />
+            <span>Connect MCP</span>
           </Link>
         </div>
       </div>
 
-      {/* Self-Hosting Interactive Panel & Cluster Diagnostic */}
-      <OverviewInteractivePanel />
+      {!identity.resolved ? (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-[13px] tone-amber">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+          <div className="space-y-1">
+            <p className="font-medium">No organization resolved</p>
+            <p>
+              Every API call will be rejected with 401 until the console has a
+              tenant. Set <code className="font-mono">CONTEXTA_DASHBOARD_API_KEY</code>{" "}
+              (recommended) or use the organization panel at the bottom of the
+              sidebar.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {identity.resolved && !probe.ok ? (
+        <div className="flex items-start gap-3 rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-[13px] tone-red">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+          <div className="space-y-1">
+            <p className="font-medium">The API rejected this tenant</p>
+            <p>{probe.error}</p>
+            <p>
+              The counts below are empty because of that, not because the
+              organization has no memories. Fix the organization panel in the
+              sidebar, then reload.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      <PipelineStrip />
 
       {/* Metrics Row */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {metrics.map((metric) => {
           const Icon = metric.icon;
           return (
             <Card key={metric.label}>
-              <CardContent className="flex min-h-24 flex-col justify-between p-4 sm:p-5">
+              <CardContent className="flex min-h-20 flex-col justify-between p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-mono tracking-wider uppercase text-muted-foreground">
-                      {metric.label}
-                    </p>
-                    <p className="text-2xl font-normal tracking-tight text-foreground font-mono tabular-nums">
+                  <div>
+                    <p className="text-xs text-muted-foreground">{metric.label}</p>
+                    <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums text-foreground">
                       {metric.value}
                     </p>
                   </div>
-                  <span className="flex size-7 items-center justify-center rounded border border-border/40 bg-secondary/60">
-                    <Icon className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
-                  </span>
+                  <Icon className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.75} />
                 </div>
-                <div className="flex items-center justify-between pt-1">
-                  <p className="text-[10px] text-muted-foreground font-mono">[{metric.delta}]</p>
-                  <span className={`text-[9px] px-1.5 py-0.2 rounded border font-mono ${metric.badgeColor}`}>
-                    {metric.badge}
-                  </span>
-                </div>
+                <p className="mt-2 text-xs text-muted-foreground">{metric.delta}</p>
               </CardContent>
             </Card>
           );
         })}
       </div>
 
-      {/* Interactive Visualizers Row: Activity Bar Chart & Mini Knowledge Graph */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <ActivityBarChart />
-        <MiniGraphPreview />
+        <MiniGraphPreview nodes={graphNodes} edges={graphEdges} actorKnown={Boolean(identity.userId)} />
       </div>
 
-      {/* Layout Grid: Memories + Activity */}
+      {/* Memories + Activity */}
       <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Encrypted Personal Facts</CardTitle>
-              <CardDescription>Decrypted on-the-fly for authorized operator session.</CardDescription>
+              <CardTitle>Current memories</CardTitle>
+              <CardDescription>
+                Rows the truth engine has not superseded.
+              </CardDescription>
             </div>
             <Link
               href="/dashboard/memories"
-              className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 font-mono transition-colors"
+              className="text-[13px] text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
             >
               View all
             </Link>
           </CardHeader>
-          <CardContent>
-            {memoryCount === 0 ? (
-              <div className="text-center py-8 space-y-2">
-                <p className="text-xs font-mono text-muted-foreground">
-                  [*] No personal facts recorded yet.
+          <CardContent className="px-0 py-0">
+            {memoryRows.length === 0 ? (
+              <div className="space-y-2 px-5 py-8 text-center">
+                <p className="text-[13px] text-muted-foreground">
+                  No memories in this organization yet.
                 </p>
-                <Link
-                  href="/onboarding"
-                  className="inline-flex items-center gap-1.5 text-xs text-foreground hover:underline"
-                >
-                  <span>Complete personal onboarding context &rarr;</span>
-                </Link>
+                <p className="text-[13px] text-muted-foreground">
+                  Use &ldquo;Ingest Observation&rdquo; in the header to push one
+                  through the pipeline.
+                </p>
               </div>
             ) : (
               <Table>
@@ -164,33 +188,38 @@ export default async function DashboardPage() {
                   <TableRow>
                     <TableHead>Title</TableHead>
                     <TableHead>Type</TableHead>
-                    <TableHead>Vault Status</TableHead>
-                    <TableHead>Salience</TableHead>
+                    <TableHead>State</TableHead>
                     <TableHead className="text-right">Updated</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(memories as any[]).map((memory: any) => (
-                    <TableRow key={memory.id} className="hover:bg-secondary/40 transition-colors duration-150">
-                      <TableCell className="font-normal text-foreground max-w-[200px] truncate">
-                        {memory.title ?? "Personal Fact"}
+                  {memoryRows.map((memory: any) => (
+                    <TableRow key={memory.id}>
+                      <TableCell className="max-w-[240px] truncate font-medium">
+                        {memory.title ?? "Untitled"}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        <span className="text-[10px] px-2 py-0.5 rounded border border-border/40 bg-secondary/50">
-                          {memory.memory_type ?? memory.type ?? "fact"}
+                      <TableCell>
+                        <span className="nb-badge h-5 text-[11px]">
+                          {memory.memory_type ?? "fact"}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-mono">
-                          <Lock className="h-2.5 w-2.5" />
-                          <span>AES-Stream</span>
+                        <span
+                          className={`text-[11px] ${
+                            (memory.memory_state ?? "active") === "active"
+                              ? "tone-green"
+                              : "tone-amber"
+                          }`}
+                        >
+                          {memory.memory_state ?? "active"}
                         </span>
                       </TableCell>
-                      <TableCell className="tabular-nums text-muted-foreground">
-                        {typeof memory.importance === "number" ? memory.importance.toFixed(2) : "0.95"}
-                      </TableCell>
-                      <TableCell className="text-right text-xs text-muted-foreground">
-                        {memory.updated_at ? new Date(memory.updated_at).toLocaleDateString() : memory.created_at ? new Date(memory.created_at).toLocaleDateString() : "Today"}
+                      <TableCell className="text-right text-muted-foreground">
+                        {memory.updated_at
+                          ? new Date(memory.updated_at).toLocaleDateString()
+                          : memory.created_at
+                            ? new Date(memory.created_at).toLocaleDateString()
+                            : "—"}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -202,23 +231,32 @@ export default async function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Audit & Activity Feed</CardTitle>
-            <CardDescription>Live telemetry and agent memory access logs.</CardDescription>
+            <CardTitle>Audit &amp; Activity Feed</CardTitle>
+            <CardDescription>Live telemetry and memory access logs.</CardDescription>
           </CardHeader>
-          <CardContent>
-            {(audit as any[])?.length === 0 ? (
-              <p className="text-xs font-mono text-muted-foreground py-6 text-center">
-                [*] No recent activity recorded.
+          <CardContent className="px-5 py-0">
+            {auditRows.length === 0 ? (
+              <p className="py-6 text-center text-[13px] text-muted-foreground">
+                No recent activity recorded.
               </p>
             ) : (
-              <div className="space-y-3 font-mono text-xs">
-                {(audit as any[]).slice(0, 6).map((entry: any, i: number) => (
-                  <div className="flex items-start gap-2.5 rounded border border-border/20 bg-secondary/30 p-2.5" key={entry.id ?? i}>
-                    <span className="mt-1 flex h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/60" />
-                    <div className="flex-1 space-y-0.5">
-                      <p className="text-foreground leading-normal font-normal">{entry.action ?? entry.event ?? "System event"}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : entry.created_at ? new Date(entry.created_at).toLocaleString() : "Just now"}
+              <div className="divide-y divide-border">
+                {auditRows.slice(0, 6).map((entry: any, i: number) => (
+                  <div
+                    className="flex items-start gap-2.5 py-2.5 first:pt-4 last:pb-4"
+                    key={entry.id ?? i}
+                  >
+                    <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] text-foreground">
+                        {entry.action ?? entry.event ?? "System event"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {entry.timestamp
+                          ? new Date(entry.timestamp).toLocaleString()
+                          : entry.created_at
+                            ? new Date(entry.created_at).toLocaleString()
+                            : "Just now"}
                       </p>
                     </div>
                   </div>
@@ -230,29 +268,31 @@ export default async function DashboardPage() {
       </div>
 
       {/* Bottom Bar: MCP Agent Quick Connect */}
-      <Card className="border-indigo-500/20 bg-indigo-950/10">
-        <CardContent className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 font-mono">
-          <div className="space-y-1">
+      <Card>
+        <CardContent className="flex flex-col items-start justify-between gap-4 p-4 md:flex-row md:items-center">
+          <div>
             <div className="flex items-center gap-2">
-              <Terminal className="h-4 w-4 text-indigo-400" />
-              <h4 className="text-xs font-semibold text-foreground">Connect External Agents via MCP</h4>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
-                Port :8765
-              </span>
+              <Terminal
+                className="size-4"
+                strokeWidth={1.75}
+                style={{ color: "var(--accent-blue)" }}
+              />
+              <h4 className="text-sm font-semibold text-foreground">
+                Connect external agents via MCP
+              </h4>
+              <span className="nb-badge h-5 text-[11px]">:8765</span>
             </div>
-            <p className="text-[11px] text-muted-foreground">
-              Integrate Claude Desktop, Cursor, and Windsurf directly with your sovereign Contexta memory vault.
+            <p className="mt-1 text-[13px] text-muted-foreground">
+              Integrate Claude Desktop, Cursor, and Windsurf with your memory
+              vault.
             </p>
           </div>
-          <div className="flex items-center gap-2.5 w-full md:w-auto">
-            <code className="text-[11px] bg-background/80 px-3 py-1.5 rounded border border-border/40 text-foreground select-all">
-              mcp-server: http://localhost:8765/sse
+          <div className="flex w-full items-center gap-2 md:w-auto">
+            <code className="nb-code flex-1 select-all md:flex-none">
+              http://localhost:8765/sse
             </code>
-            <Link
-              href="/dashboard/setup"
-              className="whitespace-nowrap px-3 py-1.5 rounded bg-foreground text-background text-xs font-medium hover:bg-foreground/90 transition-all"
-            >
-              Setup Guide &rarr;
+            <Link href="/dashboard/setup" className="nb-btn nb-btn-secondary">
+              Setup guide
             </Link>
           </div>
         </CardContent>

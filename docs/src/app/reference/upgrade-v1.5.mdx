@@ -1,0 +1,210 @@
+# Upgrading to v1.5
+
+Alembic head is **`020`**. Six revisions landed since `014`: `015`, `016`, `017`, `018`, `019`, `020`.
+
+```bash
+docker compose pull && docker compose up --build
+# or, for a bare checkout:
+alembic upgrade head
+```
+
+> **Read this first.** Revision `020` drops **24 tables** — 18 billing/usage tables and 6 dead domain schemas. If you have local data you care about, snapshot the volume first. There is no downgrade path that restores the dropped tables.
+>
+> ```bash
+> docker run --rm -v memento_postgres-data:/data -v "$PWD:/backup" alpine \
+>   tar czf /backup/contexta-pgdata-pre-v1.5.tgz -C /data .
+> ```
+
+## What each revision does
+
+### `015` — Storage and graph indexes
+
+Adds the indexes the hot retrieval paths actually filter on, and rebuilds two that were structurally unable to serve their queries:
+
+- `ix_memory_record_org_valid_to_partial` is rebuilt on `(organization_id, user_id)`. Every row in a partial index built on `valid_to IS NULL` has `valid_to = NULL`, so the old second key column was constant and carried zero information.
+- `memory_entity_link` gains a leading `entity_id` index. Without it, the `WHERE entity_id = ?` graph-expansion query could not use its `(memory_id, entity_id)` primary key at all.
+- `entity_edge` gains `uq_entity_edge_identity` and `ck_entity_edge_no_self_loop`.
+
+**What it requires of you:** nothing. All `memory_record` index builds and the `entity` trigram index run `CREATE INDEX CONCURRENTLY` outside a transaction so the table stays writable.
+
+### `016` — Bitemporal index
+
+`ix_memory_record_org_validity` on `memory_record (organization_id, user_id, valid_from, valid_to)`. This is what turns an `as_of` point-in-time read from a sequential filter into an index scan.
+
+Measured on the reference dataset: **~46ms → ~0.22ms**.
+
+**What it requires of you:** nothing. Built `CONCURRENTLY` because `memory_record` is the largest table in the schema.
+
+### `017` — `api_key.tier`
+
+Adds `api_key.tier` with a CHECK constraint over `('hobby', 'solo_pro', 'team', 'scale', 'standard')`, defaulting to `standard`.
+
+The rate limiter was already selecting limits by tier, but the column did not exist, so every key was metered as one hard-coded tier. Existing keys land on `standard` automatically.
+
+**What it requires of you:** nothing, unless you want differentiated limits — then `UPDATE api_key SET tier = '...' WHERE ...`.
+
+### `018` — Graph storage invariants
+
+Two graph rules move from application code into the schema, because concurrent ingestion does not honour application code:
+
+- **Case-insensitive uniqueness** on `entity (organization_id, user_id, lower(name))`. The index cannot be created while duplicates exist, so the migration merges them first. On the reference dataset that cleared **2,670 duplicate entity groups to zero** and deduplicated **2,745 colliding edges**; **869 relationship types** were normalised. The survivor of each group is the earliest row by `created_at` then `id`, so the identity a reader has seen longest keeps working. `mention_count` is summed into the survivor; other `aggregated_attributes` are taken from it.
+- **A closed `relationship_type` CHECK.** The column was free-text `String(50)`, and a typo silently created an edge type no reader knew how to weight. It is now constrained to the union of the literals `relation_extractor` emits and the names in `core.types.RelationType`, with the one legacy value (`co_occurs_with`) normalised.
+
+**What it requires of you:** if you wrote custom relationship types directly against `entity_edge`, map them onto the validated set before upgrading or the migration will refuse the rows.
+
+### `019` — One current truth per fact slot
+
+`uq_memory_record_current_fact_slot`, a **partial unique** index over `(organization_id, user_id, fact_key)` restricted to `valid_to IS NULL` — exactly the set retrieval reads.
+
+This is the revision that makes supersession *mandatory* rather than a convention: the slot has to be freed before its replacement can be inserted, so a correction cannot coexist with what it corrects. Current rows that already shared a slot are closed first (newest by `valid_from` survives, ties by highest id), and the count is printed in the migration log so the effect is visible.
+
+Two deliberate non-actions:
+
+- The reconciliation is **not** reversed by `downgrade()`. Reopening a row would resurrect a belief the system has already stopped asserting.
+- `memory_version` is **not** written for the closed rows. `content` is encrypted at rest with a per-tenant key the migration has no access to, so any snapshot it wrote would hold ciphertext no reader can decrypt.
+
+`fact_key IS NOT NULL` is part of the index predicate on purpose: the key is still a text hash for any extraction with no structural triple, and `NULL` keys all mean "no key" rather than one shared slot.
+
+**What it requires of you:** nothing. It is re-runnable from `018` if it failed after the autocommit, because the reconciliation is naturally idempotent and the index build is `IF NOT EXISTS` guarded.
+
+### `020` — Dead schemas dropped
+
+**24 tables go away:**
+
+| Family | Count | What |
+| :--- | ---: | :--- |
+| Billing / usage metering | 18 | `usage_event` (a RANGE-partitioned parent), its 15 monthly partitions `usage_event_2026_01` .. `usage_event_2027_03`, plus `usage_daily` and `usage_period` (which carried `overage_cents` and `invoice_id`) |
+| Dead domain schemas | 6 | `semantic_cluster`, `cluster_membership`, `compressed_summary`, `retrieval_feedback`, `memory_policy`, `custom_schema` |
+
+The billing tables contradict the "no billing or metering" invariant. The Python surface was already excised (`contexta/models/usage.py`, `contexta/api/routes/billing.py`, `contexta/services/dodo_billing.py`, and the Go aggregator were all deleted); revision `003` was the last thing still creating the tables.
+
+The six domain schemas were reachable only from dead engine modules under `contexta/core/` that are themselves imported only by tests. `retrieval_feedback` is the confusing one: feedback **is** a live feature — `POST /v1/memories/{id}/feedback` calls `MemoryRepository.apply_feedback`, which mutates `memory_record.utility_score` / `confidence` and never touches that table.
+
+Public table count goes from **57 to 33**.
+
+**What is *not* dropped**, and why:
+
+- `compressed_summary` and `missing_memory_candidate` — revision `018` repoints them and owns them.
+- The vestigial billing columns on `organization` (`plan_code`, `dodo_customer_id`, `dodo_subscription_id`). Dropping columns is a different risk class from dropping whole dead tables.
+
+**Known rough edge:** the ORM models for the six dropped schemas (`SemanticCluster`, `ClusterMembership`, `CompressedSummary`, `RetrievalFeedback`, `MemoryPolicy`, `CustomSchema`) and their five dead engine modules are still in the tree, so `Base.metadata` still *describes* tables that no longer exist. Until those are removed, `alembic revision --autogenerate` and anything calling `create_all()` will be wrong.
+
+**What it requires of you:**
+
+- Any dashboard query, report, or export that referenced a dropped table has to be removed in the same change.
+- If you want the schema back for local experimentation, restore from your pre-upgrade snapshot. There is no downgrade for these `DROP TABLE` statements.
+
+---
+
+## Application-level changes in v1.5
+
+### Two deliberate status-code changes
+
+Both are in the graph routes, both are intentional, and both were bugs before:
+
+| Situation | Before | Now |
+| :--- | :--- | :--- |
+| Path `user_id` is not the authenticated actor | `200`, reading the other user's graph | **`403`** `{"detail": "Forbidden: user_id mismatch."}` |
+| Entity belongs to another user | `200` with a foreign or empty body | **`404`** `{"detail": "Entity not found"}` |
+
+If you have a graph viewer that walks a list of user ids with one key, it will start receiving `403` instead of `200`. That is the correct outcome — mint one key per actor.
+
+### A cross-tenant read was found and fixed
+
+`GET /v1/graph/traverse` resolved its root entity with an unscoped `Entity.name.ilike(...)`. One tenant could read another tenant's entity names, entity summaries, memory titles, and memory body text, and a name shared across tenants returned a `500`.
+
+All six unscoped queries in `contexta/api/routes/graph.py` now go through repositories scoped by organization **and** actor. Regression coverage: `tests/test_graph_traverse_is_tenant_scoped.py`.
+
+Two more of the same class shipped and were fixed in the same pass:
+
+- The MCP `get_metrics` tool used an unscoped `COUNT(*)`, leaking every tenant's row counts to every tenant.
+- `contexta/scripts/enrich_graph.py` performed a cross-tenant `DELETE`.
+
+**The rule going forward:** a `select()` on a tenant-owned model that does not go through `TenantScopedRepository` is a security bug, not a style nit.
+
+### The dashboard no longer requires a sign-in
+
+`CONTEXTA_DASHBOARD_AUTH` defaults to `off`. The console resolves its tenant in this order:
+
+1. the `contexta_tenant` cookie, which the operator sets in the UI
+2. `CONTEXTA_DASHBOARD_ORG_ID` / `CONTEXTA_DASHBOARD_USER_ID`
+3. `CONTEXTA_DASHBOARD_API_KEY`, by asking the API which organization that key belongs to
+
+If nothing resolves, the console reports "unresolved" and its API calls go out unauthenticated rather than silently acting on another organization.
+
+Set `CONTEXTA_DASHBOARD_AUTH=on` to restore the NextAuth v5 credentials flow. `docker compose.yml` passes both variables through to the container, so a key no longer has to be pasted by hand.
+
+> **With auth off, the console must not be exposed to an untrusted network.** Anyone who can reach the dashboard port acts as whatever tenant it resolved.
+
+### Structural fact keys
+
+An extracted `subject` / `predicate` / `object` triple now yields a slot key of the form `sfx1:<sha256>` over `subject` + `predicate` (+ `context` when present). The object is deliberately excluded: a slot is "who, about what", and the same slot stated with a new value is a correction, which only supersedes if it reaches the incumbent row — and it can only do that if both rows share a key.
+
+A partial triple is refused rather than half-keyed, so the slot and its value always arrive together. Legacy bare-64-hex text-hash keys are still produced for any extraction with no usable triple — which is every memory written before the triple existed — and are still supported.
+
+Coverage is measurable with `fact_key LIKE 'sfx1:%'`.
+
+### Extraction no longer silently degrades
+
+- The fine-tuned extractor's context window was raised from **4,096 to 16,384 tokens**. Real extraction prompts were **8,281 tokens** and were being rejected outright, which silently downgraded whole sessions to a low-quality heuristic fallback. The raise lives in the Ollama model definition (`PARAMETER num_ctx 16384` in `benchmarks/extraction/sft/output/gguf/Modelfile`).
+- Structured-output enforcement now actually applies. **Ollama's OpenAI-compatible `/v1/chat/completions` endpoint silently drops the `format` field**, so schema constraints were never being applied. Contexta now detects an Ollama endpoint and uses the native Ollama route.
+
+Session-level extraction success went from roughly **17% to 87.5%**.
+
+> **Compose still overrides this.** `contexta/workers/inference_server.py` passes `num_ctx` in the per-request Ollama options, and a request option wins over a model-level `PARAMETER`. The compose file therefore ships `CONTEXTA_INFERENCE_NUM_CTX: 4096`, which puts you straight back into the silent-fallback bug unless you override it:
+>
+> ```bash
+> CONTEXTA_INFERENCE_NUM_CTX=16384 docker compose up -d
+> ```
+
+**If you run a custom OpenAI-compatible base URL that is not recognisably Ollama**, it will not receive a schema constraint. Point the endpoint at Ollama directly, or expect unconstrained output.
+
+### Cascade retrieval is opt-in and off
+
+`RetrievalEngine(enable_dense_escalation=True)` inverts the channel order: lexical and graph gather evidence first, and `assess_primary_sufficiency()` decides whether the dense channel is needed. It is a constructor argument only — no environment variable, no request field. It stays off until the escalation rate is measured, so nothing about your deployment changes unless you construct the engine yourself.
+
+### Vector dimensions are unchanged
+
+The offline profile is still **1024 dimensions** (`offline-qwen3-1024`). No vector migration is required. If you had switched the storage column to the 1536-d online profile, switch it back before re-indexing — vectors are never padded or truncated.
+
+---
+
+## Version string mismatch
+
+`pyproject.toml` declares `version = "0.1.0"`, `GET /healthz` reports `"0.1.0"`, and the dashboard package is also `0.1.0`. This release is documented as **v1.5**.
+
+The mismatch is a packaging bug, not a versioning scheme, and it is deliberately left in place rather than silently bumped. Until it is fixed, do not use the reported version to identify which Contexta you are running — use the Alembic head instead:
+
+```bash
+docker compose exec -T postgres psql -U postgres -d contexta -c "select version_num from alembic_version;"
+-- version_num
+-- -----------
+--  020
+```
+
+---
+
+## Post-upgrade checklist
+
+```bash
+# 1. Migrations applied and at head
+docker compose exec -T postgres psql -U postgres -d contexta -c "select version_num from alembic_version;"
+
+# 2. Table count is 33
+docker compose exec -T postgres psql -U postgres -d contexta -t -c \
+  "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';"
+
+# 3. Stack healthy
+curl http://localhost:8000/readyz
+curl -H "Authorization: Bearer $CONTEXTA_API_KEY" http://localhost:8000/v1/system/engine-status
+
+# 4. Extraction is not falling back
+#    In engine-status, confirm both Qwen3 models report "status": "ready".
+
+# 5. Structural fact keys are landing
+docker compose exec -T postgres psql -U postgres -d contexta -t -c \
+  "select count(*) from memory_record where fact_key like 'sfx1:%';"
+
+# 6. Test suite
+uv run pytest tests/ -q     # 392 passed
+```

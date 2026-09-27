@@ -69,21 +69,46 @@ async def test_model_server_classify():
 
 @pytest.mark.asyncio
 async def test_model_server_rerank():
+    documents = [
+        "The company uses MongoDB for document storage.",
+        "Postgres database is used for relational data and pgvector storage.",
+        "User likes coffee in the morning.",
+    ]
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             "/v1/rerank",
             json={
                 "query": "Postgres database storage",
-                "documents": [
-                    "The company uses MongoDB for document storage.",
-                    "Postgres database is used for relational data and pgvector storage.",
-                    "User likes coffee in the morning.",
-                ],
+                "documents": documents,
                 "top_n": 2,
             },
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data["results"]) == 2
-        # Best match should be document index 1
-        assert data["results"][0]["index"] == 1
+        results = data["results"]
+        assert len(results) == 2
+        # A batch of candidates is the case that used to raise 503: the model
+        # refuses any batch over one while config.pad_token_id is None.
+        assert len(results) > 1
+        indices = [item["index"] for item in results]
+        assert len(set(indices)) == len(indices)
+        assert set(indices) <= set(range(len(documents)))
+        # Each score is paired with the document it was computed from.
+        for item in results:
+            assert item["document"] == documents[item["index"]]
+            assert isinstance(item["relevance_score"], float)
+        scores = [item["relevance_score"] for item in results]
+        assert scores == sorted(scores, reverse=True)
+
+
+@pytest.mark.asyncio
+async def test_model_server_rerank_scores_a_single_document():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post(
+            "/v1/rerank",
+            json={"query": "Postgres database storage", "documents": ["Only one candidate."]},
+        )
+        assert resp.status_code == 200
+        results = resp.json()["results"]
+        assert len(results) == 1
+        assert results[0]["index"] == 0

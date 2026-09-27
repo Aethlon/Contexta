@@ -1,6 +1,17 @@
 # Contexta OSS Core Plan — handoff for next session
 
-> Status: OSS v1 in progress. Billing removed. Go = data-plane, Python = brain.
+> **Historical document.** Written during the OSS v1 rewrite. Kept for the record; several statements below were later overtaken. For what is true now see [`AGENT-1-STATUS.md`](AGENT-1-STATUS.md), the [v1.5 upgrade guide](../docs/src/app/reference/upgrade-v1.5.mdx), and `AGENTS.md` §2b.
+>
+> Known drift, as of v1.5:
+> - **Billing is not just removed from Python — the tables are gone.** Revision `020` dropped the 18 billing/usage tables and 6 dead domain schemas created by revision `003`. The "squash later" note in §5f is done.
+> - **The `aggregator` service no longer exists** in `docker-compose.yml`, and the `gateway` is profile-gated behind `edge` rather than on by default.
+> - **`compressed_summary` and `semantic_cluster` are dead.** The clustering and compression engines were removed; `semantic_cluster`, `cluster_membership`, and `compressed_summary` are either dropped (the first two) or repointed and owned by revision `018` (the third). The L3 layer sketch below predates that.
+> - **The gateway is no longer a second entry point.** Response cache and per-key rate limiting moved into `contexta/api/middleware/{response_cache,ratelimit}.py`.
+> - **`ef=64` in §1 is stale.** `CONTEXTA_HNSW_EF_SEARCH` is now 100 with `hnsw.iterative_scan = relaxed_order`, because a filtered HNSW query was collapsing to zero rows.
+> - The latency budget in §2 is a target, not a measurement. The measured component numbers are in the v1.5 changelog.
+> - **`web/` and `web-public/` no longer exist.** The operator console is `dashboard/` (Next.js 15 App Router). The public site is `landingpage/`, and it is a **separate git repository** (`https://github.com/Jenithpaul/contexta-landing.git`) built with the **Next.js App Router**, not Vite — so §5g's "`landing/` app (Vite + React 19 + Tailwind v4)", its `vite build` timing, and its `vercel.json` `framework=vite` note are all wrong. The Vite landing app it describes was replaced.
+
+> Status: OSS v1 in progress. Billing removed. Go = stateless edge, Python = brain and sole data path.
 > Run: `docker compose up --build` (personal local, offline-first).
 > Profiles planned: `--profile online`, `--profile enterprise`.
 
@@ -30,11 +41,23 @@ L1 HOT (Redis, ms)               L2 WARM (Postgres, 10s of ms)            L3 DEE
 - embed job queue (Stream)       - memory_entity_link                    - audit / feedback aggregates
 ```
 
+> **Retired 2026-09-26: the Go write path below was never fully implemented and
+> has been removed.** The `Go receiver :8443 -> Postgres staging + Redis stream ->
+> Celery` flow and the `Go data-plane :8080` read path were an abandoned design.
+> `services/data-plane/` is deleted, the `observations` staging table is dropped by
+> migration `014`, and the dead `drain_go_staging` Celery task is removed. That task
+> was never registered in the Celery `beat_schedule`, so it never ran despite being
+> described as scheduled.
+> **Python is now the sole data path.** What remains of the Go layer is
+> `services/gateway/`, a stateless TLS edge (`:8443`) that verifies API keys against
+> Redis, applies rate limits, and reverse proxies to the Python API (`:8000`).
+> There is no `POST /v1/ingress` route; that path never existed.
+
 Write path (async, never block SDK):
-`SDK -> Go receiver :8443 (validate <10ms, 202 job_id) -> Postgres staging + Redis stream -> Celery worker (classifier JSON -> dedup -> score -> graph -> embed Qwen3/openai -> truth) -> L2/L3 + invalidate L1`.
+`SDK -> [optional Go edge :8443: TLS + API-key verify + rate limit] -> Python API :8000/v1/observations (validate, redact, commit ingestion_observation + outbox, 202 job_id) -> Celery worker (classifier JSON -> dedup -> score -> graph -> embed Qwen3/openai -> truth) -> L2/L3 + invalidate L1`.
 
 Read path (sync, hot only):
-`query -> Go data-plane :8080 -> L1 check -> L2 parallel (HNSW filtered valid_to IS NULL + FTS + 2-hop graph from L1 adjacency) -> RRF fuse top 45 -> Qwen3-Reranker-0.6B top 15 -> rescore (sem/rerank/graph/keyword/recency/importance/utility) -> MMR diversity -> token-budget planner -> L1 cache + touch_accessed (async fire-and-forget)`.
+`query -> [optional Go edge :8443] -> Python API :8000/v1/retrieve -> L1 check -> L2 parallel (HNSW filtered valid_to IS NULL + FTS + 2-hop graph from L1 adjacency) -> RRF fuse top 45 -> Qwen3-Reranker-0.6B top 15 -> rescore (sem/rerank/graph/keyword/recency/importance/utility) -> MMR diversity -> token-budget planner -> L1 cache + touch_accessed (async fire-and-forget)`.
 
 Key fixes queued:
 - `retrieval/engine.py:385` recency computed but unused — wire into score.

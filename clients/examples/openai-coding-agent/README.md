@@ -18,21 +18,25 @@ pip install contexta-openai contexta-client openai
 # 2. Set credentials
 export CONTEXTA_API_KEY="your-contexta-api-key"
 export CONTEXTA_BASE_URL="https://api.contexta.ai/v1"
+export CONTEXTA_ORGANIZATION_ID="your-organization-id"
 export OPENAI_API_KEY="your-openai-api-key"
 
 # 3. Create and run the agent
 cat <<EOF > agent.py
 import os
-from contexta_client import contexta
-from contexta_client.adapters.openai import contextaMemory, contextaAssistantRunner
+from uuid import uuid4
+
+from contexta_client import Contexta
+from contexta_client.adapters.openai import contextaAssistantRunner, contextaMemory
 from openai import OpenAI
 
-contexta = contexta(api_key=os.environ["CONTEXTA_API_KEY"])
+client = Contexta(api_key=os.environ["CONTEXTA_API_KEY"])
 openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-memory = contextaMemory(contexta, token_budget=2000)
-runner = contextaAssistantRunner(openai_client, memory)
+user_id = "coding-agent-demo-1"
+session_id = str(uuid4())
 
-session_id = "coding-agent-demo-1"
+memory = contextaMemory(client, user_id, token_budget=2000)
+runner = contextaAssistantRunner(openai_client, memory)
 
 # Create an assistant first with an appropriate coding instruction
 # assistant = openai_client.beta.assistants.create(
@@ -47,6 +51,7 @@ response = runner.run_with_session(
     user_message="I prefer Python and FastAPI for backend development.",
 )
 print(f"Run status: {response.status}")
+client.close()
 EOF
 python agent.py
 ```

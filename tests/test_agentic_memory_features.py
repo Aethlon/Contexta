@@ -226,7 +226,13 @@ async def test_investigate_endpoint():
             res = await ac.post(
                 "/v1/retrieve/investigate",
                 json={"query_text": "What stack did we use?", "user_id": str(u_id), "max_hops": 2},
-                headers={"x-organization-id": str(org_id), "x-user-id": str(u_id)},
+                # This response clears the 1000-byte GZipMiddleware threshold, and
+                # ASGITransport hands back the compressed body without decoding it.
+                headers={
+                    "x-organization-id": str(org_id),
+                    "x-user-id": str(u_id),
+                    "accept-encoding": "identity",
+                },
             )
             assert res.status_code == 200
             data = res.json()

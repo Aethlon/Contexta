@@ -38,7 +38,10 @@ def create_celery_app() -> Celery:
         # Task routing
         task_routes={
             "contexta.workers.extraction_tasks.*": {"queue": "extraction"},
+            "contexta.workers.artifact_tasks.*": {"queue": "extraction"},
+            "contexta.workers.outbox_tasks.*": {"queue": "outbox"},
             "contexta.workers.embedding_tasks.*": {"queue": "embedding"},
+
             "contexta.workers.decay_tasks.*": {"queue": "maintenance"},
             "contexta.workers.reflection_tasks.*": {"queue": "maintenance"},
             "contexta.workers.dream_tasks.*": {"queue": "maintenance"},
@@ -47,16 +50,19 @@ def create_celery_app() -> Celery:
         # Auto-discover tasks in the workers package
         include=[
             "contexta.workers.extraction_tasks",
+            "contexta.workers.artifact_tasks",
+            "contexta.workers.outbox_tasks",
             "contexta.workers.embedding_tasks",
+
             "contexta.workers.decay_tasks",
             "contexta.workers.reflection_tasks",
             "contexta.workers.dream_tasks",
         ],
 
         beat_schedule={
-            "go-staging-drain": {
-                "task": "contexta.workers.extraction_tasks.drain_go_staging",
-                "schedule": 60.0,
+            "durable-outbox-dispatch": {
+                "task": "contexta.workers.outbox_tasks.dispatch_outbox",
+                "schedule": 5.0,
             },
             "daily-decay-cycle": {
                 "task": "contexta.workers.decay_tasks.run_decay_cycle",
@@ -67,7 +73,7 @@ def create_celery_app() -> Celery:
                 "schedule": 86400.0,
             },
             "weekly-dream-cycle": {
-                "task": "contexta.workers.dream_tasks.run_dream_cycle",
+                "task": "contexta.workers.dream_tasks.dispatch_dream_cycles",
                 "schedule": 604800.0,
             },
         },

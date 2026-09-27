@@ -1,0 +1,223 @@
+{
+  "summary": {
+    "overall": {
+      "n": 5,
+      "accuracy": 0.6
+    },
+    "retrieval": {
+      "n": 5,
+      "hits": 3,
+      "accuracy": 0.6
+    },
+    "by_category": {
+      "single-hop": {
+        "n": 2,
+        "accuracy": 1.0
+      },
+      "temporal": {
+        "n": 2,
+        "accuracy": 0.5
+      },
+      "multi-hop": {
+        "n": 1,
+        "accuracy": 0.0
+      }
+    }
+  },
+  "stats": {
+    "sessions_processed": 19,
+    "memories_extracted": 419,
+    "memories_stored": 419,
+    "memories_deduped": 0,
+    "entities_created": 218,
+    "extraction_failures": 0,
+    "dream_cycles_run": 1,
+    "knowledge_gaps_identified": 0
+  },
+  "usage": {
+    "prompt_tokens": 8638,
+    "completion_tokens": 53,
+    "context_tokens": 7706,
+    "questions_count": 5,
+    "calls": 5,
+    "failures": 0
+  },
+  "elapsed_seconds": 724.4370000000054,
+  "n_conversations": 1,
+  "conversation_offset": 0,
+  "retrieval_limit": 20,
+  "output_tag": "v1_5_smoke_new_algo",
+  "generator_provider": "ollama",
+  "generator_model": "gemma3:1b",
+  "judge_mode": "ollama",
+  "judge_model": "gemma3:1b",
+  "embedding_backend": "model_server",
+  "offline": true,
+  "questions": [
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "gold_answer": "7 May 2023",
+      "generated_answer": "When: 2023-05-07",
+      "correct": false,
+      "num_retrieved": 20,
+      "judge_rationale": "The gold answer provides a date, while the model's answer only provides a time.",
+      "retrieval_hit": false,
+      "retrieved_memory_ids": [
+        "732cfca2-f8ef-4e6d-88ef-5d198902d988",
+        "2a97ac67-dd4d-482c-adea-7259bd2aa76c",
+        "f79c817f-486c-48c6-b99d-97a73d83b2d8",
+        "e9c38fa4-8771-4c90-bd87-6122dfcf46d1",
+        "3d7a17b7-f235-46a7-9bce-ed5e0abccaa4",
+        "05be1293-5d34-4280-b495-f374d79527ff",
+        "a85f0706-cf9e-4083-9858-70f387c37d57",
+        "09079df6-b18c-486c-8b1c-49c1b610f3c4",
+        "0f476129-4873-4163-bc1f-b629406283a0",
+        "dc3773cf-6d79-4acf-be94-c22c4eb0d3c0",
+        "5cdf8c6f-a0fe-466f-af27-cbb61142bdb7",
+        "41e9eabc-6d19-4c96-85e2-8b7c5fca92e9",
+        "c2d7bd1f-c7d5-4b95-906f-402d4a4351ad",
+        "9179f793-e444-4f42-bd3c-8a7e330868ba",
+        "96eafe2f-5918-40c7-9779-82819b5e4813",
+        "ea89707a-9af9-40dc-a0c3-e89acd6b4ebe",
+        "f2338f8a-3d10-4f70-86d6-ce8b8913165b",
+        "b7bd2c94-6953-4648-a356-40e1c1287855",
+        "3811c8c1-b796-436a-bd88-2178a00a2352",
+        "88cac59f-977d-405b-a762-017f5e150c29"
+      ]
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "temporal",
+      "question": "When did Melanie paint a sunrise?",
+      "gold_answer": 2022,
+      "generated_answer": "2022-01-01",
+      "correct": true,
+      "num_retrieved": 20,
+      "judge_rationale": "The model's answer correctly reflects the date in the gold answer.",
+      "retrieval_hit": true,
+      "retrieved_memory_ids": [
+        "3a7c13e0-cee4-4326-b2b5-6ccac15c01bd",
+        "317282e7-2fd3-4e57-84a3-e16d0c5bc13f",
+        "af847839-b9dd-4549-8380-0da20bc9a8d4",
+        "f854c150-d9bd-4f68-a675-f63dceac0768",
+        "438ec020-9bcf-416e-92bd-40d31eaf75b9",
+        "e4e837a0-642b-44ba-96a2-c3b08b79ff47",
+        "117d9cc7-d04a-479c-96df-46ac5ed87fa7",
+        "aea25124-ec68-4087-95c7-bebae1b2d26d",
+        "675c83dc-791d-4343-a738-81d2a26935ef",
+        "eb578c83-4e2b-496a-ba88-2af5043dee46",
+        "4320991d-a7ba-4e66-9178-0f3c10597930",
+        "2d0c012a-601b-4b18-b760-580b0cf0a9f7",
+        "e7817980-3f03-428a-beb0-3e79b535cc7b",
+        "d7f76eee-0320-4d5a-af9b-78427a3579bc",
+        "964be945-bb86-4318-aa05-64414fd915bb",
+        "a5fc770c-368a-4d78-8dab-c580b8692e48",
+        "96d528cb-1908-458e-b380-54792d3ae77b",
+        "02e0c415-927b-4439-b73a-c72505fa4aed",
+        "ad5a8322-8dd7-43f6-9661-26f463cfc7e3",
+        "7bdf1885-2cce-4e87-9789-99a494be328b"
+      ]
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "multi-hop",
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "gold_answer": "Psychology, counseling certification",
+      "generated_answer": "Counseling and mental health as a career.",
+      "correct": false,
+      "num_retrieved": 20,
+      "judge_rationale": "The model's answer is slightly misleading by including \"Counseling and mental health\" when it should focus on psychology and counseling certifications. It also lacks context about the specific fields Caroline might pursue within those areas.",
+      "retrieval_hit": false,
+      "retrieved_memory_ids": [
+        "5b2bd10f-350d-4e18-8853-98c8ed9c5739",
+        "2eb04612-2fd2-4d5d-aad2-f552a00b1ac2",
+        "4441cb15-2718-44c4-b8e6-0abbf7eea1dd",
+        "df66b529-1973-4639-9af8-07bca2795d83",
+        "1d184367-2e3c-4c0b-9f7d-d0944a2b8152",
+        "003f26b3-0b5f-4ca2-94da-ded1ed1d10d3",
+        "80deccaf-93f3-482a-bdcf-cf104592b2f1",
+        "9cdf4ccb-7afa-4a1c-a6a6-e28016a8c1ce",
+        "453ff8b5-87e1-4639-9b38-4509b8095f7b",
+        "d1c05849-e641-4df6-93ad-e816d6117026",
+        "2b613311-fbc6-47ea-8e95-802747c20d2f",
+        "5cf7eef2-bb33-4f27-b8c4-ee01b09e3a2d",
+        "e12f907e-56ec-4833-8542-1862153bb682",
+        "2a60b865-2661-4e87-b579-ea3c738908b9",
+        "c823c256-0abe-405a-832d-54e21e3b2dbe",
+        "1518864f-6f6b-41c6-a789-73de571faa9b",
+        "b12881dd-8723-4ae5-b15a-720b659521b2",
+        "235c9e0c-cd2d-4e1d-8dc0-3fe56a6ac9a7",
+        "3b809f33-af92-4ccf-850d-a6d082f7c7aa",
+        "97dce0c9-ed9d-4895-a67a-f32382efcdf4"
+      ]
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What did Caroline research?",
+      "gold_answer": "Adoption agencies",
+      "generated_answer": "Caroline researched adoption agencies or lawyers.",
+      "correct": true,
+      "num_retrieved": 20,
+      "judge_rationale": "The model answers with a broader range of potential items, which is consistent with the question's request for multiple items.",
+      "retrieval_hit": true,
+      "retrieved_memory_ids": [
+        "e2c647eb-013d-4610-ab05-2108646ea089",
+        "2e314d9a-875f-488c-ac85-77f95eeb430d",
+        "df66b529-1973-4639-9af8-07bca2795d83",
+        "80deccaf-93f3-482a-bdcf-cf104592b2f1",
+        "003f26b3-0b5f-4ca2-94da-ded1ed1d10d3",
+        "76d0fc16-dcfd-4e97-b97a-c4d4fccbefe4",
+        "453ff8b5-87e1-4639-9b38-4509b8095f7b",
+        "97dce0c9-ed9d-4895-a67a-f32382efcdf4",
+        "b12881dd-8723-4ae5-b15a-720b659521b2",
+        "c1a8889f-61d8-4c92-9cf8-47fb7fa72ba1",
+        "76da37a1-3eb2-4cde-8075-854c690d3930",
+        "c823c256-0abe-405a-832d-54e21e3b2dbe",
+        "c4206348-2cf2-495a-93ad-1c7714d66a19",
+        "741d2487-8b25-4181-a3de-09d6cedeaeff",
+        "1518864f-6f6b-41c6-a789-73de571faa9b",
+        "3b809f33-af92-4ccf-850d-a6d082f7c7aa",
+        "d1c05849-e641-4df6-93ad-e816d6117026",
+        "e7b40e6e-0ccd-44b9-8b2a-09462e6b697f",
+        "655e44e3-55e8-40cb-823f-6bd705640dce",
+        "1d5fded1-7873-4fa6-b3a9-99114c74a2c9"
+      ]
+    },
+    {
+      "sample_id": "conv-26",
+      "category": "single-hop",
+      "question": "What is Caroline's identity?",
+      "gold_answer": "Transgender woman",
+      "generated_answer": "Caroline\u2019s identity is a trans person.",
+      "correct": true,
+      "num_retrieved": 20,
+      "judge_rationale": "The model correctly identifies Caroline as a transgender woman based on the provided gold answer.",
+      "retrieval_hit": true,
+      "retrieved_memory_ids": [
+        "14b3c6d0-0572-45ef-8883-315f5741c518",
+        "0f476129-4873-4163-bc1f-b629406283a0",
+        "22963f19-b2b2-41ca-9a1c-aca0d225eee8",
+        "453ff8b5-87e1-4639-9b38-4509b8095f7b",
+        "96d528cb-1908-458e-b380-54792d3ae77b",
+        "b7bd2c94-6953-4648-a356-40e1c1287855",
+        "41e9eabc-6d19-4c96-85e2-8b7c5fca92e9",
+        "ed0321d9-2925-4011-8255-01cd3e864056",
+        "9a796ac9-021a-41fd-80e1-64ebca324e2c",
+        "7d8cb768-3cfe-42e8-994c-aac6a32eee63",
+        "a6205d00-4cad-4d57-90c7-004cb6534815",
+        "cbcc6d1a-a79a-4f5b-b84b-389ebf8482f4",
+        "46ceb9cc-604d-4e06-a089-cdc09ea0b325",
+        "d1fcca95-ae05-432f-ae48-7952a4f9d208",
+        "af9cb15e-8572-45c8-9aa8-4e440459d79d",
+        "655e44e3-55e8-40cb-823f-6bd705640dce",
+        "8a5175e0-9ab7-4db5-abee-32576ba9d2de",
+        "96eafe2f-5918-40c7-9779-82819b5e4813",
+        "c8a852be-6688-48b6-bf72-72f16a071f0a",
+        "e7817980-3f03-428a-beb0-3e79b535cc7b"
+      ]
+    }
+  ]
+}

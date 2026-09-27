@@ -3,7 +3,6 @@ from __future__ import annotations
 import configparser
 import os
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -25,7 +24,7 @@ def _save_config(config: configparser.ConfigParser) -> None:
 
 
 def _get_client(profile: str = "default"):
-    from contexta_client.client import contexta
+    from contexta_client.client import Contexta
     config = _load_config()
     section = f"profiles.{profile}" if profile != "default" else "default"
     if section not in config:
@@ -34,10 +33,17 @@ def _get_client(profile: str = "default"):
     cfg = config[section]
     api_key = cfg.get("api_key") or os.environ.get("CONTEXTA_API_KEY")
     api_url = cfg.get("api_url") or os.environ.get("CONTEXTA_API_URL", "https://api.contexta.dev/v1")
+    org_id = cfg.get("org_id") or os.environ.get("CONTEXTA_ORGANIZATION_ID")
     if not api_key:
         typer.echo("No API key found. Run 'contexta login' or set CONTEXTA_API_KEY.")
         raise typer.Exit(1)
-    return contexta(api_key=api_key, base_url=api_url)
+    return Contexta(
+        api_key=api_key,
+        base_url=api_url,
+        organization_id=org_id or None,
+        ca_bundle_path=os.environ.get("CONTEXTA_CA_BUNDLE"),
+        verify_tls=os.environ.get("CONTEXTA_VERIFY_TLS", "true").lower() != "false",
+    )
 
 
 def login(

@@ -49,7 +49,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             org_id: data.organization_id,
             role: data.role ?? "owner",
             must_reset_password: Boolean(data.must_reset_password),
-            onboarding_completed: Boolean(data.onboarding_completed),
           };
         } catch (err) {
           console.error("[auth] Signin error:", err);
@@ -75,13 +74,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.org_id = (user as any).org_id;
         token.role = (user as any).role;
         token.must_reset_password = (user as any).must_reset_password;
-        token.onboarding_completed = (user as any).onboarding_completed;
       }
       if (trigger === "update" && session) {
         token.org_id = session.org_id ?? token.org_id;
         token.role = session.role ?? token.role;
         token.must_reset_password = session.must_reset_password ?? token.must_reset_password;
-        token.onboarding_completed = session.onboarding_completed ?? token.onboarding_completed;
       }
       return token;
     },
@@ -91,7 +88,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         (session.user as any).org_id = token.org_id as string;
         (session.user as any).role = token.role as string;
         (session.user as any).must_reset_password = token.must_reset_password as boolean;
-        (session.user as any).onboarding_completed = token.onboarding_completed as boolean;
       }
       return session;
     },

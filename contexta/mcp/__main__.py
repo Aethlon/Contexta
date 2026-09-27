@@ -8,7 +8,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import sys
 
 from contexta.mcp.server import create_mcp_server
 

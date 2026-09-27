@@ -142,6 +142,64 @@ RELATION_PATTERNS = [
     (r"\b(?:is\s+(?:an?|the)?\s*|acts\s+as\s+(?:an?|the)?\s*|serves\s+as\s+(?:an?|the)?\s*)\b", "is_a", "has_instance"),
 ]
 
+# Every literal this module can put in an edge's `relationship_type`, derived
+# from the pattern table so it cannot drift from it. Kept next to the patterns
+# rather than imported from `models.entity.ALLOWED_RELATIONSHIP_TYPES` because
+# the DB constraint is the union of this set and `core.types.RelationType`; the
+# two only need to agree on the overlap.
+EMITTED_RELATIONSHIP_TYPES: frozenset[str] = frozenset(
+    {rel for _pattern, forward, backward in RELATION_PATTERNS
+     for rel in (forward, backward)} | {"related_to"}
+)
+
+# Bounds for the co-occurrence backfill.
+#
+# The blanket fallback was quadratic: a memory with n entities produced
+# n(n-1)/2 `related_to` edges, so a 20-entity note alone wrote 190 rows that all
+# said the same thing -- "these entities were in the same note". The typed
+# patterns above are extracted from the text between a pair, so they scale
+# with how much the note actually says; the fallback exists only so a pair with
+# no verb between it is not dropped, and it is bounded on both axes:
+#
+#   * RELATED_TO_MAX_ENTITIES: above this the pairs are no longer "co-occurring
+#     in a note" but "co-occurring in a note that is really an entity list", and
+#     the backfill emits nothing. The memory-entity links still record who was
+#     in it, which is what the typed patterns are for.
+#   * RELATED_TO_MAX_PAIRS: a second, independent ceiling on emitted pairs. At
+#     the entity cap it is currently unreachable (n=4 is already 6 pairs), so
+#     raising one limit alone can never quietly restore the quadratic blowup.
+RELATED_TO_MAX_ENTITIES = 4
+RELATED_TO_MAX_PAIRS = 6
+
+
+def _related_to_backfill(
+    entities: Sequence[Entity],
+    covered_pairs: set[frozenset[uuid.UUID]],
+) -> list[tuple[Entity, str, Entity]]:
+    """Bounded `related_to` backfill for pairs the grammar pass did not type.
+
+    ``covered_pairs`` is mutated so a pair is never emitted twice. Returns
+    nothing at all once the memory holds more than
+    ``RELATED_TO_MAX_ENTITIES`` entities -- see the note on those constants for
+    why the blanket fallback was a quadratic edge producer.
+    """
+    if len(entities) > RELATED_TO_MAX_ENTITIES:
+        return []
+
+    backfill: list[tuple[Entity, str, Entity]] = []
+    for index, entity_a in enumerate(entities):
+        for entity_b in entities[index + 1:]:
+            if len(backfill) >= RELATED_TO_MAX_PAIRS:
+                return backfill
+            if entity_a.id == entity_b.id:
+                continue
+            pair = frozenset({entity_a.id, entity_b.id})
+            if pair in covered_pairs:
+                continue
+            covered_pairs.add(pair)
+            backfill.append((entity_a, "related_to", entity_b))
+    return backfill
+
 
 def extract_semantic_relations(
     text: str,
@@ -205,15 +263,7 @@ def extract_semantic_relations(
     relations: list[tuple[Entity, str, Entity]] = list(matched_specific.values())
     covered_pairs = set(matched_specific.keys())
 
-    # Fallback to related_to for unlinked pairs that co-occur in the same memory
-    for i in range(len(entities)):
-        for j in range(i + 1, len(entities)):
-            ea = entities[i]
-            eb = entities[j]
-            if ea.id != eb.id:
-                pair = frozenset({ea.id, eb.id})
-                if pair not in covered_pairs:
-                    relations.append((ea, "related_to", eb))
-                    covered_pairs.add(pair)
+    # Bounded co-occurrence backfill for pairs no grammar pattern claimed.
+    relations.extend(_related_to_backfill(entities, covered_pairs))
 
     return relations

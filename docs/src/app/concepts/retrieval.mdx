@@ -1,178 +1,152 @@
-# Hybrid Retrieval
+# Retrieval
 
-contexta's retrieval engine combines five signals to find the most relevant memories. It's a four-stage pipeline designed for speed and accuracy.
+Contexta's retrieval engine runs three independent channels over the same query and fuses their rankings. One channel is never enough — vectors miss exact tokens, lexical misses paraphrase, the graph misses anything unlinked — and pretending otherwise is the most common way a memory layer underperforms.
 
-## Pipeline Overview
+## The channels
 
-```
-                    Query (text + filters)
-                           │
-                           ▼
-        ┌──────────────────────────────────┐
-        │  Stage 0: Query Understanding    │
-        │   - Embed query                  │
-        │   - Detect entity mentions       │
-        │   - Optional HyDE expansion      │
-        └──────────────┬───────────────────┘
-                       │
-                       ▼
-        ┌──────────────────────────────────┐
-        │  Stage 1: Candidate Generation   │
-        │   ├── Semantic search (vector)   │
-        │   ├── Keyword search (tsvector)  │
-        │   └── Graph expansion (entities) │
-        └──────────────┬───────────────────┘
-                       │
-                       ▼
-        ┌──────────────────────────────────┐
-        │  Stage 2: Hybrid Scoring         │
-        │   RRF + weighted signals         │
-        └──────────────┬───────────────────┘
-                       │
-                       ▼
-        ┌──────────────────────────────────┐
-        │  Stage 3: Diversification        │
-        │   MMR λ=0.7 + entity caps       │
-        └──────────────┬───────────────────┘
-                       │
-                       ▼
-        ┌──────────────────────────────────┐
-        │  Stage 4: Optional LLM Rerank   │
-        │   (opt-in, +400-700ms)           │
-        └──────────────┬───────────────────┘
-                       │
-                       ▼
-                 Final Results
-```
+| Channel | Engine | Default weight | What it is good at |
+| :--- | :--- | ---: | :--- |
+| `dense` | pgvector HNSW, cosine | 0.5 | Paraphrase and semantic similarity |
+| `lexical` | PostgreSQL `tsvector` GIN / BM25 | 0.3 | Exact tokens — port numbers, identifiers, error strings, proper nouns |
+| `graph` | Recursive CTE over `entity_edge`, hard-capped | 0.2 | Anything reachable only through the people and projects around a fact |
 
-## The Five Signals
+Weights live in `RetrievalEngine.DEFAULT_CHANNEL_WEIGHTS` and are adjusted at query time by the Contexta Cortex when it is enabled: an `exact` strategy boosts lexical, a `semantic` strategy boosts dense, and a graph strategy boosts graph.
 
-### Semantic (Vector) — Weight: 0.40
+## Fusion
 
-Dense vector search using OpenAI `text-embedding-3-small` embeddings in pgvector with HNSW indexing. Cluster-first: contexta searches inside matched entity clusters before falling back to tenant-wide search.
-
-### Keyword (Full-Text) — Weight: 0.05
-
-Postgres `tsvector` full-text search on memory content and titles. Handles exact term matching that vector search may miss.
-
-### Graph (Entity Relationships) — Weight: 0.25
-
-When the query mentions known entities (people, projects, technologies), contexta traverses the entity graph to find linked memories. Configurable depth (default 1, max 3 hops).
-
-### Importance — Weight: 0.20
-
-Each memory's stored importance score. High-importance memories (pinned, frequently referenced, decision-impacting) rank higher.
-
-### Recency — Weight: 0.10
-
-Exponential decay based on `last_accessed_at`:
+`weighted_reciprocal_rank_fusion` in `contexta/core/retrieval/fusion.py`:
 
 ```
-recency = exp(-ln(2) × days_since_access / 30)
+score(d) = Σ_channels  weight(c) / (k + rank_c(d))
 ```
 
-Half-life: 30 days. Memories accessed within the last day are near 1.0; memories untouched for 6 months are near 0.01.
+with `k = 60` (`DEFAULT_RRF_K`), normalised against the best achievable score and clamped at `1.0`. Two small priors are added on top: a `utility_prior` of `0.005` from `utility_score`, and a `quality_prior` of `0.20` combining `importance` and `confidence`.
 
-## Scoring Formula
+RRF is used rather than a weighted sum of raw scores because the three channels produce scores on incompatible scales. Rank position is the only thing they share.
 
+## Query understanding
+
+Before channels run, `build_query_plan` inspects the query text and the caller's known entities to produce a `QueryPlan`: the entities named, any required evidence ids, a `required_evidence_count`, a `retrieval_limit_hint` (a table needs more rows than a one-line fact), and whether the question carries an explicit temporal constraint. An explicit temporal constraint widens the candidate pool before fusion, because filtering a capped pool afterwards leaves holes nothing back-fills.
+
+## Candidate generation
+
+`CANDIDATE_MULTIPLIER` and `MIN_CANDIDATES` size the per-channel pool, which is comfortably larger than the result page so fusion has something to work with. On the dense side `ef_search` is tuned and `hnsw.iterative_scan` is set to `relaxed_order`, because a filtered HNSW query used to collapse and silently return zero rows rather than drop the tenant constraint to get an answer.
+
+## Cascade mode (opt-in, off by default)
+
+```python
+RetrievalEngine(memory_repository=repo, ..., enable_dense_escalation=True)
 ```
-final_score =
-    0.40 × semantic
-  + 0.25 × graph
-  + 0.20 × importance
-  + 0.10 × recency
-  + 0.05 × keyword
-  + 0.10 × same_cluster_bonus
-  - 0.30 × is_cold
-  - 0.50 × is_archived
-```
 
-## Cluster-First Search
+This inverts the order. Lexical and graph gather evidence first, graph expansion anchoring off the lexical hits. Only if `assess_primary_sufficiency()` says that evidence is insufficient does the dense channel get consulted.
 
-contexta groups memories into semantic clusters. When a query arrives:
+The sufficiency gate is pure and pure-function testable — it reads its arguments, touches no clock, database, or embedding service, and returns a stable machine-readable `reason`:
 
-1. Find top-3 matching clusters by centroid embedding similarity
-2. Search inside those clusters first (fast, focused)
-3. If cluster match is poor (distance > 0.4), fall back to tenant-wide search
-4. Supplement with tenant-wide results if cluster results are insufficient
+| `reason` | Meaning |
+| :--- | :--- |
+| `sufficient_depth` | Returned at least as many results as the plan asked for |
+| `sufficient_dominant_hit` | One hit clears `dominance_margin` (0.10) over everything else |
+| `missing_required_evidence` | The plan named evidence that is not present |
+| `missing_required_entity` | The plan named an entity no result covers |
+| `below_quality_floor` | The leader is under `quality_floor` (0.45) |
+| `no_dominant_hit` | A shallow field of near-equals |
 
-This reduces vector search from millions to thousands of candidates per query.
+Contract and quality are checked before depth, and depth before dominance, because "enough" is a property of the *question*, not of the ranker.
+
+**It stays off.** There is no environment variable and no request field for it — the constructor argument is the only switch. `last_escalation` is written on the engine for observability so the escalation rate can be measured before anyone relies on it. Do not add a flag without that measurement.
+
+## Reranking
+
+`RetrievalEngine` takes an optional `Reranker` and applies it to the top `RERANK_POOL_SIZE = 45`.
+
+**The HTTP retrieval routes do not supply one.** `POST /v1/retrieve` and friends construct the engine with repositories only, so there is no cross-encoder stage and **no `rerank` request field** on those routes. Neural reranking is wired on the MCP path, which passes `LocalNeuralReranker` against the model server.
+
+If you were integrating against a `rerank: true` body field, it was never honoured on this route and the extra key is ignored.
+
+## After fusion
+
+- **Read-age decay is applied to every hit.** `touch_accessed()` / `touch_accessed_many()` updates `last_accessed_at`, so decay follows usefulness rather than write time.
+- **Freshness is precision-aware.** A memory whose `temporal_precision` says the timestamp is approximate is not treated as having an exact one.
+- **Superseded memories are excluded.** Stale facts are not competing answers.
+- **Scope is re-checked.** Results are filtered against the authenticated organization and actor after the engine returns them, so a repository that over-reaches still cannot leak.
 
 ## Usage
 
 ```python
-# Simple context retrieval (recommended)
-ctx = contexta.context(
-    user_id="u_123",
-    query="what databases does the user prefer?",
-    token_budget=1500,
-)
+from contexta_client import Contexta
 
-# Raw retrieval with full control
-results = contexta.retrieve(
-    user_id="u_123",
-    query_text="postgresql preferences",
+memory = Contexta.from_env()
+
+results = memory.retrieve(
+    user_id=ACTOR_UUID,
+    organization_id=ORG_UUID,
+    query_text="what database does the user prefer?",
     memory_types=["preference", "fact"],
     tags=["database"],
     limit=20,
     graph_depth=2,
-    rerank=False,
 )
 ```
 
 ```ts
-const results = await contexta.retrieve({
-  userId: "u_123",
-  queryText: "postgresql preferences",
-  memoryTypes: ["preference", "fact"],
-  tags: ["database"],
+const results = await memory.retrieve({
+  userId: ACTOR_UUID,
+  organizationId: ORG_UUID,
+  queryText: "what database does the user prefer?",
   limit: 20,
   graphDepth: 2,
-  rerank: false,
 });
 ```
 
-## Response Shape
+## Response shape
 
-Each result includes a score breakdown:
+`POST /v1/retrieve` nests the record under `memory` and returns the score breakdown as flat siblings:
 
 ```json
 {
-  "memory_id": "01J...",
-  "memory_type": "preference",
-  "title": "Prefers Postgres",
-  "score": 0.872,
-  "score_breakdown": {
-    "semantic": 0.91,
-    "graph": 0.0,
-    "importance": 0.75,
-    "recency": 0.86,
-    "keyword": 0.50
-  },
-  "tags": ["database"],
-  "created_at": "2026-04-12T18:32:11Z"
+  "status": "success",
+  "query": "…",
+  "results": [
+    {
+      "memory": {
+        "id": "…", "user_id": "…", "organization_id": "…",
+        "memory_type": "preference", "title": "Prefers Postgres",
+        "content": "User prefers Postgres over Mongo.",
+        "structured_data": {}, "tags": ["database"],
+        "is_pinned": false, "is_archived": false,
+        "memory_state": "active", "created_at": "…"
+      },
+      "score": 0.916,
+      "semantic_score": 0.91,
+      "graph_score": 0.0,
+      "importance_score": 0.75,
+      "recency_score": 0.86,
+      "keyword_score": 0.5
+    }
+  ]
 }
 ```
 
-## Rerank (Optional)
+`GET /v1/memories/hybrid` uses the older flat shape — `memory_id` plus a nested `score_breakdown` object. `GET /v1/memories/search` returns pure vector hits with a `similarity` field and a `threshold` filter (default `0.65`).
 
-When `rerank=true`, the top 50 candidates are sent to an LLM for reordering. This adds 400-700ms latency and counts as a rerank billing operation. Use for high-stakes retrievals where precision matters most.
+## Point-in-time reads
 
-## Performance Targets
+`as_of` on a `RetrievalQuery` turns retrieval into a bitemporal range read: memories valid at that instant, not the ones that are current now. Revision `016` added `ix_memory_record_org_validity` on `(organization_id, user_id, valid_from, valid_to)`, which is what makes it an index scan.
 
-| Without rerank | p50: 22ms | p99: 150ms |
-| With rerank | p50: 420ms | p99: 850ms |
+Measured on the reference dataset: **~46ms → ~0.22ms**.
 
-## Filtering
+## Multi-hop investigation
 
-```python
-results = contexta.retrieve(
-    user_id="u_123",
-    query_text="deployment",
-    memory_types=["fact", "event"],  # only these types
-    tags=["production", "devops"],   # must match any
-    limit=20,
-    include_archived=False,
-    include_cold=False,
-)
-```
+`POST /v1/retrieve/investigate` runs an iterative agentic loop instead of one pass. It returns the `investigation_trace` step by step, the entities it discovered, the temporal evolution it observed, and a `synthesized_context` — useful when the answer is not in any single memory but only in the path between them.
+
+## Measured component latencies
+
+These are component-level measurements, not end-to-end query latency, which depends on deployment, model, and query load:
+
+| Path | Before v1.5 | After v1.5 |
+| :--- | ---: | ---: |
+| Lexical GIN search | ~550ms | ~48ms |
+| `as_of` bitemporal read | ~46ms | ~0.22ms |
+| Recursive-CTE graph traversal | ~38.5ms | ~2.16ms (~16x) |
+
+No fixed end-to-end latency figure is claimed, because none was measured under a documented, reproducible configuration.

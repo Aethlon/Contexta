@@ -1,4 +1,4 @@
-interface QueuedEntry {
+export interface QueuedEntry {
   id: string;
   url: string;
   body: string;
@@ -107,10 +107,38 @@ export class DurableBuffer {
     return this.memory.length;
   }
 
-  async flush(): Promise<void> {
+  /**
+   * Replay every queued entry through `sender`. Entries that throw are requeued
+   * (and dead-lettered once `maxRetries` is exceeded) so nothing is silently lost.
+   * Returns the number of entries replayed successfully.
+   */
+  async drain(sender: (entry: QueuedEntry) => Promise<void>): Promise<number> {
+    await this.initPromise;
+    let flushed = 0;
+    while (this.memory.length > 0) {
+      const entry = this.memory.shift();
+      if (!entry) break;
+      try {
+        await sender(entry);
+        flushed += 1;
+      } catch {
+        await this.requeue(entry);
+      }
+    }
+    await this.persist();
+    return flushed;
+  }
+
+  /** Drop every queued entry without replaying it. */
+  async clear(): Promise<void> {
     await this.initPromise;
     this.memory = [];
     await this.persist();
+  }
+
+  /** @deprecated Use {@link clear} to discard or {@link drain} to replay. */
+  async flush(): Promise<void> {
+    await this.clear();
   }
 
   private async load(): Promise<void> {

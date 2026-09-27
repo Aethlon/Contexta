@@ -1,0 +1,128 @@
+{
+  "stats": {
+    "sessions": 6,
+    "chunks": 45,
+    "extracted": 3,
+    "stored": 3,
+    "skipped": 0,
+    "discarded": 0,
+    "failures": 4,
+    "total_ms": 323396.46,
+    "max_ms": 105829.77,
+    "embedded": 3,
+    "embed_failed": 0,
+    "embed_errors": []
+  },
+  "per_session": [
+    {
+      "session_key": "commit_be6f5ca3",
+      "session_id": "c7ec3e4d-c197-47c1-b9c0-25c7978b2c35",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 36821.08,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ',' delimiter: line 1 column 564 (char 563)"
+    },
+    {
+      "session_key": "commit_09e01394",
+      "session_id": "df087914-96f9-4026-9042-7fca62d6dcea",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 40133.62,
+      "extracted": 1,
+      "stored": 1,
+      "skipped": 0,
+      "discarded": 0,
+      "timings": {
+        "cortex_ms": 0.17,
+        "extraction_ms": 38886.8,
+        "deduplication_ms": 732.25,
+        "entity_graph_ms": 237.2,
+        "persistence_ms": 133.71,
+        "total_ms": 39997.59,
+        "redaction_ms": 5.32
+      }
+    },
+    {
+      "session_key": "s3",
+      "session_id": "5c5095f9-4d30-425a-9614-b3bb98c97418",
+      "domain": "record",
+      "chunks": 2,
+      "ingest_ms": 8384.48,
+      "extracted": 2,
+      "stored": 2,
+      "skipped": 0,
+      "discarded": 0,
+      "timings": {
+        "cortex_ms": 0.19,
+        "extraction_ms": 8165.73,
+        "deduplication_ms": 63.04,
+        "entity_graph_ms": 15.82,
+        "persistence_ms": 36.96,
+        "total_ms": 8296.83,
+        "redaction_ms": 11.24
+      }
+    },
+    {
+      "session_key": "s2",
+      "session_id": "ece29586-8b6b-4cb2-8a9d-e20d00c3a3aa",
+      "domain": "conversation",
+      "chunks": 17,
+      "ingest_ms": 56137.2,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting property name enclosed in double quotes: line 1 column 396 (char 395)"
+    },
+    {
+      "session_key": "s4",
+      "session_id": "e7f71418-37ab-471e-ae6d-d588be6412f0",
+      "domain": "conversation",
+      "chunks": 4,
+      "ingest_ms": 76090.31,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ',' delimiter: line 1 column 1398 (char 1397)"
+    },
+    {
+      "session_key": "s5",
+      "session_id": "080898fc-9e53-4a78-bf85-6ab6aaa1c50e",
+      "domain": "record",
+      "chunks": 20,
+      "ingest_ms": 105829.77,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ',' delimiter: line 1 column 4396 (char 4395)"
+    }
+  ],
+  "stored_memories": [
+    {
+      "id": "86fb4938-9082-43b5-ba75-50476e805c76",
+      "session_id": "df087914-96f9-4026-9042-7fca62d6dcea",
+      "type": "fact",
+      "title": "Function definition update",
+      "content": "Added new implementation for function_15.",
+      "importance": 0.6666666666666667,
+      "confidence": 0.6,
+      "state": "active",
+      "valid_from": "2026-01-09T13:00:00",
+      "valid_to": null
+    },
+    {
+      "id": "93199358-f196-44b8-a212-1a2a6918dc6e",
+      "session_id": "5c5095f9-4d30-425a-9614-b3bb98c97418",
+      "type": "fact",
+      "title": "Contract record (draft, superseded): [PERSON_1] value 172,000 USD.",
+      "content": "Contract record (draft, superseded): [PERSON_1] value 172,000 USD.",
+      "importance": 0.6333333333333333,
+      "confidence": 1.0,
+      "state": "active",
+      "valid_from": "2026-01-11T11:00:00",
+      "valid_to": null
+    },
+    {
+      "id": "9bd9ca17-a99d-498d-a82d-533893a4b17a",
+      "session_id": "5c5095f9-4d30-425a-9614-b3bb98c97418",
+      "type": "fact",
+      "title": "[PERSON_2] acknowledged the incident report queue.",
+      "content": "[PERSON_2] acknowledged the incident report queue.",
+      "importance": 0.6333333333333333,
+      "confidence": 0.6,
+      "state": "active",
+      "valid_from": "2026-01-11T12:00:00",
+      "valid_to": null
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-"""Contexta MCP Service Bridge.
+﻿"""Contexta MCP Service Bridge.
 
 Provides high-level memory operations (remember, recall, context compilation,
 graph traversal, and dream cycles) for the Model Context Protocol (MCP) server.
@@ -18,25 +18,25 @@ import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 import httpx
-from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from contexta.core.dream.engine import DreamCycleEngine
 from contexta.core.entities.relation_extractor import (
     extract_semantic_relations,
     filter_entity_candidates,
-    infer_entity_type,
 )
 from contexta.core.entities.resolver import EntityResolver
+from contexta.core.extraction.sensitive_filter import redact_all
 from contexta.core.retrieval.engine import RetrievalEngine, RetrievalResult
-from contexta.core.schemas import MemoryType, RetrievalQuery
+from contexta.core.schemas import RetrievalQuery
 from contexta.core.scoring.engine import MemoryScoringEngine
-from contexta.core.types import EntityType, SourceType
+from contexta.core.types import MemoryType, SourceType
+from contexta.mcp.security import McpSecurityError, validate_importance
 from contexta.models.dream import DreamRecord
-from contexta.models.entity import Entity, EntityEdge
+from contexta.models.entity import Entity, EntityEdge, MemoryEntityLink
 from contexta.models.memory import MemoryRecord
 from contexta.repositories.entity_repo import (
     EntityEdgeRepository,
@@ -47,9 +47,15 @@ from contexta.repositories.memory_repo import MemoryRepository
 
 logger = logging.getLogger("contexta.mcp")
 
+# Must match the active embedding profile so MCP writes land in the same column and
+# carry the same metadata as REST/worker writes. See settings.embedding_profile.
+EMBEDDING_MODEL_ID = "Qwen/Qwen3-Embedding-0.6B"
+EMBEDDING_VERSION = "qwen3-embedding-0.6b-v1"
+EMBEDDING_PROFILE = "offline-qwen3-1024"
+
 DEFAULT_ORG_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
-DB_VECTOR_DIM = 1536
-EMBEDDING_MODEL_NAME = "BAAI/bge-small-en-v1.5"
+DB_VECTOR_DIM = 1024
+EMBEDDING_MODEL_NAME = "Qwen/Qwen3-Embedding-0.6B"
 
 
 def parse_raw_records(text: str) -> list[dict[str, Any]]:
@@ -109,51 +115,67 @@ def to_uuid(val: str | uuid.UUID | None) -> uuid.UUID:
         return uuid.uuid5(uuid.NAMESPACE_DNS, str(val).strip().lower())
 
 
-class FastEmbedLocalProvider:
-    """Zero-dependency local embedding provider with zero-padding to 1536 dims."""
+class ModelServerEmbeddingProvider:
+    """Embeds through the Contexta model server's Qwen3 endpoint.
 
-    def __init__(self, model_name: str = EMBEDDING_MODEL_NAME) -> None:
+    The MCP service never loads a second, differently-dimensioned embedding model:
+    vectors must come from the same Qwen3 profile the API and worker store, otherwise
+    cosine comparisons against pgvector are meaningless.
+    """
+
+    def __init__(
+        self,
+        server_url: str = "http://localhost:8001",
+        model_name: str = EMBEDDING_MODEL_NAME,
+        expected_dim: int = DB_VECTOR_DIM,
+    ) -> None:
+        self.server_url = server_url.rstrip("/")
         self.model_name = model_name
-        self._model = None
+        self.expected_dim = expected_dim
+        self._client: httpx.AsyncClient | None = None
 
-    def _get_model(self):
-        if self._model is None:
-            from fastembed import TextEmbedding
-            self._model = TextEmbedding(model_name=self.model_name)
-        return self._model
+    def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=60.0)
+        return self._client
 
-    def _embed_sync(self, text: str) -> list[float]:
-        m = self._get_model()
-        vec = list(m.embed([text]))[0].tolist()
-        if len(vec) < DB_VECTOR_DIM:
-            vec = vec + [0.0] * (DB_VECTOR_DIM - len(vec))
-        return vec
-
-    def _embed_batch_sync(self, texts: list[str]) -> list[list[float]]:
-        if not texts:
-            return []
-        m = self._get_model()
-        results = []
-        for vec in m.embed(texts):
-            v_list = vec.tolist()
-            if len(v_list) < DB_VECTOR_DIM:
-                v_list = v_list + [0.0] * (DB_VECTOR_DIM - len(v_list))
-            results.append(v_list)
-        return results
+    def _validate(self, vector: list[float]) -> list[float]:
+        if len(vector) != self.expected_dim:
+            raise ValueError(
+                f"Embedding model returned {len(vector)} dimensions; expected {self.expected_dim}. "
+                "Vectors are never padded or truncated, so the MCP service and the model "
+                "server must agree on the active Qwen3 profile."
+            )
+        return vector
 
     async def embed(self, text: str) -> list[float]:
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, self._embed_sync, text)
+        vectors = await self.embed_batch([text])
+        return vectors[0]
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, self._embed_batch_sync, texts)
+        response = await self._get_client().post(
+            f"{self.server_url}/v1/embeddings",
+            json={"input": texts, "model": self.model_name},
+        )
+        response.raise_for_status()
+        payload = response.json()
+        items = sorted(payload.get("data", []), key=lambda item: item.get("index", 0))
+        if len(items) != len(texts):
+            raise ValueError(
+                f"Embedding model returned {len(items)} vectors for {len(texts)} inputs."
+            )
+        return [self._validate([float(value) for value in item["embedding"]]) for item in items]
+
+    async def close(self) -> None:
+        if self._client is not None and not self._client.is_closed:
+            await self._client.aclose()
+        self._client = None
 
 
 class LocalNeuralReranker:
-    """Connects to Contexta local model server running BAAI/bge-reranker-base."""
+    """Connects to the Contexta model server running Qwen/Qwen3-Reranker-0.6B."""
 
     def __init__(self, server_url: str = "http://localhost:8001") -> None:
         self.server_url = server_url
@@ -220,26 +242,53 @@ class LocalNeuralReranker:
 
 
 class ContextaMCPService:
-    """Core bridge managing persistence, embedding, and retrieval for MCP agents."""
+    """Core bridge managing persistence, embedding, and retrieval for MCP agents.
+
+    Every method is tenant-scoped. `organization_id` is required rather than
+    defaulted: the previous hard-coded `DEFAULT_ORG_ID` meant every agent on every
+    deployment wrote into one shared tenant, which is a cross-tenant isolation
+    failure rather than a configuration detail.
+    """
 
     def __init__(
         self,
         db_url: str | None = None,
         model_server_url: str = "http://localhost:8001",
+        organization_id: uuid.UUID | str | None = None,
+        *,
+        allow_legacy_tenant: bool = False,
     ) -> None:
         self.db_url = db_url or os.environ.get(
             "CONTEXTA_DATABASE_URL",
             "postgresql+asyncpg://postgres:postgres@localhost:55432/contexta",
         )
         self.model_server_url = model_server_url
+        resolved = organization_id or os.environ.get("CONTEXTA_ORGANIZATION_ID")
+        if resolved is None:
+            if not allow_legacy_tenant:
+                raise ValueError(
+                    "ContextaMCPService requires organization_id (or "
+                    "CONTEXTA_ORGANIZATION_ID). Tenant isolation is mandatory for "
+                    "agent writes; pass allow_legacy_tenant=True only for local "
+                    "single-tenant experiments."
+                )
+            resolved = DEFAULT_ORG_ID
+        self.organization_id = (
+            resolved if isinstance(resolved, uuid.UUID) else uuid.UUID(str(resolved))
+        )
         self._engine = None
         self._session_factory = None
-        self._embedder = FastEmbedLocalProvider()
+        self._embedder = ModelServerEmbeddingProvider(model_server_url)
         self._reranker = LocalNeuralReranker(model_server_url)
         self._scoring_engine = MemoryScoringEngine()
         self._jobs: dict[str, dict[str, Any]] = {}
         self._benchmark_jobs: dict[str, dict[str, Any]] = {}
         self._benchmark_evaluator = None
+
+    @property
+    def org_id(self) -> uuid.UUID:
+        """Tenant for every read and write performed by this service."""
+        return self.organization_id
 
     @property
     def benchmark_evaluator(self):
@@ -278,9 +327,31 @@ class ContextaMCPService:
         observed_at: datetime | None = None,
         importance: float = 0.5,
     ) -> dict[str, Any]:
-        """Store a new memory in Contexta with automatic embedding and entity linking."""
+        """Store a new memory in Contexta with automatic embedding and entity linking.
+
+        Content passes the same redaction gate as the REST API, so an agent cannot
+        write credentials or personal data into memory by using MCP instead of HTTP.
+        """
+        from contexta.core.extraction.sensitive_filter import redact_all
+        from contexta.mcp.security import (
+            McpSecurityError,
+            validate_content,
+            validate_importance,
+        )
+
+        content = validate_content(content)
+        importance = validate_importance(importance)
+        scan = redact_all(content)
+        content = scan.redacted_content
+        if scan.contains_sensitive_data:
+            logger.warning(
+                "MCP remember redacted %d sensitive occurrences for user_id=%s: %s",
+                len(scan.redaction_events),
+                user_id,
+                sorted(scan.pseudonym_map),
+            )
         u_id = to_uuid(user_id)
-        org_id = DEFAULT_ORG_ID
+        org_id = self.organization_id
         now_dt = observed_at or datetime.now(UTC).replace(tzinfo=None)
 
         # Generate concise title if omitted
@@ -292,10 +363,21 @@ class ContextaMCPService:
         embed_text = f"{title}\n{content}".strip()
         embedding = await self._embedder.embed(embed_text)
 
-        # Normalize memory type
-        type_str = memory_type.lower()
-        if type_str not in {"episodic", "semantic", "procedural"}:
-            type_str = "episodic"
+        # Accept the MCP vocabulary but map it onto the core enum so stored rows are
+        # queryable by the same filters the REST API and kernel use.
+        type_str = str(memory_type or "episodic").lower()
+        legacy_to_core = {
+            "episodic": "event",
+            "semantic": "fact",
+            "procedural": "skill",
+        }
+        type_str = legacy_to_core.get(type_str, type_str)
+        valid_types = {item.value for item in MemoryType}
+        if type_str not in valid_types:
+            raise McpSecurityError(
+                f"memory_type must be one of {sorted(valid_types)} (MCP aliases "
+                "episodic/semantic/procedural are also accepted)"
+            )
 
         async with self.session() as session:
             mem_repo = MemoryRepository(session, tenant_id=org_id)
@@ -314,7 +396,16 @@ class ContextaMCPService:
                 source_type=SourceType.USER_EXPLICIT,
                 importance=importance,
                 valid_from=now_dt,
-                embedding=embedding,
+                # The active profile is Qwen3-1024, which persists to
+                # `embedding_1024`. Writing the 1024-dim vector to the legacy
+                # `embedding` column raised EmbeddingDimensionError (that column is
+                # 1536) and, had it been padded, would have produced a row the dense
+                # retrieval layer could never match.
+                embedding_1024=embedding,
+                embedding_profile=EMBEDDING_PROFILE,
+                embedding_model=EMBEDDING_MODEL_ID,
+                embedding_version=EMBEDDING_VERSION,
+                embedding_dimensions=len(embedding),
             )
             saved_record = await mem_repo.create(record)
 
@@ -422,7 +513,7 @@ class ContextaMCPService:
     ) -> list[dict[str, Any]]:
         """Retrieve memories using Contexta 3-Layer hybrid search."""
         u_id = to_uuid(user_id)
-        org_id = DEFAULT_ORG_ID
+        org_id = self.organization_id
 
         q_embedding = await self._embedder.embed(query)
         retrieval_query = RetrievalQuery(
@@ -477,7 +568,7 @@ class ContextaMCPService:
             results = await self.recall(focus, user_id=user_id, limit=max_memories)
         else:
             u_id = to_uuid(user_id)
-            org_id = DEFAULT_ORG_ID
+            org_id = self.organization_id
             async with self.session() as session:
                 mem_repo = MemoryRepository(session, tenant_id=org_id)
                 recs = await mem_repo.get_by_user(u_id, limit=max_memories)
@@ -508,7 +599,7 @@ class ContextaMCPService:
     ) -> dict[str, Any]:
         """Archive or invalidate a memory by ID."""
         m_id = uuid.UUID(memory_id)
-        org_id = DEFAULT_ORG_ID
+        org_id = self.organization_id
         now_dt = datetime.now(UTC).replace(tzinfo=None)
 
         async with self.session() as session:
@@ -536,7 +627,7 @@ class ContextaMCPService:
     ) -> dict[str, Any]:
         """Explore knowledge graph entity relations, connected memories, and neighbor edges."""
         u_id = to_uuid(user_id)
-        org_id = DEFAULT_ORG_ID
+        org_id = self.organization_id
 
         async with self.session() as session:
             entity_repo = EntityRepository(session, tenant_id=org_id)
@@ -554,12 +645,7 @@ class ContextaMCPService:
 
             # If still not found, fallback to tenant-wide search in case of scope mismatch
             if not entity:
-                stmt = select(Entity).where(
-                    Entity.organization_id == org_id,
-                    Entity.name.ilike(f"%{entity_name}%"),
-                ).limit(5)
-                res = await session.execute(stmt)
-                org_matching = res.scalars().all()
+                org_matching = await entity_repo.find_by_name_fragment(entity_name)
                 if org_matching:
                     entity = org_matching[0]
 
@@ -619,7 +705,7 @@ class ContextaMCPService:
     ) -> dict[str, Any]:
         """Run Contexta dream cycle to detect knowledge gaps and synthesize insights."""
         u_id = to_uuid(user_id)
-        org_id = DEFAULT_ORG_ID
+        org_id = self.organization_id
 
         async with self.session() as session:
             entity_repo = EntityRepository(session, tenant_id=org_id)
@@ -722,35 +808,41 @@ class ContextaMCPService:
                     "message": "Could not parse 'raw_content'. Ensure it is formatted as a JSON array, JSONL lines, or CSV text.",
                 }
 
-        # 2. Download from remote URL
+        # 2. Download from remote URL, behind the SSRF guard
         if file_url:
+            from contexta.mcp.security import McpSecurityError, safe_remote_fetch
+
             try:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    resp = await client.get(file_url)
-                    if resp.status_code == 200:
-                        parsed = parse_raw_records(resp.text)
-                        if parsed:
-                            raw_records.extend(parsed)
-                        else:
-                            return {
-                                "status": "error",
-                                "message": f"Could not parse data downloaded from {file_url}. Ensure JSON, JSONL, or CSV format.",
-                            }
-                    else:
-                        return {
-                            "status": "error",
-                            "message": f"Failed to download from {file_url}: HTTP {resp.status_code}",
-                        }
-            except Exception as dl_err:
+                payload = await asyncio.to_thread(safe_remote_fetch, file_url)
+            except McpSecurityError as dl_err:
+                return {"status": "error", "message": f"file_url rejected: {dl_err}"}
+            except Exception as dl_err:  # noqa: BLE001 - report, do not abort the tool call
                 return {
                     "status": "error",
                     "message": f"Error downloading from {file_url}: {dl_err}",
                 }
+            try:
+                parsed = parse_raw_records(payload.decode("utf-8", errors="replace"))
+            except Exception:  # noqa: BLE001 - unparseable payload is a user error
+                parsed = []
+            if parsed:
+                raw_records.extend(parsed)
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Could not parse data downloaded from {file_url}. Ensure JSON, JSONL, or CSV format.",
+                }
 
-        # 3. Read from server-side local file path
+        # 3. Read from a server-side local file, confined to configured roots
         if file_path:
-            p = Path(file_path)
+            from contexta.mcp.security import McpSecurityError, safe_local_path
+
+            try:
+                p = safe_local_path(file_path)
+            except McpSecurityError as path_err:
+                return {"status": "error", "message": f"file_path rejected: {path_err}"}
             if not p.is_file():
+
                 return {
                     "status": "error",
                     "message": (
@@ -867,7 +959,7 @@ class ContextaMCPService:
         job["status"] = "processing"
 
         u_id = to_uuid(user_id)
-        org_id = DEFAULT_ORG_ID
+        org_id = self.organization_id
 
         total = len(records)
         processed = 0
@@ -876,6 +968,7 @@ class ContextaMCPService:
         # In-memory entity and edge cache for high-throughput batch ingestion
         entity_cache: dict[str, Entity] = {}
         known_edges: set[tuple[uuid.UUID, uuid.UUID]] = set()
+        redacted_records = 0
 
         for chunk_idx in range(0, total, batch_size):
             chunk = records[chunk_idx : chunk_idx + batch_size]
@@ -898,12 +991,22 @@ class ContextaMCPService:
                         raw_tags = item.get("tags", [])
                         tags = [str(t) for t in raw_tags] if isinstance(raw_tags, list) else []
                         m_type = str(item.get("memory_type", "episodic")).lower()
-                        importance = float(item.get("importance", 0.5))
+                        try:
+                            importance = validate_importance(item.get("importance", 0.5))
+                        except McpSecurityError:
+                            importance = 0.5
                     else:
                         continue
 
                     if not content:
                         continue
+
+                    # Batch imports are the easiest way to smuggle PII into memory,
+                    # so every record goes through the same gate as a single write.
+                    scan = redact_all(content)
+                    if scan.contains_sensitive_data:
+                        redacted_records += 1
+                        content = scan.redacted_content
 
                     if not title:
                         words = content.split()
@@ -941,7 +1044,13 @@ class ContextaMCPService:
                             source_type=SourceType.API,
                             importance=min(1.0, max(0.0, imp)),
                             valid_from=now_dt,
-                            embedding=embeddings[idx],
+                            # Same column/profile as single writes, otherwise bulk
+                            # imports would be invisible to dense retrieval.
+                            embedding_1024=embeddings[idx],
+                            embedding_profile=EMBEDDING_PROFILE,
+                            embedding_model=EMBEDDING_MODEL_ID,
+                            embedding_version=EMBEDDING_VERSION,
+                            embedding_dimensions=len(embeddings[idx]),
                         )
                         session.add(rec)
                         mem_records.append((rec_id, t, c, tg))
@@ -1160,14 +1269,51 @@ class ContextaMCPService:
         return dict(job)
 
     async def get_metrics(self) -> dict[str, Any]:
-        """Return system health, database record counts, and engine telemetry."""
+        """Return system health, database record counts, and engine telemetry.
+
+        The counts are the calling tenant's, which is what `contexta_metrics`
+        documents itself as. A global ``count(*)`` also handed every tenant the
+        row counts of every other tenant sharing the host.
+        """
         from sqlalchemy import text
 
         async with self.session() as session:
-            mem_count = (await session.execute(text("SELECT COUNT(*) FROM memory_record"))).scalar()
-            ent_count = (await session.execute(text("SELECT COUNT(*) FROM entity"))).scalar()
-            edge_count = (await session.execute(text("SELECT COUNT(*) FROM entity_edge"))).scalar()
-            link_count = (await session.execute(text("SELECT COUNT(*) FROM memory_entity_link"))).scalar()
+            mem_count = (
+                await session.execute(
+                    text(
+                        "SELECT COUNT(*) FROM memory_record "
+                        "WHERE organization_id = :organization_id"
+                    ),
+                    {"organization_id": self.organization_id},
+                )
+            ).scalar()
+            ent_count = (
+                await session.execute(
+                    text(
+                        "SELECT COUNT(*) FROM entity "
+                        "WHERE organization_id = :organization_id"
+                    ),
+                    {"organization_id": self.organization_id},
+                )
+            ).scalar()
+            edge_count = (
+                await session.execute(
+                    text(
+                        "SELECT COUNT(*) FROM entity_edge "
+                        "WHERE organization_id = :organization_id"
+                    ),
+                    {"organization_id": self.organization_id},
+                )
+            ).scalar()
+            link_count = (
+                await session.execute(
+                    text(
+                        "SELECT COUNT(*) FROM memory_entity_link "
+                        "WHERE organization_id = :organization_id"
+                    ),
+                    {"organization_id": self.organization_id},
+                )
+            ).scalar()
 
         # Probe reranker health
         reranker_status = "active"
@@ -1193,8 +1339,8 @@ class ContextaMCPService:
             },
             "embedding": {
                 "model": self._embedder.model_name,
-                "dimension": 1536,
-                "provider": "FastEmbedLocalProvider (BAAI/bge-small-en-v1.5 zero-padded)",
+                "dimension": DB_VECTOR_DIM,
+                "provider": "Contexta model server (Qwen/Qwen3-Embedding-0.6B, 1024d)",
             },
             "reranker": {
                 "url": self.model_server_url,

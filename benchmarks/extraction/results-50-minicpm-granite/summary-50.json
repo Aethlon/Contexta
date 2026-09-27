@@ -1,0 +1,28 @@
+{
+  "dataset": "C:\\Users\\jenit\\Downloads\\contexta_extreme_200_conversations.csv",
+  "limit": 50,
+  "models": [
+    {
+      "model": "openbmb/minicpm5:latest",
+      "count": 50,
+      "json_valid_rate": 1.0,
+      "mean_claims": 1.2,
+      "mean_complete_claim_rate": 1.0,
+      "mean_evidence_grounded_rate": 0.5367,
+      "mean_anchor_coverage": 0.8675,
+      "question_claims": 2,
+      "p95_latency_ms": 3865.55
+    },
+    {
+      "model": "granite4:1b-h",
+      "count": 50,
+      "json_valid_rate": 1.0,
+      "mean_claims": 1.72,
+      "mean_complete_claim_rate": 1.0,
+      "mean_evidence_grounded_rate": 0.3616,
+      "mean_anchor_coverage": 0.7244,
+      "question_claims": 0,
+      "p95_latency_ms": 11554.15
+    }
+  ]
+}

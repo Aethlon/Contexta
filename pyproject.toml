@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "contexta"
-version = "0.1.0"
+version = "1.5.0"
 description = "Contexta - Memory Intelligence Engine for AI Agents"
 requires-python = ">=3.11"
 dependencies = [
@@ -27,18 +27,43 @@ dependencies = [
     "httpx==0.28.1",
     "email-validator==2.2.0",
     "huggingface-hub>=0.23.0",
-    "fastembed>=0.4.0",
     "aiosqlite>=0.22.1",
+    "mcp>=1.0.0",
+    "pypdf>=5.0.0",
+    "python-docx>=1.1.2",
 ]
 
 [project.optional-dependencies]
+# Qwen3 embedding + reranking run only inside the model-server container, so the
+# CPU Torch/sentence-transformers stack is kept out of the shared runtime image.
+model-server = [
+    "torch==2.6.0",
+    "sentence-transformers==3.4.1",
+    "accelerate==1.4.0",
+]
 dev = [
     "hypothesis==6.119.3",
     "pytest==8.3.4",
     "pytest-asyncio==0.24.0",
     "pytest-cov==6.0.0",
     "httpx==0.28.1",
+    # tests/test_model_server.py and tests/test_model_server_auto_download.py
+    # exercise the real SentenceTransformer load path and refuse to serve without
+    # it, so the model-server stack is part of running the suite, not just of
+    # building the model-server image.
+    "contexta[model-server]==0.1.0",
 ]
+
+# Torch is resolved from the CPU-only wheel index. The default PyPI `torch` wheel
+# drags in the CUDA runtime (~2.5 GB of nvidia-* packages) even on a CPU-only
+# model-server image, so the extra would silently bloat every build.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

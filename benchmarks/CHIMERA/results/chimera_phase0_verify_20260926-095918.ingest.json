@@ -1,0 +1,138 @@
+{
+  "stats": {
+    "sessions": 10,
+    "chunks": 53,
+    "extracted": 1,
+    "stored": 1,
+    "skipped": 0,
+    "discarded": 0,
+    "failures": 8,
+    "total_ms": 123175.72,
+    "max_ms": 37125.53,
+    "embedded": 0,
+    "embed_failed": 1,
+    "embed_errors": [
+      "ddff7dff-114f-438f-84ff-8811af0ca197: provider returned failure"
+    ]
+  },
+  "per_session": [
+    {
+      "session_key": "s2",
+      "session_id": "45c14f8c-f06f-4d70-88bb-e9d99461de6b",
+      "domain": "conversation",
+      "chunks": 17,
+      "ingest_ms": 9586.44,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "session_key": "commit_be6f5ca3",
+      "session_id": "c0568036-14f8-4826-8994-fec8dcbf86e0",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 13443.25,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ',' delimiter: line 1 column 804 (char 803)"
+    },
+    {
+      "session_key": "commit_09e01394",
+      "session_id": "66d536de-f3f2-4964-9622-239b89261b33",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 6989.98,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ',' delimiter: line 1 column 796 (char 795)"
+    },
+    {
+      "session_key": "s3",
+      "session_id": "cb479799-023b-4eee-8934-0a394f4ae36a",
+      "domain": "record",
+      "chunks": 2,
+      "ingest_ms": 3158.03,
+      "extracted": 1,
+      "stored": 1,
+      "skipped": 0,
+      "discarded": 0,
+      "timings": {
+        "cortex_ms": 0.16,
+        "extraction_ms": 2926.21,
+        "deduplication_ms": 187.06,
+        "entity_graph_ms": 0.47,
+        "persistence_ms": 35.42,
+        "total_ms": 3154.3,
+        "redaction_ms": 3.38
+      }
+    },
+    {
+      "session_key": "s5",
+      "session_id": "9cbe450b-3438-47d1-8558-35b3cd96feac",
+      "domain": "record",
+      "chunks": 20,
+      "ingest_ms": 2359.91,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "session_key": "commit_f0919ab8",
+      "session_id": "3bfdde43-49e9-4395-ae52-a7f6a272936a",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 4529.31,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ':' delimiter: line 1 column 18 (char 17)"
+    },
+    {
+      "session_key": "s4",
+      "session_id": "fd2f54e5-01c7-4247-9437-c1f2d3ecf7bc",
+      "domain": "conversation",
+      "chunks": 4,
+      "ingest_ms": 17386.13,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Extra data: line 1 column 1178 (char 1177)"
+    },
+    {
+      "session_key": "s6",
+      "session_id": "7aa30375-f159-4c88-aff7-c59206676d6e",
+      "domain": "record",
+      "chunks": 5,
+      "ingest_ms": 22561.46,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "session_key": "commit_43bba6d5",
+      "session_id": "c1f2fb2d-eab3-4461-9aab-c9f867cd8df3",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 37125.53,
+      "error": "ExtractionError: LLM extraction failed: Failed to parse LLM JSON response: Expecting ',' delimiter: line 1 column 735 (char 734)"
+    },
+    {
+      "session_key": "commit_85f67925",
+      "session_id": "043ebd23-b323-41f3-a436-0b0901bec214",
+      "domain": "code",
+      "chunks": 1,
+      "ingest_ms": 6035.68,
+      "extracted": 0,
+      "stored": 0,
+      "skipped": 0,
+      "discarded": 0,
+      "timings": {
+        "cortex_ms": 0.17,
+        "extraction_ms": 6032.85,
+        "deduplication_ms": 0.0,
+        "entity_graph_ms": 0.0,
+        "persistence_ms": 0.0,
+        "total_ms": 6035.22,
+        "redaction_ms": 2.14
+      }
+    }
+  ],
+  "stored_memories": [
+    {
+      "id": "ddff7dff-114f-438f-84ff-8811af0ca197",
+      "session_id": "cb479799-023b-4eee-8934-0a394f4ae36a",
+      "type": "event",
+      "title": "Contract record (draft, superseded): [PERSON_1] value 172,000 USD.",
+      "content": "[PERSON_1] acknowledged the incident report queue.",
+      "importance": 0.5,
+      "confidence": 1.0,
+      "state": "active",
+      "valid_from": "2026-01-11T12:00:00",
+      "valid_to": null
+    }
+  ]
+}
