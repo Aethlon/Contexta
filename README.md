@@ -16,10 +16,60 @@
   <a href="#-sdks">SDKs</a> •
   <a href="#-api-authentication">Auth</a> •
   <a href="#-running-the-tests">Tests</a> •
-  <a href="docs/">Docs</a>
+  <a href="docs/"><code>docs/</code> <sub>(internal reference)</sub></a>
 </p>
 
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-dual--licensed-blue" alt="License: dual licensed"/></a>
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+"/></a>
+  <img src="https://img.shields.io/badge/embedding-Qwen3--Embedding--0.6B-2564bb" alt="Qwen3 Embedding 0.6B"/>
+  <img src="https://img.shields.io/badge/reranker-Qwen3--Reranker--0.6B-2564bb" alt="Qwen3 Reranker 0.6B"/>
+  <img src="https://img.shields.io/badge/cloud%20API%20keys-required-0" alt="No cloud API keys required"/>
+</p>
+
+### Try it in three commands
+
+```bash
+git clone https://github.com/Aethlon/Contexta.git && cd Contexta
+cp .env.example .env
+./entrypoint.sh            # or: .\start.ps1 on Windows
+```
+
+Then create your first API key — this is the one step that cannot be done over
+HTTP, because `POST /v1/keys` is itself authenticated:
+
+```bash
+docker compose up -d          # after the first boot has created the schema
+python scripts/bootstrap_key.py
+```
+
+<details>
+<summary><b>Send an observation and read a memory back</b></summary>
+
+```bash
+KEY=mk_live_...        # printed by bootstrap_key.py
+ORG=<organization uuid>
+ACTOR=<actor uuid>
+
+curl -X POST http://localhost:8000/v1/observations \
+  -H "x-api-key: $KEY" -H "Content-Type: application/json" \
+  -d '{"user_id":"'"$ACTOR"'","organization_id":"'"$ORG"'",
+       "session_id":"33333333-3333-4333-8333-333333333333",
+       "messages":[{"role":"user","content":"I moved to London; my port is 5432."}]}'
+
+# extraction is asynchronous — poll, then retrieve
+curl -H "x-api-key: $KEY" http://localhost:8000/v1/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{"query_text":"Where do I live?","user_id":"'"$ACTOR"'"}'
+```
+
+The operator console is at <http://localhost:3000>, and MCP for Claude Desktop /
+Cursor / Windsurf is on `:8765`.
+
+</details>
+
 ---
+
 
 ## 💡 What is Contexta
 
@@ -143,40 +193,58 @@ Both endpoints are public and need no credentials.
 
 ### 2. Create your first API key
 
-`POST /v1/keys` is itself authenticated, so the very first key has to be bootstrapped directly. The token is `mk_live_<url-safe>`, stored only as a SHA-256 hash, with the first 16 characters kept as a display prefix.
+`POST /v1/keys` is itself authenticated, so a brand-new install cannot mint its own first key over HTTP. One command does it — it creates the organization, the account, the owner membership, and the key, and prints the token once:
 
 ```bash
-# macOS / Linux
+python scripts/bootstrap_key.py
+```
+
+```
+  CONTEXTA_API_KEY=mk_live_...
+  ORG   = <organization uuid>
+  ACTOR = <actor uuid>
+```
+
+Re-running is safe: it reuses the existing organization and account instead of creating duplicates, so you can call it again to mint a second key for a different application.
+
+<details>
+<summary>Doing it by hand with raw SQL instead</summary>
+
+The token is `mk_live_<url-safe>`, stored only as a SHA-256 hash, with the first 16 characters kept as a display prefix.
+
+```bash
+# generate the values
+python -c "import hashlib,secrets,uuid;t='mk_live_'+secrets.token_urlsafe(32);print('TOKEN =',t);print('HASH  =',hashlib.sha256(t.encode()).hexdigest());print('ORG   =',uuid.uuid4());print('ACTOR =',uuid.uuid4())"
+
+# insert the key
 docker compose exec -T postgres psql -U postgres -d contexta -c "
 INSERT INTO api_key (id, name, prefix, token_hash, organization_id, actor_id, scopes, created_at)
 VALUES (
-  gen_random_uuid(),
-  'first-key',
-  'mk_live_LOCAL0',
-  '<sha256 of your token>',
-  '<organization uuid>',
-  '<actor uuid>',
-  ARRAY['read','write'],
-  now()
+  gen_random_uuid(), 'first-key', 'mk_live_LOCAL0',
+  '<sha256 of your token>', '<organization uuid>', '<actor uuid>',
+  ARRAY['read','write'], now()
 );"
 ```
 
-Generate the values first:
-
-```bash
-python -c "import hashlib,secrets,uuid;t='mk_live_'+secrets.token_urlsafe(32);print('TOKEN =',t);print('HASH  =',hashlib.sha256(t.encode()).hexdigest());print('ORG   =',uuid.uuid4());print('ACTOR =',uuid.uuid4())"
-```
+</details>
 
 **Keep the actor UUID.** Every request's `user_id` must equal the authenticated actor, so a mismatch is a `403`, not a silent empty result. One key = one (organization, actor) pair.
 
-Once you have a key, put it in `.env` so the containerised console can use it:
+Once you have a key, put it in `.env` so the containerised console and the MCP server can use it:
 
 ```bash
 CONTEXTA_DASHBOARD_AUTH=off
 CONTEXTA_DASHBOARD_API_KEY=mk_live_...
+CONTEXTA_MCP_API_KEY=mk_live_...
 ```
 
+Then `docker compose up -d`.
+
 Open <http://localhost:3000> and the console resolves its tenant from that key. Use **API Keys** in the console to mint further keys for your applications.
+
+> `CONTEXTA_MCP_API_KEY` is **required**. The MCP server refuses to start without a valid key and will crash-loop rather than come up unauthenticated. `CONTEXTA_MCP_ALLOW_ANONYMOUS=true` disables that, for local development only.
+>
+> All of these are documented in `.env.example`.
 
 > **The console ships without a sign-in.** `CONTEXTA_DASHBOARD_AUTH` defaults to `off` because Contexta is a self-hosted, single-operator tool. Set it to `on` to restore the NextAuth v5 credentials flow.
 >

@@ -140,7 +140,9 @@ def create_app() -> FastAPI:
     app.include_router(api_keys_router)
     app.include_router(artifacts_router, prefix="/v1/artifacts", tags=["artifacts"])
     app.include_router(audit_router)
-    app.include_router(audit_router, prefix="/audit", tags=["audit"])
+    # NOTE: audit_router already carries its own "/v1/audit" prefix. Mounting it
+    # again under prefix="/audit" produced a doubled, unreachable "/audit/v1/audit"
+    # path in the OpenAPI schema, so it is intentionally mounted only once.
     app.include_router(observations_router, prefix="/v1/observations", tags=["observations"])
     app.include_router(retrieval_router, prefix="/v1", tags=["retrieval"])
     app.include_router(retrieval_router, tags=["retrieval"])
