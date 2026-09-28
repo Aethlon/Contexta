@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -136,11 +136,11 @@ export function WelcomeView({
         title="The engine is running"
         done={engineUp}
         doneLabel="Local engine responding"
-        detail="Contexta runs entirely on your machine â€” local Qwen3 models, your own database, no cloud keys."
+        detail="Contexta runs entirely on your machine — local Qwen3 models, your own database, no cloud keys."
       >
         {serverUp === null ? (
           <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" /> Checkingâ€¦
+            <Loader2 className="size-4 animate-spin" /> Checking…
           </p>
         ) : engineUp ? (
           <p className="text-[13px] text-muted-foreground">
@@ -162,7 +162,7 @@ export function WelcomeView({
         title="Create an API key"
         done={hasKey}
         doneLabel={`${keyCount} key${keyCount === 1 ? "" : "s"} on this tenant`}
-        detail="Your agent authenticates with a key. The console can create one for you in a single click â€” no SQL, no hashing by hand."
+        detail="Your agent authenticates with a key. The console can create one for you in a single click — no SQL, no hashing by hand."
       >
         <Link href="/dashboard/mcp" className="nb-btn nb-btn-primary">
           <Terminal className="size-4" strokeWidth={1.75} />
@@ -184,7 +184,7 @@ export function WelcomeView({
       >
         {hasMemory && !sent ? (
           <p className="text-[13px] text-muted-foreground">
-            You already have memories â€” nothing to do here.
+            You already have memories — nothing to do here.
           </p>
         ) : sent ? (
           <div className="space-y-2">
@@ -192,7 +192,7 @@ export function WelcomeView({
               className="flex items-center gap-2 text-[13px] font-medium"
               style={{ color: "var(--accent-green)" }}
             >
-              <CheckCircle2 className="size-4" /> Accepted â€” extraction is running.
+              <CheckCircle2 className="size-4" /> Accepted — extraction is running.
             </p>
             <p className="text-[13px] text-muted-foreground">
               Give it a few seconds, then{" "}
@@ -224,7 +224,7 @@ export function WelcomeView({
                 ) : (
                   <Rocket className="size-4" strokeWidth={1.75} />
                 )}
-                {sending ? "Sendingâ€¦" : "Send it"}
+                {sending ? "Sending…" : "Send it"}
               </button>
               <span className="text-xs text-muted-foreground">try:</span>
               {EXAMPLES.map((ex) => (
@@ -234,7 +234,7 @@ export function WelcomeView({
                   onClick={() => setText(ex)}
                   className="rounded-full border border-[color:var(--input)] px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
-                  {ex.length > 34 ? ex.slice(0, 34) + "â€¦" : ex}
+                  {ex.length > 34 ? ex.slice(0, 34) + "…" : ex}
                 </button>
               ))}
             </div>

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -101,7 +101,7 @@ export function TenantSwitcher({ identity }: { identity: OperatorIdentity }) {
             <p className="text-muted-foreground">Acting as organization</p>
             <div className="flex items-center gap-1.5">
               <code className="min-w-0 flex-1 truncate rounded bg-card px-1.5 py-1 font-mono text-[10px] text-foreground">
-                {identity.orgId ?? "â€”"}
+                {identity.orgId ?? "—"}
               </code>
               <button
                 type="button"
@@ -122,7 +122,7 @@ export function TenantSwitcher({ identity }: { identity: OperatorIdentity }) {
           <div className="space-y-1">
             <p className="text-muted-foreground">Actor (user) id</p>
             <code className="block truncate rounded bg-card px-1.5 py-1 font-mono text-[10px] text-foreground">
-              {identity.userId ?? "â€” (resolved from API key)"}
+              {identity.userId ?? "— (resolved from API key)"}
             </code>
           </div>
 

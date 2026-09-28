@@ -1,4 +1,4 @@
-﻿import { KeyRound, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { KeyRound, ShieldAlert, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ContextaMark } from "@/components/contexta-logo";

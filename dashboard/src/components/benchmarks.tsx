@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -320,7 +320,7 @@ export function Benchmarks() {
           </span>
         );
       }
-      return <span className="text-[var(--text-secondary)]/40 font-mono text-xs">â€”</span>;
+      return <span className="text-[var(--text-secondary)]/40 font-mono text-xs">—</span>;
     }
     const tops = topScores[field];
     const isFirst = val === tops.first;
@@ -328,9 +328,9 @@ export function Benchmarks() {
     const isThird = val === tops.third;
 
     let badge = null;
-    if (isFirst) badge = <span className="tone-amber font-bold ml-1">ðŸ¥‡</span>;
-    else if (isSecond) badge = <span className="text-slate-300 font-bold ml-1">ðŸ¥ˆ</span>;
-    else if (isThird) badge = <span className="text-amber-600 font-bold ml-1">ðŸ¥‰</span>;
+    if (isFirst) badge = <span className="tone-amber font-bold ml-1">🥇</span>;
+    else if (isSecond) badge = <span className="text-slate-300 font-bold ml-1">🥈</span>;
+    else if (isThird) badge = <span className="text-amber-600 font-bold ml-1">🥉</span>;
 
     return (
       <span
@@ -703,9 +703,9 @@ export function Benchmarks() {
 
                 <div className="p-4 bg-[var(--muted)]/40 border-t border-[var(--border)]/30 flex flex-wrap items-center justify-between text-xs text-[var(--text-secondary)] gap-2">
                   <div className="flex items-center gap-4">
-                    <span>ðŸ¥‡ #1 Rank</span>
-                    <span>ðŸ¥ˆ #2 Rank</span>
-                    <span>ðŸ¥‰ #3 Rank</span>
+                    <span>🥇 #1 Rank</span>
+                    <span>🥈 #2 Rank</span>
+                    <span>🥉 #3 Rank</span>
                   </div>
                   <div className="text-[11px] font-mono tone-green">
                     Contexta scores verified with Postgres + pgvector + Qwen3 offline engine
@@ -884,7 +884,7 @@ export function Benchmarks() {
                     <span className="text-xs text-[var(--text-secondary)]">tokens</span>
                   </div>
                   <p className="text-xs text-[var(--text-secondary)] font-light leading-relaxed">
-                    Ultra-dense, synthesized memory context fed to LLM generation â€” eliminating prompt bloat and runaway latency.
+                    Ultra-dense, synthesized memory context fed to LLM generation — eliminating prompt bloat and runaway latency.
                   </p>
                 </Card>
 

@@ -1,4 +1,4 @@
-﻿import { resolveOperatorIdentity } from "@/lib/dashboard-identity";
+import { resolveOperatorIdentity } from "@/lib/dashboard-identity";
 import { listApiKeysAction, getEngineStatusAction } from "@/app/actions";
 import { DocsView } from "./docs-view";
 import type { DocContext, DocSection } from "./docs-content";

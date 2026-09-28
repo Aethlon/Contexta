@@ -1,4 +1,4 @@
-﻿export default function DashboardLoading() {
+export default function DashboardLoading() {
   return (
     <div className="space-y-8 animate-pulse">
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">

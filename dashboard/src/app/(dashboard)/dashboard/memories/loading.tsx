@@ -1,4 +1,4 @@
-﻿export default function MemoriesLoading() {
+export default function MemoriesLoading() {
   return (
     <div className="space-y-8 animate-pulse">
       <div>

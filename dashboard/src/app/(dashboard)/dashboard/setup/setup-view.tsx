@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState } from "react";
 import {
@@ -182,7 +182,7 @@ console.log(memories);`;
                   Launch Sovereign Contexta Engine
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Runs natively in the backgroundâ€”no Docker required.
+                  Runs natively in the background—no Docker required.
                 </CardDescription>
               </div>
             </div>

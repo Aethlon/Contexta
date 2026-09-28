@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useTransition } from "react";
 import { Cpu, Cloud, Zap, CheckCircle2, AlertCircle, RefreshCw, X, ShieldAlert } from "lucide-react";
@@ -332,7 +332,7 @@ export function EngineControlModal({
             {validationErrors.length > 0 && (
               <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-[11px] tone-red space-y-1">
                 {validationErrors.map((err, i) => (
-                  <p key={i}>â€¢ {err}</p>
+                  <p key={i}>• {err}</p>
                 ))}
               </div>
             )}

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -49,7 +49,7 @@ const ARCHITECTURE_LAYERS: LayerSpec[] = [
     name: "KNOWLEDGE GRAPH",
     category: "GRAPH SYNTHESIS",
     title: "Entity Resolution & Relational Triples",
-    description: "Converts raw conversational context into formal Subject â€¢ Predicate â€¢ Object semantic triples with cross-session entity linking and 2-hop graph traversal.",
+    description: "Converts raw conversational context into formal Subject • Predicate • Object semantic triples with cross-session entity linking and 2-hop graph traversal.",
     specs: [
       { label: "EXTRACTION ENGINE", value: "Fine-tuned LFM2.5-1.2B (local)" },
       { label: "TRIPLE PRECISION", value: "99.4%" },
@@ -427,7 +427,7 @@ export function ArchitectureScene() {
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.2 }}
             >
-              <span className="text-blue-400 text-sm">âœ±</span>
+              <span className="text-blue-400 text-sm">✱</span>
               What is Contexta?
             </motion.div>
             <motion.h2
@@ -753,7 +753,7 @@ export function ArchitectureScene() {
             >
               <div className="space-y-2">
                 <span className="text-[11px] font-mono uppercase tracking-widest tone-green">
-                  {SANDBOX_NODES[activeSandbox].label} â€¢ {SANDBOX_NODES[activeSandbox].role}
+                  {SANDBOX_NODES[activeSandbox].label} • {SANDBOX_NODES[activeSandbox].role}
                 </span>
                 <div className="flex items-center justify-center gap-4 text-xs font-mono text-[#6B7280]">
                   <span>Latency: <span className="text-foreground font-medium">{SANDBOX_NODES[activeSandbox].latency}</span></span>

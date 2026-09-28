@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, GitBranch, Loader2 } from "lucide-react";

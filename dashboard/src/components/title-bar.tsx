@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -82,7 +82,7 @@ export function TitleBar() {
         <span data-tauri-drag-region className="font-medium tracking-tight text-foreground">
           Contexta
         </span>
-        <span className="text-muted-foreground/60">â€”</span>
+        <span className="text-muted-foreground/60">—</span>
         <span data-tauri-drag-region className="text-muted-foreground hidden sm:inline">
           Sovereign Memory Console
         </span>

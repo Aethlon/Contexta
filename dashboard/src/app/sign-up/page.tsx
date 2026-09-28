@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -43,7 +43,7 @@ export default function SignUpPage() {
               <ContextaMark className="size-5" />
             </div>
             <span className="text-sm font-mono uppercase tracking-widest text-foreground flex items-center">
-              contexta<span className="text-[10px] text-muted-foreground font-mono ml-1 font-normal">â„¢</span>
+              contexta<span className="text-[10px] text-muted-foreground font-mono ml-1 font-normal">™</span>
             </span>
           </div>
 
@@ -185,7 +185,7 @@ export default function SignUpPage() {
                 &ldquo;We just ditched RAG completely and went memory only through Contexta.&rdquo;
               </p>
               <p className="text-[11px] text-muted-foreground font-normal leading-relaxed mb-5">
-                Reduced avg response time from 40s â†’ 12s. Using about 40â€“50% fewer tokens.
+                Reduced avg response time from 40s → 12s. Using about 40–50% fewer tokens.
               </p>
 
               {/* Author */}

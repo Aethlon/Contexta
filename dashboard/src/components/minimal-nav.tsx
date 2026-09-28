@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
@@ -16,15 +16,15 @@ interface CommandItem {
 }
 
 const COMMAND_ITEMS: CommandItem[] = [
-  { id: "github", label: "GitHub Repository", description: "View source code & contribute", shortcut: "âŒ˜G", section: "Resources", action: () => window.open(GITHUB_REPO, "_blank") },
-  { id: "docs", label: "Documentation", description: "API reference & guides", shortcut: "âŒ˜D", section: "Resources", action: () => window.open("/docs", "_blank") },
-  { id: "discord", label: "Discord Community", description: "Join 2,400+ developers", shortcut: "âŒ˜K", section: "Resources", action: () => window.open("https://discord.gg/contexta", "_blank") },
+  { id: "github", label: "GitHub Repository", description: "View source code & contribute", shortcut: "⌘G", section: "Resources", action: () => window.open(GITHUB_REPO, "_blank") },
+  { id: "docs", label: "Documentation", description: "API reference & guides", shortcut: "⌘D", section: "Resources", action: () => window.open("/docs", "_blank") },
+  { id: "discord", label: "Discord Community", description: "Join 2,400+ developers", shortcut: "⌘K", section: "Resources", action: () => window.open("https://discord.gg/contexta", "_blank") },
   { id: "pricing", label: "Pricing", description: "Self-hosted & cloud plans", section: "Resources", action: () => window.open("/pricing", "_blank") },
   { id: "changelog", label: "Changelog", description: "Recent updates & fixes", section: "Resources", action: () => window.open("/changelog", "_blank") },
   { id: "architecture", label: "Architecture Deep Dive", description: "Technical architecture overview", section: "Navigate", action: () => document.getElementById("architecture")?.scrollIntoView({ behavior: "smooth" }) },
   { id: "benchmarks", label: "50K Benchmarks", description: "Performance data & comparisons", section: "Navigate", action: () => document.getElementById("benchmarks")?.scrollIntoView({ behavior: "smooth" }) },
   { id: "playground", label: "Live Playground", description: "Test extraction engine", section: "Navigate", action: () => document.getElementById("playground")?.scrollIntoView({ behavior: "smooth" }) },
-  { id: "console", label: "Open Console", description: "Sign in to your enclave", shortcut: "âŒ˜E", section: "Navigate", action: () => window.location.href = "/sign-in" },
+  { id: "console", label: "Open Console", description: "Sign in to your enclave", shortcut: "⌘E", section: "Navigate", action: () => window.location.href = "/sign-in" },
 ];
 
 export function MinimalNav() {
@@ -137,9 +137,9 @@ export function MinimalNav() {
             <button
               onClick={() => { setShowCommandPalette(true); setCommandQuery(""); setSelectedIndex(0); }}
               className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent hover:bg-accent text-xs font-mono text-[#6B7280] hover:text-foreground transition-all"
-              aria-label="Open command palette (âŒ˜K)"
+              aria-label="Open command palette (⌘K)"
             >
-              <kbd className="px-1.5 py-0.5 rounded bg-accent text-[10px] font-mono text-[#6B7280]">âŒ˜K</kbd>
+              <kbd className="px-1.5 py-0.5 rounded bg-accent text-[10px] font-mono text-[#6B7280]">⌘K</kbd>
             </button>
 
             <Link
@@ -158,7 +158,7 @@ export function MinimalNav() {
                 whileHover={{ x: 4 }}
                 transition={{ type: "spring", stiffness: 400, damping: 20 }}
               >
-                â†’
+                →
               </motion.span>
             </Link>
           </div>
@@ -181,7 +181,7 @@ export function MinimalNav() {
             <motion.div className="cmdk-window" initial={{ opacity: 0, scale: 0.96, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: -20 }} transition={{ type: "spring", stiffness: 300, damping: 25 }} onClick={(e) => e.stopPropagation()}>
               <div className="relative">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-micro text-[#3D4450] pointer-events-none">
-                  <kbd className="px-1.5 py-0.5 rounded bg-accent">âŒ˜</kbd>
+                  <kbd className="px-1.5 py-0.5 rounded bg-accent">⌘</kbd>
                   <kbd className="px-1.5 py-0.5 rounded bg-accent">K</kbd>
                 </div>
                 <input
@@ -238,7 +238,7 @@ export function MinimalNav() {
 
               <div className="px-4 py-3 border-t border-border text-micro text-[#3D4450] flex items-center justify-between">
                 <span>Contexta v0.2.0-beta</span>
-                <span>âŒ˜K to close</span>
+                <span>⌘K to close</span>
               </div>
             </motion.div>
           </motion.div>

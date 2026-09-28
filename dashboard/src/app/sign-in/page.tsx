@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { ArrowRight, ShieldOff } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ContextaMark } from "@/components/contexta-logo";

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useTransition } from "react";
 import {
@@ -154,7 +154,7 @@ export function SettingsView({ identity, keys, apiUrl }: SettingsViewProps) {
               <p className="text-xs font-mono text-foreground">PostgreSQL 16 + pgvector</p>
               <div className="text-[10px] text-muted-foreground flex items-center gap-2 pt-1 border-t border-border">
                 <span>HNSW index enabled</span>
-                <span>â€¢</span>
+                <span>•</span>
                 <span>Redis cache healthy</span>
               </div>
             </div>
@@ -195,7 +195,7 @@ export function SettingsView({ identity, keys, apiUrl }: SettingsViewProps) {
                 </span>
               </div>
               <p className="text-[10px] text-muted-foreground font-sans">
-                1024-dim dense vectors â€¢ On-device CPU/GPU inference
+                1024-dim dense vectors • On-device CPU/GPU inference
               </p>
             </div>
 
@@ -219,7 +219,7 @@ export function SettingsView({ identity, keys, apiUrl }: SettingsViewProps) {
                 </span>
               </div>
               <p className="text-[10px] text-muted-foreground font-sans">
-                Cross-attention reranker â€¢ Salience & truth maintenance
+                Cross-attention reranker • Salience & truth maintenance
               </p>
             </div>
           </div>
@@ -418,7 +418,7 @@ export function SettingsView({ identity, keys, apiUrl }: SettingsViewProps) {
                 {keys.slice(0, 5).map((key: any) => (
                   <TableRow key={key.id}>
                     <TableCell className="font-normal text-foreground">{key.name}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{key.prefix}â€¦</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{key.prefix}…</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {new Date(key.created_at).toLocaleDateString()}
                     </TableCell>

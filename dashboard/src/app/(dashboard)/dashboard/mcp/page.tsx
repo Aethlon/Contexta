@@ -1,4 +1,4 @@
-﻿import { listApiKeysAction } from "@/app/actions";
+import { listApiKeysAction } from "@/app/actions";
 import { McpClientView } from "./mcp-client-view";
 
 export const revalidate = 0;

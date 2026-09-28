@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -115,7 +115,7 @@ export function CodeImmersion() {
           </h2>
           <p className="text-sm font-light text-[#6B7280] leading-relaxed">
             Plug Contexta into LangChain, LlamaIndex, Cursor, or FastAPI with zero changes
-            to your agent prompt loops. Simulated locally â€” no key required.
+            to your agent prompt loops. Simulated locally — no key required.
           </p>
           <div className="flex items-center gap-2 bg-accent p-1 rounded-full w-fit" role="tablist" aria-label="Language">
             {(["python", "typescript", "curl"] as Lang[]).map((t) => (
@@ -159,7 +159,7 @@ export function CodeImmersion() {
             className="absolute top-4 right-4 px-3 py-1.5 rounded-full bg-accent hover:bg-accent text-[11px] font-mono text-[#6B7280] hover:text-foreground transition-all"
             aria-label="Copy code snippet"
           >
-            {copied ? "copied âœ“" : "copy"}
+            {copied ? "copied ✓" : "copy"}
           </button>
 
           <AnimatePresence mode="wait">
@@ -178,14 +178,14 @@ export function CodeImmersion() {
           </AnimatePresence>
 
           <div className="mt-6 pt-5 border-t border-border space-y-3">
-            <div className="text-[11px] font-mono uppercase tracking-widest text-[#3D4450]">Try it â€” simulated recall</div>
+            <div className="text-[11px] font-mono uppercase tracking-widest text-[#3D4450]">Try it — simulated recall</div>
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && runTry()}
                 className="flex-1 rounded-lg bg-black/40 px-4 py-2.5 text-xs font-mono text-foreground outline-none focus:ring-2 focus:ring-blue-500/40 placeholder:text-[#3D4450]"
-                placeholder="Ask about language, region, officeâ€¦"
+                placeholder="Ask about language, region, office…"
                 aria-label="Test query"
               />
               <button
@@ -193,16 +193,16 @@ export function CodeImmersion() {
                 disabled={running}
                 className="px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-xs font-mono text-foreground transition-all"
               >
-                {running ? "runningâ€¦" : "Run â–¸"}
+                {running ? "running…" : "Run ▸"}
               </button>
             </div>
             <div className="min-h-[44px] rounded-lg bg-black/50 px-4 py-3 font-mono text-[11px] leading-relaxed" aria-live="polite">
               {running ? (
-                <span className="text-[#3D4450] animate-pulse">â– fusing vector + BM25 + graphâ€¦</span>
+            <span className="text-[#3D4450] animate-pulse">✨ fusing vector + BM25 + graph…</span>
               ) : result ? (
                 <span className="tone-green">{result}</span>
               ) : (
-                <span className="text-[#3D4450]">result appears here â€¢ try â€œrustâ€ or â€œtokyoâ€</span>
+      <span className="text-[#3D4450]">result appears here — try &quot;orustar&quot;, or &quot;tokyo&quot;</span>
               )}
             </div>
           </div>

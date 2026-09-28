@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { AlertTriangle, ArrowLeft, Lock } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ContextaMark } from "@/components/contexta-logo";
@@ -38,7 +38,7 @@ export default async function EmergencyResetPage({
               <ContextaMark className="size-5" />
             </div>
             <span className="text-sm uppercase tracking-widest text-foreground flex items-center">
-              contexta<span className="text-[10px] text-muted-foreground ml-1 font-normal">â„¢</span>
+              contexta<span className="text-[10px] text-muted-foreground ml-1 font-normal">™</span>
             </span>
           </div>
           <span className="text-[10px] px-2 py-0.5 rounded bg-red-500/10 border border-red-500/30 tone-red font-semibold tracking-wider uppercase">

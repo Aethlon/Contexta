@@ -1,4 +1,4 @@
-﻿export default function ApiKeysLoading() {
+export default function ApiKeysLoading() {
   return (
     <div className="space-y-6 animate-pulse">
       <div className="h-5 w-24 rounded-md bg-muted" />

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -80,7 +80,7 @@ function LatencyChart({ hover, setHover }: { hover: number | null; setHover: (i:
             {s.label}
           </span>
         ))}
-        <span className="ml-auto text-[#3D4450]">lower is better â€¢ ms p95</span>
+        <span className="ml-auto text-[#3D4450]">lower is better • ms p95</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[300px]" role="img" aria-label="P95 latency vs corpus scale">
         <defs>
@@ -159,7 +159,7 @@ function LatencyChart({ hover, setHover }: { hover: number | null; setHover: (i:
                     SCALE {d.scale}
                   </text>
                   <text x={Math.min(x(i) + 20, W - 160)} y={PT + 42} fontSize="11" fill="#fff" fontFamily="monospace">
-                    ctx {d.contexta}ms â€¢ mem0 {d.mem0}ms
+                    ctx {d.contexta}ms • mem0 {d.mem0}ms
                   </text>
                   <text x={Math.min(x(i) + 20, W - 160)} y={PT + 56} fontSize="11" fill="#A855F7" fontFamily="monospace">
                     zep {d.langchain}ms
@@ -170,7 +170,7 @@ function LatencyChart({ hover, setHover }: { hover: number | null; setHover: (i:
           </g>
         ))}
       </svg>
-      <p className="text-xs text-[#3D4450] font-light pt-1">HNSW M=16 efSearch=64 â€¢ pgvector â€¢ stable recall as corpus grows to 50K.</p>
+      <p className="text-xs text-[#3D4450] font-light pt-1">HNSW M=16 efSearch=64 • pgvector • stable recall as corpus grows to 50K.</p>
     </div>
   );
 }
@@ -271,7 +271,7 @@ export function BenchmarkScene() {
         >
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 mb-3 text-xs font-mono uppercase tracking-widest text-blue-400">
-              <span aria-hidden="true">âœ±</span> 50,000 Records Benchmark
+              <span aria-hidden="true">✱</span> 50,000 Records Benchmark
             </div>
             <h2 className="text-title text-2xl sm:text-4xl lg:text-5xl tracking-tight text-foreground leading-[1.15]">
               Sub-180ms p95 recall at enterprise scale
@@ -333,21 +333,21 @@ export function BenchmarkScene() {
             {tab === "latency" && (
               <motion.div key="latency" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }}>
                 <h3 className="text-lg font-normal text-foreground">P95 Retrieval Latency vs Memory Corpus Scale</h3>
-                <p className="text-xs text-[#6B7280] font-light pb-4">Lower is better â€¢ hover any scale for exact values.</p>
+                <p className="text-xs text-[#6B7280] font-light pb-4">Lower is better • hover any scale for exact values.</p>
                 <LatencyChart hover={hover} setHover={setHover} />
               </motion.div>
             )}
             {tab === "throughput" && (
               <motion.div key="throughput" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }}>
                 <h3 className="text-lg font-normal text-foreground">Memory Record Ingestion Throughput</h3>
-                <p className="text-xs text-[#6B7280] font-light pb-4">Higher is better â€¢ records per second with live entity extraction.</p>
+                <p className="text-xs text-[#6B7280] font-light pb-4">Higher is better • records per second with live entity extraction.</p>
                 <IsoBars data={THROUGHPUT} unit="rec/s" max={2800} hover={hover} setHover={setHover} />
               </motion.div>
             )}
             {tab === "accuracy" && (
               <motion.div key="accuracy" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }}>
                 <h3 className="text-lg font-normal text-foreground">Mean Reciprocal Rank (MRR @ 10)</h3>
-                <p className="text-xs text-[#6B7280] font-light pb-4">Higher is better â€¢ semantic relevance across multi-turn dialog queries.</p>
+                <p className="text-xs text-[#6B7280] font-light pb-4">Higher is better • semantic relevance across multi-turn dialog queries.</p>
                 <IsoBars data={ACCURACY} unit="%" max={100} hover={hover} setHover={setHover} />
               </motion.div>
             )}
