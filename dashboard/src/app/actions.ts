@@ -292,14 +292,34 @@ export async function getMemoryDetailAction(memoryId: string) {
 }
 
 export async function getEngineStatusAction() {
+  // `/v1/system/engine-status` is tenant-authenticated, so a console running
+  // without CONTEXTA_DASHBOARD_API_KEY cannot read it. Previously the fallback
+  // silently omitted the extractor, so the console displayed "unknown" for the
+  // one model an operator most wants to know about.
+  //
+  // Which model is configured is deployment config, not tenant data, so the
+  // fallback reads it from the console's own environment. `status` stays
+  // explicitly unverified so the UI can say so rather than implying liveness.
+  const configuredExtractor = process.env.CONTEXTA_LLM_MODEL ?? "contexta-lfm-extract";
+
   const offlineFallback = {
     node_online: false,
     current_mode: "offline",
     active_engine: "local_qwen",
+    extraction: {
+      model: configuredExtractor,
+      provider: process.env.CONTEXTA_LLM_PROVIDER ?? "local",
+      mode: "local",
+      status: "unverified",
+      detail:
+        "Set CONTEXTA_DASHBOARD_API_KEY to read live model health from the API.",
+    },
     local_model_server: {
       status: "offline",
       embedding_model: {
-        name: "Qwen/Qwen3-Embedding-0.6B",
+        name: process.env.CONTEXTA_EMBEDDING_MODEL ?? "Qwen/Qwen3-Embedding-0.6B",
+        profile: process.env.CONTEXTA_EMBEDDING_PROFILE ?? "offline-qwen3-1024",
+        dimensions: Number(process.env.CONTEXTA_EMBEDDING_DIMENSIONS ?? "1024"),
         avg_latency_ms: 0,
       },
       reranker_model: {

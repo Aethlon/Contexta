@@ -85,6 +85,40 @@ async def get_engine_status(request: Request) -> dict[str, Any]:
         },
     }
 
+    # 3. Extraction model.
+    #
+    # The extractor was previously only visible as `cloud_providers.llm`, which
+    # is wrong twice over: in the default offline mode there is no cloud provider
+    # at all, and the model that actually runs is a local fine-tune, not the
+    # configured cloud one. Surface it explicitly so an operator can see which
+    # model turns observations into memories.
+    extraction = {
+        "model": settings.llm_model,
+        "provider": settings.llm_provider,
+        "mode": "local" if not settings.llm_api_key else "cloud",
+        "inference_url": settings.inference_server_url,
+    }
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=1.5) as client:
+            resp = await client.get(f"{settings.inference_server_url}/health")
+            if resp.status_code == 200:
+                body = resp.json()
+                extraction["status"] = "ready"
+                extraction["default_model"] = body.get("model") or body.get("default_model")
+            else:
+                extraction["status"] = f"unavailable ({resp.status_code})"
+    except (httpx.HTTPError, OSError, ValueError, KeyError) as exc:
+        # Offline extraction depends on a local Ollama process. If it is not
+        # running, say so plainly rather than reporting a misleading "ready".
+        extraction["status"] = "unavailable"
+        extraction["detail"] = (
+            "The local extraction model server is not responding. "
+            "Observations are queued but will not produce memories until it is up."
+        )
+        logger.debug("extraction health probe failed", exc_info=exc)
+
     # Active operational mode
     active_engine = "local_qwen"
     if settings.engine_mode == "online":
@@ -95,6 +129,7 @@ async def get_engine_status(request: Request) -> dict[str, Any]:
     return {
         "current_mode": settings.engine_mode,
         "active_engine": active_engine,
+        "extraction": extraction,
         "local_model_server": local_status,
         "cloud_providers": cloud_status,
     }

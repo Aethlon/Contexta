@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -67,12 +67,12 @@ export function TenantSwitcher({ identity }: { identity: OperatorIdentity }) {
 
   return (
     <div className="shrink-0 border-t border-border p-2">
-      <div className="rounded-md border border-border bg-secondary/25 px-2 py-1.5">
+      <div className="rounded-md border border-border px-2 py-1.5" style={{ background: "color-mix(in srgb, var(--muted) 25%, transparent)" }}>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex w-full items-center gap-2 text-left cursor-pointer"
+          className="flex w-full min-w-0 items-center gap-2 text-left cursor-pointer"
         >
           <Building2 className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} />
           <span className="min-w-0 flex-1">
@@ -83,10 +83,11 @@ export function TenantSwitcher({ identity }: { identity: OperatorIdentity }) {
               {identity.orgId ?? "UNRESOLVED"}
             </span>
           </span>
+          {/* Down when collapsed (click to open), up when expanded (click to close). */}
           {open ? (
-            <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} />
-          ) : (
             <ChevronUp className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} />
+          ) : (
+            <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} />
           )}
         </button>
         <p className="mt-1 truncate text-[10px] text-muted-foreground">
@@ -95,12 +96,12 @@ export function TenantSwitcher({ identity }: { identity: OperatorIdentity }) {
       </div>
 
       {open && (
-        <div className="mt-2 space-y-3 rounded-md border border-border bg-secondary/20 p-2.5 text-[11px]">
+        <div className="mt-2 space-y-3 rounded-md border border-border bg-muted p-2.5 text-[11px]">
           <div className="space-y-1">
             <p className="text-muted-foreground">Acting as organization</p>
             <div className="flex items-center gap-1.5">
-              <code className="min-w-0 flex-1 truncate rounded bg-background/70 px-1.5 py-1 font-mono text-[10px] text-foreground">
-                {identity.orgId ?? "—"}
+              <code className="min-w-0 flex-1 truncate rounded bg-card px-1.5 py-1 font-mono text-[10px] text-foreground">
+                {identity.orgId ?? "â€”"}
               </code>
               <button
                 type="button"
@@ -120,13 +121,13 @@ export function TenantSwitcher({ identity }: { identity: OperatorIdentity }) {
 
           <div className="space-y-1">
             <p className="text-muted-foreground">Actor (user) id</p>
-            <code className="block truncate rounded bg-background/70 px-1.5 py-1 font-mono text-[10px] text-foreground">
-              {identity.userId ?? "— (resolved from API key)"}
+            <code className="block truncate rounded bg-card px-1.5 py-1 font-mono text-[10px] text-foreground">
+              {identity.userId ?? "â€” (resolved from API key)"}
             </code>
           </div>
 
           {!identity.resolved ? (
-            <div className="flex items-start gap-1.5 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[10px] tone-amber">
+            <div className="flex items-start gap-1.5 rounded-md border p-2 text-[10px] pill pill-amber">
               <TriangleAlert className="mt-0.5 size-3 shrink-0" />
               <span>
                 No tenant resolved. Set <code>CONTEXTA_DASHBOARD_API_KEY</code>{" "}
@@ -140,8 +141,8 @@ export function TenantSwitcher({ identity }: { identity: OperatorIdentity }) {
             <div
               className={`rounded border p-2 text-[10px] ${
                 probe.ok
-                  ? "border-emerald-500/30 bg-emerald-500/10 tone-green"
-                  : "border-red-500/30 bg-red-500/10 tone-red"
+                  ? "pill pill-green"
+                  : "pill pill-red"
               }`}
             >
               {probe.ok ? (
@@ -190,19 +191,19 @@ export function TenantSwitcher({ identity }: { identity: OperatorIdentity }) {
               name="org_id"
               defaultValue={identity.orgId ?? ""}
               placeholder="Organization UUID"
-              className="w-full rounded border border-border bg-background px-2 py-1.5 font-mono text-[10px] text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-ring"
+              className="w-full rounded border border-border bg-card px-2 py-1.5 font-mono text-[10px] text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-ring"
             />
             <input
               name="user_id"
               defaultValue={identity.userId ?? ""}
               placeholder="User UUID (optional)"
-              className="w-full rounded border border-border bg-background px-2 py-1.5 font-mono text-[10px] text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-ring"
+              className="w-full rounded border border-border bg-card px-2 py-1.5 font-mono text-[10px] text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-ring"
             />
             <input
               name="api_key"
               type="password"
               placeholder="Bootstrap API key (optional)"
-              className="w-full rounded border border-border bg-background px-2 py-1.5 font-mono text-[10px] text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-ring"
+              className="w-full rounded border border-border bg-card px-2 py-1.5 font-mono text-[10px] text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-ring"
             />
             {error ? <p className="tone-red">{error}</p> : null}
             <div className="flex gap-1.5">

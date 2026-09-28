@@ -14,7 +14,11 @@ const nextConfig: NextConfig = {
   httpAgentOptions: {
     keepAlive: true,
   },
-  // Reload trigger
+  // The dev-tools badge renders as a floating circle in the bottom-left corner,
+  // which sits directly on top of the tenant switcher in the sidebar footer and
+  // makes the organization id unreadable. It is a dev-only affordance, so turn
+  // it off rather than moving the layout around it.
+  devIndicators: false,
 };
 
 export default nextConfig;

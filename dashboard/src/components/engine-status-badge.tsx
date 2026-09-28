@@ -9,6 +9,15 @@ interface EngineTelemetry {
   node_online?: boolean;
   current_mode: "offline" | "online" | "auto";
   active_engine: string;
+  /** Which model turns observations into memories. */
+  extraction?: {
+    model?: string;
+    default_model?: string;
+    provider?: string;
+    mode?: string;
+    status?: string;
+    detail?: string;
+  };
   local_model_server: {
     status: string;
     ram_usage_mb?: number;
@@ -27,6 +36,10 @@ export function EngineStatusBadge() {
     node_online: true,
     current_mode: "offline",
     active_engine: "local_qwen",
+    extraction: {
+      model: "contexta-lfm-extract",
+      status: "checking",
+    },
     local_model_server: {
       status: "healthy",
       ram_usage_mb: 1180,
@@ -148,26 +161,50 @@ export function EngineStatusBadge() {
           {/* Telemetry Stats */}
           <div className="space-y-0.5 py-1.5">
             {[
-              ["API", "http://localhost:8000"],
-              ["Embedding", "Qwen3-Embedding (0.6B)"],
-              ["Reranker", "Qwen3-Reranker (0.6B)"],
+              [
+                "Extractor",
+                telemetry.extraction?.default_model ??
+                  telemetry.extraction?.model ??
+                  "unknown",
+                telemetry.extraction?.status !== "ready",
+              ],
+              ["Embedding", "Qwen3-Embedding-0.6B"],
+              ["Reranker", "Qwen3-Reranker-0.6B"],
               ["Storage", "pgvector + Redis"],
               ["MCP", ":8765/sse"],
-            ].map(([label, value]) => (
+            ].map(([label, value, warn]) => (
               <div
-                key={label}
+                key={label as string}
                 className="flex items-center justify-between gap-3 rounded px-1 py-1 hover:bg-accent"
               >
                 <span className="shrink-0 text-muted-foreground">{label}</span>
                 <span
-                  className="truncate font-mono text-xs text-foreground"
-                  title={value}
+                  className="truncate font-mono text-xs"
+                  style={warn ? { color: "var(--accent-yellow)" } : { color: "var(--foreground)" }}
+                  title={String(value)}
                 >
-                  {value}
+                  {String(value)}
+                  {warn ? " !" : ""}
                 </span>
               </div>
             ))}
           </div>
+
+          {/* Surface extraction problems loudly — a silent extractor outage
+              means observations are queued but never become memories. */}
+          {telemetry.extraction?.status &&
+            telemetry.extraction.status !== "ready" &&
+            telemetry.extraction.detail && (
+              <p
+                className="mt-1 rounded-md px-2 py-1.5 text-[11px] leading-relaxed"
+                style={{
+                  color: "var(--accent-yellow)",
+                  background: "color-mix(in srgb, var(--accent-yellow) 10%, transparent)",
+                }}
+              >
+                {telemetry.extraction.detail}
+              </p>
+            )}
 
           {/* Action Button */}
           {!isOnline && (
