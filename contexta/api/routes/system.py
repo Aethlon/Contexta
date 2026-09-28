@@ -105,8 +105,19 @@ async def get_engine_status(request: Request) -> dict[str, Any]:
             resp = await client.get(f"{settings.inference_server_url}/health")
             if resp.status_code == 200:
                 body = resp.json()
-                extraction["status"] = "ready"
-                extraction["default_model"] = body.get("model") or body.get("default_model")
+                extraction["default_model"] = body.get("model")
+                # The server being up is not the same as the model being there.
+                # Reporting "ready" for a healthy server with no model loaded is
+                # exactly the silent-failure case this field exists to catch.
+                if body.get("model_loaded") is False:
+                    extraction["status"] = "model missing"
+                    extraction["detail"] = (
+                        f"The inference server is up but {body.get('model')!r} is not "
+                        "installed. Run scripts/provision_extractor.sh, or bring the "
+                        "stack up with `docker compose up` so provisioning runs."
+                    )
+                else:
+                    extraction["status"] = "ready"
             else:
                 extraction["status"] = f"unavailable ({resp.status_code})"
     except (httpx.HTTPError, OSError, ValueError, KeyError) as exc:

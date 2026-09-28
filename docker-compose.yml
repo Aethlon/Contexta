@@ -63,18 +63,64 @@ services:
       start_period: 300s
     restart: unless-stopped
 
+  # ── Ollama: the local runtime for the fine-tuned extractor ──────────────
+  # Previously extraction depended on Ollama running on the HOST, reached over
+  # host.docker.internal. That meant a reboot silently left the stack accepting
+  # observations that were never extracted, with nothing in the container stack
+  # reporting the cause. Running it in compose removes the host dependency, so
+  # `docker compose up` is genuinely the only step.
+  ollama:
+    image: ollama/ollama:0.12.3
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  # One-shot: makes sure the extractor exists before the inference server needs
+  # it. Exits non-zero if it cannot, so `docker compose up` fails loudly rather
+  # than coming up with silent regex-fallback extraction.
+  extractor-provision:
+    image: ollama/ollama:0.12.3
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      CONTEXTA_INFERENCE_MODEL: ${CONTEXTA_INFERENCE_MODEL:-contexta-lfm-extract}
+      CONTEXTA_INFERENCE_OLLAMA_URL: http://ollama:11434
+      CONTEXTA_EXTRACTOR_MODEL_REF: ${CONTEXTA_EXTRACTOR_MODEL_REF:-}
+      CONTEXTA_EXTRACTOR_GGUF: ${CONTEXTA_EXTRACTOR_GGUF:-/models/contexta-lfm-extract-q4_k_m.gguf}
+    volumes:
+      - ollama-models:/root/.ollama
+      - ./models:/models:ro
+      - ./scripts/provision_extractor.sh:/provision_extractor.sh:ro
+    entrypoint: ["/bin/sh", "/provision_extractor.sh"]
+    restart: "no"
+
   inference-server:
     build: .
     # Not profile-gated: this serves the fine-tuned extractor, which is the
     # default extraction path. The worker degrades to a low-quality regex
-    # assembler if it is down, so it is a normal dependency rather than a
-    # hard one.
+    # assembler if it's down, so it is a normal dependency rather than a hard one.
+    depends_on:
+      extractor-provision:
+        condition: service_completed_successfully
     environment:
       MODE: inference-server
-      CONTEXTA_INFERENCE_OLLAMA_URL: http://host.docker.internal:11434
+      CONTEXTA_INFERENCE_OLLAMA_URL: http://ollama:11434
       CONTEXTA_INFERENCE_MODEL: ${CONTEXTA_INFERENCE_MODEL:-contexta-lfm-extract}
       CONTEXTA_INFERENCE_NUM_CTX: ${CONTEXTA_INFERENCE_NUM_CTX:-16384}
       CONTEXTA_INFERENCE_NUM_PREDICT: ${CONTEXTA_INFERENCE_NUM_PREDICT:-4096}
+      # Chunking. The model has 128k of context yet still drops facts on long
+      # input: measured 13/90 captured single-shot vs 70/90 chunked. These are
+      # the values that won; see contexta/core/extraction/chunking.py.
+      CONTEXTA_INFERENCE_CHUNK_SENTENCES: ${CONTEXTA_INFERENCE_CHUNK_SENTENCES:-10}
+      CONTEXTA_INFERENCE_CHUNK_MAX_CHARS: ${CONTEXTA_INFERENCE_CHUNK_MAX_CHARS:-1600}
+      CONTEXTA_INFERENCE_CHUNK_MAX_TOKENS: ${CONTEXTA_INFERENCE_CHUNK_MAX_TOKENS:-2048}
     ports:
       - "${CONTEXTA_INFERENCE_PORT:-8002}:8002"
     extra_hosts:
@@ -291,3 +337,6 @@ volumes:
   postgres-data:
   model-cache:
   artifact-data:
+  # Ollama's model store. Kept in a named volume so the fine-tuned extractor is
+  # provisioned once and survives `docker compose down`.
+  ollama-models:
