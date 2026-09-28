@@ -71,6 +71,19 @@ services:
   # `docker compose up` is genuinely the only step.
   ollama:
     image: ollama/ollama:0.12.3
+    environment:
+      # Keep the extractor resident. The default 5m keep-alive is short enough
+      # that a burst of requests pays a full model load each time, and on CPU
+      # that load is a large fraction of the total request cost.
+      OLLAMA_KEEP_ALIVE: "30m"
+      # Allow a small amount of request overlap. This is a CPU-only box, so the
+      # ceiling is deliberately low: the Qwen3 embedding/reranking server is
+      # competing for the same cores, and oversubscribing here makes single
+      # request latency much worse rather than better.
+      OLLAMA_NUM_PARALLEL: "2"
+      # One model is enough here, and pinning it avoids the allocator thrashing
+      # when the embedding and reranking models are also resident.
+      OLLAMA_MAX_LOADED_MODELS: "1"
     volumes:
       - ollama-models:/root/.ollama
     healthcheck:
