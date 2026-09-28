@@ -322,9 +322,13 @@ services:
       CONTEXTA_EMBEDDING_DIMENSIONS: 1024
       CONTEXTA_EMBEDDING_API_KEY: ""
       CONTEXTA_LOCAL_MODEL_SERVER_URL: http://model-server:8001
-      # MCP authenticates every caller with a Contexta API key and scopes writes to
-      # that key's tenant. Set CONTEXTA_MCP_ALLOW_ANONYMOUS=true only for a local
-      # single-tenant experiment - never for a shared or exposed deployment.
+      # MCP binds one tenant at startup from CONTEXTA_MCP_API_KEY and refuses to
+      # start if that key is missing, unknown, or revoked. It does NOT authenticate
+      # each caller: every client that can reach the port shares that one tenant.
+      # That is why the published port below is bound to loopback. Put a reverse
+      # proxy with per-client auth in front of it before exposing MCP to a network.
+      # CONTEXTA_MCP_ALLOW_ANONYMOUS=true skips even the startup key check and is
+      # for local single-tenant experiments only - never for a shared deployment.
       CONTEXTA_MCP_API_KEY: ${CONTEXTA_MCP_API_KEY:-}
       CONTEXTA_MCP_ALLOW_ANONYMOUS: ${CONTEXTA_MCP_ALLOW_ANONYMOUS:-false}
       CONTEXTA_MCP_RATE_PER_SECOND: ${CONTEXTA_MCP_RATE_PER_SECOND:-20}
@@ -336,7 +340,9 @@ services:
       CONTEXTA_MCP_ALLOWED_FETCH_HOSTS: ${CONTEXTA_MCP_ALLOWED_FETCH_HOSTS:-}
       MODEL_CACHE_DIR: /app/models
     ports:
-      - "8765:8765"
+      # Loopback only. The server authenticates one tenant at startup, not each
+      # caller, so binding to 0.0.0.0 would hand that tenant to the whole network.
+      - "127.0.0.1:${CONTEXTA_MCP_PORT:-8765}:8765"
     volumes:
       - ./models:/app/models
     depends_on:

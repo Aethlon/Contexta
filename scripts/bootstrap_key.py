@@ -71,7 +71,7 @@ def find_postgres_container() -> str:
             text=True,
             check=False,
         )
-        if probe.returncode == 0 and re.search(r"^\s*contexta\s*\|", probe.stdout, re.M):
+        if probe.returncode == 0 and re.search(r"^\s*contexta\s*\|", probe.stdout, re.MULTILINE):
             return name
 
     sys.exit(

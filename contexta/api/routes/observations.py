@@ -503,6 +503,21 @@ def _invalid_json_response() -> JSONResponse:
     status_code=status.HTTP_202_ACCEPTED,
     response_model=IngestResponse,
     responses={422: {"model": ValidationErrorResponse}},
+    # The body is read and validated by hand so that an oversized payload and a
+    # malformed body return the same 422 shape as a schema violation. That manual
+    # read hides the schema from FastAPI, so publish it explicitly.
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": ObservationPayload.model_json_schema(
+                        ref_template="#/components/schemas/{model}"
+                    )
+                }
+            },
+        }
+    },
 )
 async def ingest_observation(
     request: Request,
