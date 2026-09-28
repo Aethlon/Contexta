@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -8,6 +8,7 @@ import {
   Database,
   KeyRound,
   LayoutGrid,
+  Rocket,
   Settings,
 } from "lucide-react";
 import { ContextaMark } from "@/components/contexta-logo";
@@ -16,6 +17,7 @@ import type { OperatorIdentity } from "@/lib/dashboard-identity";
 
 const nav = [
   { href: "/dashboard", label: "Overview", icon: LayoutGrid },
+  { href: "/dashboard/welcome", label: "Get started", icon: Rocket },
   { href: "/dashboard/memories", label: "Memories", icon: Database },
   { href: "/dashboard/api-keys", label: "API keys", icon: KeyRound },
   { href: "/dashboard/mcp", label: "MCP", icon: Bot },

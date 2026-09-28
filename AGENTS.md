@@ -127,12 +127,21 @@ The operator console runs **without a sign-in by default**, because Contexta is 
 docker compose up --build
 ```
 
-### Local Dashboard (`dashboard/`):
+### Local Dashboard (`dashboard/`)
 ```bash
 cd dashboard
 bun install
 bun run dev      # Runs on http://localhost:3000
 bun run build    # Verify production compilation
+```
+
+`npm` works identically — both lockfiles are committed, so pick whichever you
+have. Do not run both in the same checkout.
+```bash
+cd dashboard
+npm ci           # or: npm install
+npm run dev
+npm run build
 ```
 
 ### Python Backend & Tests (`contexta/`):

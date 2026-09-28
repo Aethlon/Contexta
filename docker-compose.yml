@@ -131,6 +131,11 @@ services:
       dockerfile: dashboard/Dockerfile
     environment:
       CONTEXTA_API_URL: http://api:8000
+      # Inside the compose network the MCP server is reachable by service name.
+      # Without this the console's health check falls back to localhost:8765,
+      # which resolves to the dashboard container itself, so the MCP status
+      # always reads "offline" even when the server is healthy.
+      CONTEXTA_MCP_URL: http://mcp:8765
       AUTH_SECRET: ${AUTH_SECRET:-dev-secret-key-change-in-prod}
       CONTEXTA_DASHBOARD_AUTH: ${CONTEXTA_DASHBOARD_AUTH:-off}
       CONTEXTA_DASHBOARD_API_KEY: ${CONTEXTA_DASHBOARD_API_KEY:-}
@@ -138,6 +143,8 @@ services:
       - "${DASHBOARD_PORT:-3000}:3000"
     depends_on:
       api:
+        condition: service_started
+      mcp:
         condition: service_started
     restart: unless-stopped
 

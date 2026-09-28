@@ -384,7 +384,6 @@ try {
 Runs on Node 18+, Bun, Deno, Vercel Edge, and Cloudflare Workers. Zero required dependencies — native `fetch`, `crypto`, and `AbortSignal.timeout`.
 
 Both clients send an `Idempotency-Key` on writes, retry `429`/`5xx`/network failures with backoff, and fall back to a durable on-disk queue when the network is down. `flush()` drains it, `close()` releases connections.
-
 The two SDKs expose the same 32 public methods, asserted against `clients/public-api.manifest.json` by both test suites.
 
 ### Known SDK gaps in v1.5
@@ -513,6 +512,56 @@ These are component-level measurements, not end-to-end accuracy:
 | Recursive-CTE graph traversal | ~38.5ms | ~2.16ms (~16x) |
 | Session-level extraction success | ~17% | 87.5% |
 | Public tables | 57 | 33 |
+
+---
+
+## 🧰 Working on the Code
+
+Everything here runs offline. `bun` and `npm` are both supported — **both
+lockfiles are committed for every JS workspace**, so pick whichever you already
+have and do not run both in the same checkout.
+
+### The console (`dashboard/`)
+
+```bash
+cd dashboard
+
+# with bun
+bun install && bun run dev      # http://localhost:3000
+
+# or with npm
+npm ci      && npm run dev      # http://localhost:3000
+```
+
+`npm run build` (or `bun run build`) type-checks and produces a production
+build. It needs no Rust toolchain.
+
+### The backend
+
+```bash
+uv sync                                        # or: uv run <cmd> directly
+uv run pytest tests/ -q
+uv run ruff check contexta tests
+```
+
+### The TypeScript SDK (`clients/typescript/`)
+
+```bash
+cd clients/typescript
+bun install   # or: npm ci
+bun run build # or: npm run build
+```
+
+### Notes
+
+- The operator console defaults to **no sign-in** (`CONTEXTA_DASHBOARD_AUTH=off`).
+  With auth off, do not expose `:3000` to an untrusted network — anyone who can
+  reach it acts as whichever tenant the console resolved.
+- `docs/` is an **internal reference guide**. It is not part of the compose
+  stack and is not deployed.
+- `landingpage/` is a **separate git repository** with its own `node_modules`.
+  It is not built by the compose stack and should not be edited as part of a
+  product release.
 
 ---
 
