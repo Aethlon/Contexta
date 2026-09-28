@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2,
@@ -14,6 +14,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { probeTenantAction, setTenantAction, signOutAction } from "@/app/actions";
+import { REVEAL_TENANT_EVENT } from "@/components/reveal-tenant-button";
 import type { OperatorIdentity } from "@/lib/dashboard-identity";
 
 const SOURCE_LABEL: Record<OperatorIdentity["source"], string> = {
@@ -36,6 +37,14 @@ export function TenantSwitcher({ identity }: { identity: OperatorIdentity }) {
     error: string | null;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // A page that cannot resolve its tenant can ask the sidebar to open this
+  // panel, so the fix is one click away instead of hunted for in the nav.
+  useEffect(() => {
+    const onReveal = () => setOpen(true);
+    window.addEventListener(REVEAL_TENANT_EVENT, onReveal);
+    return () => window.removeEventListener(REVEAL_TENANT_EVENT, onReveal);
+  }, []);
 
   const runProbe = () => {
     startTransition(async () => {
@@ -96,7 +105,7 @@ export function TenantSwitcher({ identity }: { identity: OperatorIdentity }) {
       </div>
 
       {open && (
-        <div className="mt-2 space-y-3 rounded-md border border-border bg-muted p-2.5 text-[11px]">
+        <div className="mt-2 max-h-[min(70vh,34rem)] space-y-3 overflow-y-auto overscroll-contain rounded-md border border-border bg-muted p-2.5 text-[11px]">
           <div className="space-y-1">
             <p className="text-muted-foreground">Acting as organization</p>
             <div className="flex items-center gap-1.5">
@@ -127,8 +136,8 @@ export function TenantSwitcher({ identity }: { identity: OperatorIdentity }) {
           </div>
 
           {!identity.resolved ? (
-            <div className="flex items-start gap-1.5 rounded-md border p-2 text-[10px] pill pill-amber">
-              <TriangleAlert className="mt-0.5 size-3 shrink-0" />
+            <div className="callout callout-amber">
+              <TriangleAlert className="size-3" />
               <span>
                 No tenant resolved. Set <code>CONTEXTA_DASHBOARD_API_KEY</code>{" "}
                 (recommended) or fill the form below. Until then the API rejects
@@ -139,11 +148,7 @@ export function TenantSwitcher({ identity }: { identity: OperatorIdentity }) {
 
           {probe ? (
             <div
-              className={`rounded border p-2 text-[10px] ${
-                probe.ok
-                  ? "pill pill-green"
-                  : "pill pill-red"
-              }`}
+              className={`callout ${probe.ok ? "callout-green" : "callout-red"}`}
             >
               {probe.ok ? (
                 <span>

@@ -304,6 +304,7 @@ export async function getEngineStatusAction() {
 
   const offlineFallback = {
     node_online: false,
+    verified: false,
     current_mode: "offline",
     active_engine: "local_qwen",
     extraction: {
@@ -338,7 +339,7 @@ export async function getEngineStatusAction() {
     const res = await contextaFetch("/v1/system/engine-status");
     if (!res.ok) return offlineFallback;
     const data = await res.json();
-    return { ...data, node_online: true };
+    return { ...data, node_online: true, verified: true };
   } catch {
     return offlineFallback;
   }

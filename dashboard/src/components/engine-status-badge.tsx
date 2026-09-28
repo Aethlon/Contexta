@@ -1,12 +1,19 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { Cpu, Cloud, Zap, Loader2, Settings } from "lucide-react";
+import { Cpu, Cloud, Zap, Loader2, Settings, ShieldQuestion } from "lucide-react";
 import Link from "next/link";
 import { getEngineStatusAction } from "@/app/actions";
 
 interface EngineTelemetry {
   node_online?: boolean;
+  /**
+   * False when the console could not ask the API, so every figure below is
+   * deployment config rather than a live reading. Without this the badge has to
+   * report "offline" for a node that is actually healthy, which sends the
+   * operator debugging the wrong process.
+   */
+  verified?: boolean;
   current_mode: "offline" | "online" | "auto";
   active_engine: string;
   /** Which model turns observations into memories. */
@@ -32,8 +39,12 @@ interface EngineTelemetry {
 }
 
 export function EngineStatusBadge() {
+  // Start unverified rather than healthy. The previous default carried invented
+  // latencies (14.2ms, 41.5ms) and 1180MB of RAM, which rendered as a real
+  // reading for the few frames before the first fetch resolved.
   const [telemetry, setTelemetry] = useState<EngineTelemetry>({
     node_online: true,
+    verified: false,
     current_mode: "offline",
     active_engine: "local_qwen",
     extraction: {
@@ -41,10 +52,10 @@ export function EngineStatusBadge() {
       status: "checking",
     },
     local_model_server: {
-      status: "healthy",
-      ram_usage_mb: 1180,
-      embedding_model: { name: "Qwen/Qwen3-Embedding-0.6B", avg_latency_ms: 14.2 },
-      reranker_model: { name: "Qwen/Qwen3-Reranker-0.6B", avg_latency_ms: 41.5 },
+      status: "checking",
+      ram_usage_mb: 0,
+      embedding_model: { name: "Qwen/Qwen3-Embedding-0.6B", avg_latency_ms: 0 },
+      reranker_model: { name: "Qwen/Qwen3-Reranker-0.6B", avg_latency_ms: 0 },
     },
     cloud_providers: {
       fully_configured: false,
@@ -102,12 +113,18 @@ export function EngineStatusBadge() {
   };
 
   const mode = telemetry.current_mode;
+  // Unverified means the console is unauthenticated, not that the node is down.
+  const isUnverified = telemetry.verified === false;
   const isOnline = telemetry.node_online !== false;
   let accent = "var(--accent-yellow)";
   let modeLabel = "Hybrid (Auto)";
   let Icon = Zap;
 
-  if (!isOnline) {
+  if (isUnverified) {
+    accent = "var(--accent-yellow)";
+    modeLabel = "Unverified · set key";
+    Icon = ShieldQuestion;
+  } else if (!isOnline) {
     accent = "var(--destructive)";
     modeLabel = "Node Offline";
     Icon = Zap;
@@ -154,9 +171,27 @@ export function EngineStatusBadge() {
                 background: `color-mix(in srgb, ${accent} 10%, transparent)`,
               }}
             >
-              {isOnline ? "Healthy" : "Offline"}
+              {isUnverified ? "Unverified" : isOnline ? "Healthy" : "Offline"}
             </span>
           </div>
+
+          {isUnverified ? (
+            <div className="mt-2.5 rounded-md border border-[color-mix(in_srgb,var(--accent-yellow)_30%,transparent)] bg-[color-mix(in_srgb,var(--accent-yellow)_8%,transparent)] px-2.5 py-2 text-[12px] leading-relaxed text-[var(--accent-yellow)]">
+              <p className="font-medium">The console cannot read live health.</p>
+              <p className="mt-1">
+                Without <code className="font-mono">CONTEXTA_DASHBOARD_API_KEY</code>{" "}
+                the engine status endpoint is tenant-authenticated, so these rows
+                show deployment config, not a reading. The services below may well
+                be healthy.
+              </p>
+              <Link
+                href="/dashboard/welcome"
+                className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-[color-mix(in_srgb,var(--accent-yellow)_35%,transparent)] px-2 py-1 text-[11px] font-medium"
+              >
+                <span>Set an API key</span>
+              </Link>
+            </div>
+          ) : null}
 
           {/* Telemetry Stats */}
           <div className="space-y-0.5 py-1.5">
