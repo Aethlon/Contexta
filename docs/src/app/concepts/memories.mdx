@@ -48,9 +48,11 @@ A low-value extraction is dropped **before** it costs an embedding and a graph e
 
 This is the part that makes memory *true* rather than merely accumulated.
 
-When the extractor returns a `subject` / `predicate` / `object` triple, the pipeline hashes `subject` + `predicate` (+ `context`) into a structural slot key of the form `sfx1:<sha256>`. Two statements of the same slot therefore share a key.
+When the extractor returns a `subject` / `predicate` / `object` triple, the pipeline hashes the canonicalised `subject` + `predicate` (+ `context`) + `object` into a structural slot key of the form `sfx2:<sha256>`. Two statements of the same slot therefore share a key.
 
-> The **object** is deliberately excluded from the hash. A slot is "who, about what" — the same subject and predicate stated with a new value is a *correction*, and a correction only supersedes if it reaches the incumbent row, which it can only do if both rows share a key. A partial triple is refused rather than half-keyed, so the slot and its value always arrive together.
+> The slot names the **whole assertion**, so the object is part of the digest. A partial triple is refused rather than half-keyed: a row that cannot name its slot falls back to the legacy text hash rather than being guessed into someone else's slot.
+>
+> v1.5 originally shipped `sfx1:`, which hashed subject + predicate and left the object out on the theory that a slot is "who, about what" and a new value is a correction of that slot. That only holds if the predicate is exclusive — one live value per subject and predicate — and it is not. Measured over a 10-conversation ingest, 123 keyed rows resolved to 32 slots, `subject` was the literal string `"the user"` in all 123, and four mutually exclusive `uses` facts shared one slot. With `uq_memory_record_current_fact_slot` allowing one current row per slot, each new arrival closed the previous one: of 10 sampled supersession pairs, 0 were real contradictions and 8 were unrelated. A slot that collides on unrelated facts does not reconcile truth, it deletes it. `sfx2:` is the fix, and the version bump keeps every pre-existing `sfx1:` digest provably distinct from any new one instead of letting a stale digest alias onto a live slot.
 
 If a correction arrives, `TruthSupersessionService`:
 
@@ -61,9 +63,9 @@ If a correction arrives, `TruthSupersessionService`:
 
 `uq_memory_record_current_fact_slot` — a partial unique index over `(organization_id, user_id, fact_key)` restricted to `valid_to IS NULL` — makes this mandatory rather than conventional. A correction cannot coexist with what it corrects.
 
-A rephrasing of the same fact is *not* a contradiction: same slot key, so the value is compared and the row is left alone. Only a genuine contradiction supersedes.
+A rephrasing of the same fact is *not* a contradiction: the same slot hashes to the same key, so the value is compared and the row is left alone. Two genuinely different facts get two different slots and both survive — the index stops being the thing that decides which fact lives.
 
-**Legacy keys.** Any extraction with no usable triple — which is every memory written before the triple existed, and any memory whose model omitted it — still gets a bare 64-hex text-hash key. Those are still produced and still supported. Coverage is measurable with `fact_key LIKE 'sfx1:%'`.
+**Legacy keys.** Any extraction with no usable triple — which is every memory written before the triple existed, and any memory whose model omitted it — still gets a bare 64-hex text-hash key. Those are still produced and still supported. Coverage is measurable with `fact_key LIKE 'sfx2:%'`. An `sfx1:` key is a superseded structural key: still readable, never written, and worth backfilling.
 
 ## Lifecycle
 
@@ -99,7 +101,7 @@ curl http://localhost:8000/v1/memories/$ID -H "Authorization: Bearer $CONTEXTA_A
   "confidence": 1.0, "importance": 0.5167, "utility_score": 0.0,
   "memory_state": "active",
   "valid_from": "2026-09-27T01:23:46", "valid_to": null,
-  "fact_key": "sfx1:…",
+  "fact_key": "sfx2:…",
   "created_at": "…", "updated_at": "…", "last_accessed_at": null
 }
 ```

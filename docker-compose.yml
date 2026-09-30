@@ -224,6 +224,10 @@ services:
       CONTEXTA_CELERY_BROKER_URL: redis://redis:6379/1
       CONTEXTA_CELERY_RESULT_BACKEND: redis://redis:6379/2
       CONTEXTA_CELERY_TASK_ALWAYS_EAGER: "false"
+      # Must equal the api service's value: the per-tenant vault key is derived
+      # from it, so a mismatch leaves the worker unable to decrypt anything the
+      # API returns.
+      CONTEXTA_SECRET_KEY: ${CONTEXTA_SECRET_KEY:-change-me-in-production-use-a-long-random-string}
       CONTEXTA_ENGINE_MODE: offline
       CONTEXTA_LLM_PROVIDER: local
       CONTEXTA_LLM_BASE_URL: ""
@@ -322,6 +326,9 @@ services:
       CONTEXTA_EMBEDDING_DIMENSIONS: 1024
       CONTEXTA_EMBEDDING_API_KEY: ""
       CONTEXTA_LOCAL_MODEL_SERVER_URL: http://model-server:8001
+      # Reads and decrypts tenant memory, so it must derive the same vault key as
+      # the api and worker services.
+      CONTEXTA_SECRET_KEY: ${CONTEXTA_SECRET_KEY:-change-me-in-production-use-a-long-random-string}
       # MCP binds one tenant at startup from CONTEXTA_MCP_API_KEY and refuses to
       # start if that key is missing, unknown, or revoked. It does NOT authenticate
       # each caller: every client that can reach the port shares that one tenant.

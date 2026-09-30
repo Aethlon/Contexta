@@ -200,7 +200,7 @@ Every observation walks the same nine stages.
 2. **Contexta Cortex decision gate** — when Cortex routing is enabled, ephemeral chit-chat can be skipped before extraction and typed hints passed to the extractor. **Offline mode bypasses this entirely** rather than depending on an external routing service.
 3. **Temporal grounding** — relative expressions are normalized only when a reference time exists. The basis and provenance are retained; unresolved expressions stay unknown.
 4. **Structured extraction** — the extraction worker on `:8002` returns typed memory candidates with confidence and explicit temporal precision.
-5. **Deduplication** — in-batch merge, then a check against the `fact_key` slot. A `subject`/`predicate`/`object` triple yields an `sfx1:<sha256>` slot key so a rephrasing lands in the same slot.
+5. **Deduplication** — in-batch merge, then a check against the `fact_key` slot. A `subject`/`predicate`/`object` triple yields an `sfx2:<sha256>` slot key over the whole triple, so two genuinely different facts get two slots instead of colliding into one.
 6. **Scoring** — importance from emphasis, decision impact, and mention count; confidence from source type. Low-value extractions drop out before they cost an embedding.
 7. **Entity graph resolution** — named entities and typed relationship edges are resolved and written.
 8. **Reconcile** — a contradicted fact is closed with `valid_to = now()` and its lineage recorded through `memory_version.superseded_by_id`. Enforced by the partial unique index `uq_memory_record_current_fact_slot`.

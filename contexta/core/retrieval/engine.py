@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import inspect
+import logging
 import math
 import re
 import uuid
+from collections import defaultdict
 from collections.abc import Callable, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field, replace
@@ -14,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from contexta.config.settings import get_settings
 from contexta.core.cortex import ContextaCortex, CortexReadDecision
+from contexta.core.lexicon import DISCOURSE_STOPWORDS
 from contexta.core.retrieval.fusion import (
     SufficiencyAssessment,
     assess_primary_sufficiency,
@@ -24,6 +27,9 @@ from contexta.models.memory import MemoryRecord
 
 if TYPE_CHECKING:
     from contexta.core.schemas import RetrievalQuery
+    from contexta.models.entity import MemoryEntityLink
+
+logger = logging.getLogger(__name__)
 
 try:
     from contexta.core.scoring.engine import (
@@ -152,8 +158,9 @@ class RetrievalResult:
     query_plan: QueryPlan | None = field(default=None, compare=False)
     # Precomputed lowercased entity names this result's text mentions. Carried
     # so the sufficiency gate can read plan coverage without re-scanning text,
-    # and excluded from equality: it is derived, `replace()` copies it, and it
-    # is only populated on the cascade path (the gate is its only consumer).
+    # and excluded from equality: it is derived and `replace()` copies it. Both
+    # channel orders populate it, so a result means the same thing whichever
+    # path produced it (the gate is its primary consumer).
     mentioned_entities: frozenset[str] = field(
         default_factory=frozenset,
         compare=False,
@@ -169,8 +176,9 @@ class CascadeEscalation:
     """What the cascade decided for one retrieval, and why.
 
     Populated on `RetrievalEngine.last_escalation`. `escalated` is False both
-    when escalation is disabled (the default) and when the gate said the
-    primary channels were enough; `enabled` distinguishes them.
+    when escalation is turned off (the engine was constructed with
+    `enable_dense_escalation=False`) and when the gate said the primary channels
+    were enough; `enabled` distinguishes them.
     """
 
     enabled: bool
@@ -178,16 +186,47 @@ class CascadeEscalation:
     reason: str
     dense_candidates: int = 0
     fused_candidates: int = 0
+    lexical_candidates: int = 0
+    graph_candidates: int = 0
+    lexical_available: bool = True
+    graph_available: bool = True
     assessment: SufficiencyAssessment | None = None
 
 
+def _ordered_page(
+    results: Sequence[RetrievalResult],
+    limit: int,
+) -> list[RetrievalResult]:
+    """Score-descending page, truncated to `limit`.
+
+    `sorted` is stable, so rows with equal scores keep the order the channels
+    produced them in and promotion cannot reshuffle ties.
+    """
+    if limit <= 0:
+        return []
+    return sorted(results, key=lambda result: result.score, reverse=True)[:limit]
+
+
 class RetrievalEngine:
-    """Hybrid semantic, keyword, graph, importance, and recency retrieval."""
+    """Hybrid semantic, keyword, graph, importance, and recency retrieval.
+
+    The cascade is the default channel order: lexical and graph gather the
+    primary evidence and `assess_primary_sufficiency()` decides whether the
+    dense channel has to be consulted at all. Construct with
+    `enable_dense_escalation=False` to restore the previous order, where dense
+    is fetched up front and always fused.
+    """
 
     CANDIDATE_MULTIPLIER = 15
     MIN_CANDIDATES = 150
     RERANK_POOL_SIZE = 45
     TEMPORAL_CANDIDATE_UPLIFT = 1.5
+    # Graph-degree currency check: how many linked memories the engine will read
+    # to drop the superseded ones from an entity's degree, and how many ids it
+    # asks for per round trip. Past the first budget it stops checking, which
+    # reverts to counting every link rather than guessing.
+    MAX_CURRENT_CHECK_IDS = 1500
+    CURRENT_CHECK_CHUNK = 500
     # Base half-lives for the two freshness terms, in days. Both are stretched
     # by `precision_half_life_scale` according to the fact's
     # `temporal_precision`, and both contribute a bounded weight to the score
@@ -217,11 +256,11 @@ class RetrievalEngine:
         "sure", "that", "this", "these", "those", "there", "here",
     }
 
-    DISCOURSE_STOPWORDS = {
-        "speaker", "user", "assistant", "system", "date", "year", "time",
-        "day", "yesterday", "today", "tomorrow", "session", "turn", "conversation",
-        "chat", "pm", "am", "clock", "hour", "minute", "month", "week",
-    }
+    # Shared with the SQL lexical channel through `contexta.core.lexicon`, so
+    # the words this scorer already knows are noise are the words the tsquery
+    # never sees. Kept as a class attribute because the scorer reads it off the
+    # class (`self.DISCOURSE_STOPWORDS`).
+    DISCOURSE_STOPWORDS = frozenset(DISCOURSE_STOPWORDS)
 
     ENTITY_STOPWORDS = STOPWORDS | {
         "both", "common", "compare", "comparison", "difference", "differences",
@@ -253,7 +292,7 @@ class RetrievalEngine:
         reranker: Reranker | None = None,
         scoring_engine: MemoryScoringEngine | None = None,
         cortex: ContextaCortex | None = None,
-        enable_dense_escalation: bool = False,
+        enable_dense_escalation: bool = True,
     ) -> None:
         self._memories = memory_repository
         self._links = link_repository
@@ -262,17 +301,19 @@ class RetrievalEngine:
         self._reranker = reranker
         self._scoring = scoring_engine or MemoryScoringEngine()
         self._cortex = cortex
-        # Default False: dense is fetched up front and always fused, exactly as
-        # before the cascade existed. Flip it on to make lexical + graph the
-        # primary channels and dense an escalation the sufficiency gate has to
-        # earn. See `assess_primary_sufficiency` for the signal and
-        # `last_escalation` for how to measure it.
+        # Default True: lexical + graph are the primary channels and dense is an
+        # escalation the sufficiency gate has to earn. The parameter is kept so a
+        # caller can pass False to restore the old order, where dense is fetched
+        # up front and always fused -- that is the flag's only remaining job.
+        # See `assess_primary_sufficiency` for the signal and `last_escalation`
+        # for how it is measured.
         self._enable_dense_escalation = enable_dense_escalation
         # Observability only, set once per `retrieve()`. It exists so the
         # escalation rate can be measured in production before the cascade is
         # relied on; nothing branches on it, and concurrent retrieves may
         # interleave writes to it.
         self.last_escalation: CascadeEscalation | None = None
+        self._lexical_ranks: dict[uuid.UUID, float] | None = None
 
     async def retrieve(
         self,
@@ -431,12 +472,14 @@ class RetrievalEngine:
             if assessment.sufficient:
                 results = primary_results
                 self.last_escalation = CascadeEscalation(
-                    enabled=True,
-                    escalated=False,
-                    reason=assessment.reason,
-                    fused_candidates=len(results),
-                    assessment=assessment,
-                )
+            enabled=True,
+            escalated=False,
+            reason=assessment.reason,
+            lexical_candidates=len(lexical_candidates),
+            graph_candidates=len(graph_candidates),
+            fused_candidates=len(results),
+            assessment=assessment,
+        )
             else:
                 # Escalate: fetch dense and re-fuse over all three channels.
                 # The primary results are inputs to the new ranking, not
@@ -471,13 +514,15 @@ class RetrievalEngine:
                     entity_names=detected_entity_names,
                 )
                 self.last_escalation = CascadeEscalation(
-                    enabled=True,
-                    escalated=True,
-                    reason=assessment.reason,
-                    dense_candidates=len(dense_candidates),
-                    fused_candidates=len(results),
-                    assessment=assessment,
-                )
+            enabled=True,
+            escalated=True,
+            reason=assessment.reason,
+            dense_candidates=len(dense_candidates),
+            lexical_candidates=len(lexical_candidates),
+            graph_candidates=len(graph_candidates),
+            fused_candidates=len(results),
+            assessment=assessment,
+        )
         else:
             graph_memory_weights, graph_candidates = await self._graph_channel(
                 query,
@@ -499,14 +544,17 @@ class RetrievalEngine:
                 now=reference,
                 cortex_decision=cortex_decision,
                 query_plan=query_plan,
+                entity_names=detected_entity_names,
             )
             self.last_escalation = CascadeEscalation(
-                enabled=False,
-                escalated=True,
-                reason="escalation_disabled",
-                dense_candidates=len(dense_candidates),
-                fused_candidates=len(results),
-            )
+            enabled=False,
+            escalated=True,
+            reason="escalation_disabled",
+            dense_candidates=len(dense_candidates),
+            lexical_candidates=len(lexical_candidates),
+            graph_candidates=len(graph_candidates),
+            fused_candidates=len(results),
+        )
 
         results.sort(key=lambda result: result.score, reverse=True)
         if query_plan.explicit_temporal_constraints:
@@ -649,11 +697,16 @@ class RetrievalEngine:
 
         `entity_names` is the caller's detected entity list, and what a
         candidate mentions in it is cached on the result so the sufficiency gate
-        can read plan coverage without re-scanning text. Pass `()` when no gate
-        will read it: the scan is a regex per name over title, content, tags and
-        structured data, and the candidate pool is two orders of magnitude
-        larger than the page. The scan also stops as soon as every name has been
-        seen, since later candidates cannot add coverage.
+        can read plan coverage without re-scanning text. Pass `()` only when no
+        consumer will read it: the scan is a regex per name over title, content,
+        tags and structured data. The scan also stops as soon as every name has
+        been seen, since later candidates cannot add coverage.
+
+        This is also where the cold penalty is applied, once. It lives here and
+        not in `_score_memory` so that `_score_memory` stays a pure feature
+        blend and the whole row -- rank evidence included -- is demoted, rather
+        than only its features. Applying it in both places multiplied it into
+        `0.7 * 0.7`.
         """
         pending = set(entity_names)
         results: list[RetrievalResult] = []
@@ -751,6 +804,7 @@ class RetrievalEngine:
                     query_embedding,
                     query=query,
                     limit=limit,
+                    channel="dense",
                 )
                 if records:
                     eligible = [
@@ -798,14 +852,21 @@ class RetrievalEngine:
                 self._expanded_lexical_query(query.query_text),
                 query=query,
                 limit=limit,
+                channel="lexical",
+                extra={"include_ranks": True},
             )
             if records:
                 candidates = [
                     memory for memory in records if self._include_memory(query, memory)
                 ]
                 if candidates:
+                    # Keep the rank PostgreSQL actually ordered by, so the
+                    # reported keyword_score is the same evidence the channel
+                    # ranked on instead of a second, unrelated measurement.
+                    self._lexical_ranks = getattr(records, "ranks", None)
                     return candidates[:limit], None
 
+        self._lexical_ranks = None
         if fallback_memories is None:
             fallback_memories = await self._fallback_memories(query, limit=limit)
         ranked = [
@@ -830,6 +891,7 @@ class RetrievalEngine:
             query.user_id,
             query=query,
             limit=max(limit * 2, 1000),
+            channel="candidate-fallback",
         )
         if records is None:
             return None
@@ -841,6 +903,8 @@ class RetrievalEngine:
         *args: Any,
         query: RetrievalQuery,
         limit: int,
+        channel: str,
+        extra: dict[str, Any] | None = None,
     ) -> Sequence[MemoryRecord] | None:
         kwargs: dict[str, Any] = {"limit": limit}
         try:
@@ -870,22 +934,39 @@ class RetrievalEngine:
         for name, value in filters.items():
             if accepts_kwargs or name in parameters:
                 kwargs[name] = value
-        records = await self._try_candidate_call(method, args, kwargs)
+        for name, value in (extra or {}).items():
+            if accepts_kwargs or name in parameters:
+                kwargs[name] = value
+        records = await self._try_candidate_call(method, args, kwargs, channel)
         if records is not None:
             return records
-        return await self._try_candidate_call(method, args, {"limit": limit})
+        return await self._try_candidate_call(method, args, {"limit": limit}, channel)
 
     @staticmethod
     async def _try_candidate_call(
         method: Any,
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
+        channel: str,
     ) -> list[MemoryRecord] | None:
-        with suppress(Exception):
+        """Call a candidate-channel repository method, degrading on failure.
+
+        A channel that cannot answer costs that channel, never the request: the
+        caller falls back to a cheaper path (or to no candidates at all). The
+        log line is the only signal that it happened -- without it a broken
+        vector index looks exactly like a corpus with nothing in it.
+        """
+        try:
             records = await method(*args, **kwargs)
-            if records is not None:
-                return list(records)
-        return None
+        except Exception as error:  # noqa: BLE001 - a channel may fail, the request may not
+            logger.warning(
+                "%s channel: candidate query failed (%s), degrading: %s",
+                channel,
+                getattr(method, "__qualname__", type(method).__name__),
+                error,
+            )
+            return None
+        return list(records) if records is not None else None
 
     def _dense_order_key(
         self,
@@ -921,21 +1002,49 @@ class RetrievalEngine:
         self,
         memory_ids: Sequence[uuid.UUID],
     ) -> list[uuid.UUID]:
+        """Entities linked to the anchor memories, for graph expansion.
+
+        The anchor set is at most ten memories, so this is bounded either way.
+        A link read that fails costs the expansion, not the request: without
+        seeds the graph channel simply contributes nothing.
+        """
         if self._links is None or not memory_ids:
             return []
         bulk = getattr(self._links, "bulk_get_entities_for_memories", None)
         if callable(bulk):
-            with suppress(Exception):
-                return list(
-                    dict.fromkeys(link.entity_id for link in await bulk(memory_ids))
+            try:
+                links = await bulk(memory_ids)
+            except Exception as error:  # noqa: BLE001 - expansion is optional, degrade to none
+                logger.warning(
+                    "graph channel: bulk entity-link lookup failed for %d "
+                    "anchor memories, no expansion from them: %s",
+                    len(memory_ids),
+                    error,
                 )
+                return []
+            return list(dict.fromkeys(link.entity_id for link in links))
         get_for_memory = getattr(self._links, "get_entities_for_memory", None)
         if not callable(get_for_memory):
             return []
         links: list[MemoryEntityLink] = []
+        failures = 0
         for memory_id in memory_ids:
-            with suppress(Exception):
+            try:
                 links.extend(await get_for_memory(memory_id))
+            except Exception as error:  # noqa: BLE001 - one unreadable anchor loses only itself
+                failures += 1
+                logger.warning(
+                    "graph channel: entity-link read failed for memory %s: %s",
+                    memory_id,
+                    error,
+                )
+        if failures:
+            logger.warning(
+                "graph channel: %d of %d anchor memory link reads failed; "
+                "expansion continues on the ones that answered",
+                failures,
+                len(memory_ids),
+            )
         return list(dict.fromkeys(link.entity_id for link in links))
 
     @classmethod
@@ -983,6 +1092,17 @@ class RetrievalEngine:
         query_plan: QueryPlan | None = None,
         result_limit: int | None = None,
     ) -> list[RetrievalResult]:
+        """Return the page, with declared evidence forced into it.
+
+        Promotion satisfies a declared requirement: an id the plan named, or one
+        row per entity a comparative/list question asked about. It can only ever
+        *add* to a page that has room and otherwise evicts the worst-scoring row
+        that no promotion already claimed. The result is re-ordered afterwards,
+        so a promoted row that scores below the page sits at the bottom of it
+        instead of being spliced in above rows that beat it -- which is what
+        happened when the eviction target was "the last slot" and an earlier
+        promotion had already taken that slot.
+        """
         unique_results = list(
             {result.memory.id: result for result in results}.values()
         )
@@ -1006,7 +1126,7 @@ class RetrievalEngine:
         if coverage_limit <= 0:
             return []
         if not required_ids and (not should_promote or not coverage_entities):
-            return unique_results[:coverage_limit]
+            return _ordered_page(unique_results, coverage_limit)
 
         final = unique_results[:coverage_limit]
         final_ids = {result.memory.id for result in final}
@@ -1020,11 +1140,18 @@ class RetrievalEngine:
             if len(final) < coverage_limit:
                 final.append(candidate)
             else:
+                # Worst-scoring row that no promotion has claimed. Searching by
+                # score rather than by slot matters once one promotion has
+                # already rewritten a slot, which is what let a below-threshold
+                # row evict a better-scoring one.
                 replace_index = next(
                     (
                         index
-                        for index in range(len(final) - 1, -1, -1)
-                        if final[index].memory.id not in promoted_ids
+                        for index, existing in sorted(
+                            enumerate(final),
+                            key=lambda pair: pair[1].score,
+                        )
+                        if existing.memory.id not in promoted_ids
                     ),
                     None,
                 )
@@ -1047,7 +1174,7 @@ class RetrievalEngine:
                 promote(candidate)
 
         if not should_promote or not coverage_entities:
-            return final
+            return _ordered_page(final, coverage_limit)
         promotion_budget = min(len(coverage_entities), coverage_limit)
         promotions = 0
         for entity_name in coverage_entities:
@@ -1072,7 +1199,7 @@ class RetrievalEngine:
             promotions += 1
             if promotions >= promotion_budget:
                 break
-        return final
+        return _ordered_page(final, coverage_limit)
 
     async def _graph_candidates(
         self,
@@ -1095,8 +1222,15 @@ class RetrievalEngine:
         get_many = getattr(self._memories, "get_many_by_ids", None)
         if missing_ids and callable(get_many):
             fetched: list[MemoryRecord] = []
-            with suppress(Exception):
+            try:
                 fetched = list(await get_many(missing_ids))
+            except Exception as error:  # noqa: BLE001 - graph hydration degrades to in-hand rows
+                logger.warning(
+                    "graph channel: hydrating %d graph-linked memories failed, "
+                    "keeping only the ones already in hand: %s",
+                    len(missing_ids),
+                    error,
+                )
             for memory in fetched:
                 if self._include_memory(query, memory):
                     memory_map[memory.id] = memory
@@ -1144,22 +1278,50 @@ class RetrievalEngine:
         return weights
 
     async def _touch_accessed(self, results: list[RetrievalResult], now: datetime) -> None:
-        """Best-effort update of last_accessed_at so decay uses read-age, not write-age."""
+        """Best-effort update of last_accessed_at so decay uses read-age, not write-age.
+
+        A failure here is invisible in the response but not harmless: without
+        `last_accessed_at` the decay engine keeps scoring these rows as if
+        nobody had read them (AGENTS.md section 2.D), so it is logged rather
+        than swallowed. The retrieve itself still returns its page.
+        """
         if not results:
             return
         accessed_at = now.replace(tzinfo=None)
         memory_ids = [result.memory.id for result in results]
         touch_many = getattr(self._memories, "touch_accessed_many", None)
         if callable(touch_many):
-            with suppress(Exception):
+            try:
                 await touch_many(memory_ids, accessed_at)
-                return
+            except Exception as error:  # noqa: BLE001 - decay bookkeeping never fails a retrieve
+                logger.warning(
+                    "read-age decay: touch_accessed_many failed for %d "
+                    "retrieved memories; their last_accessed_at is stale: %s",
+                    len(memory_ids),
+                    error,
+                )
+            return
         touch = getattr(self._memories, "touch_accessed", None)
         if not callable(touch):
             return
+        failures = 0
         for memory_id in memory_ids:
-            with suppress(Exception):
+            try:
                 await touch(memory_id, accessed_at)
+            except Exception as error:  # noqa: BLE001 - decay bookkeeping never fails a retrieve
+                failures += 1
+                logger.warning(
+                    "read-age decay: touch_accessed failed for memory %s; its "
+                    "last_accessed_at is stale: %s",
+                    memory_id,
+                    error,
+                )
+        if failures:
+            logger.warning(
+                "read-age decay: %d of %d retrieved memories were not touched",
+                failures,
+                len(memory_ids),
+            )
 
     @staticmethod
     def _scope_uuid(value: Any) -> uuid.UUID | None:
@@ -1430,7 +1592,7 @@ class RetrievalEngine:
                 base_half_life_days=self.RECENCY_HALF_LIFE_DAYS,
             )
         )
-        keyword = float(self._keyword_score(query.query_text, memory))
+        keyword = self._reported_keyword_score(query.query_text, memory)
         utility = float(max(-1.0, min(1.0, memory.utility_score or 0.0)))
         confidence = float(max(0.0, min(1.0, memory.confidence or 0.0)))
         temporal = self._temporal_relevance(query, memory, now, query_plan=query_plan)
@@ -1515,8 +1677,6 @@ class RetrievalEngine:
             + type_bonus
             + temporal * 0.12
         )
-        if memory.memory_state == "cold":
-            score = max(0.0, score * 0.7)
         clamped_score = min(1.0, max(0.0, score))
         return RetrievalResult(
             memory=memory,
@@ -1542,21 +1702,161 @@ class RetrievalEngine:
             seed_entity_ids,
             max_depth=max_depth,
         )
+        # One query returns the current memory ids per entity. `MemoryEntityLink`
+        # has no `valid_to`, so an unfiltered degree counts links to superseded
+        # rows: a memory the truth engine closed n times looks like a degree-n
+        # hub and is divided by sqrt(n), systematically demoting exactly the rows
+        # that were corrected.
+        current_by_entity = await self._current_memory_ids_by_entity(list(hop_distances))
         memory_weights: dict[uuid.UUID, float] = {}
         for entity_id, depth in hop_distances.items():
-            links = await self._links.get_memories_for_entity(entity_id)
-            degree = len(links)
+            memory_ids = current_by_entity.get(entity_id, [])
+            degree = len(memory_ids)
             if degree == 0:
                 continue
             # Inverse degree specificity: high-degree hub nodes get lower weight
             weight = (1.0 / (degree ** 0.5)) * (1.0 if depth == 0 else 0.5 ** depth)
-            for link in links:
-                memory_weights[link.memory_id] = max(
-                    memory_weights.get(link.memory_id, 0.0),
+            for memory_id in memory_ids:
+                memory_weights[memory_id] = max(
+                    memory_weights.get(memory_id, 0.0),
                     weight,
                 )
 
         return memory_weights
+
+    async def _current_memory_ids_by_entity(
+        self,
+        entity_ids: Sequence[uuid.UUID],
+    ) -> dict[uuid.UUID, list[uuid.UUID]]:
+        """Current memory ids per entity for the whole frontier.
+
+        Prefers the repository's purpose-built tenant-scoped join. Falls back to
+        the older two-step read when a link repository does not provide it, so a
+        custom implementation degrades in cost rather than losing the graph
+        channel entirely.
+        """
+        if self._links is None or not entity_ids:
+            return {}
+        fetch = getattr(self._links, "bulk_current_memory_ids_by_entity", None)
+        if callable(fetch):
+            try:
+                return await fetch(entity_ids)
+            except Exception as exc:  # noqa: BLE001 - graph must degrade, not fail
+                logger.warning(
+                    "current-memory-by-entity lookup failed (%d entities): %s",
+                    len(entity_ids),
+                    exc,
+                )
+                return {}
+
+        links_by_entity = await self._entity_memory_links(entity_ids)
+        current_ids = await self._current_memory_ids(
+            [link.memory_id for links in links_by_entity.values() for link in links]
+        )
+        grouped: dict[uuid.UUID, list[uuid.UUID]] = {}
+        for entity_id, links in links_by_entity.items():
+            grouped[entity_id] = [
+                link.memory_id
+                for link in links
+                if current_ids is None or link.memory_id in current_ids
+            ]
+        return grouped
+
+    async def _entity_memory_links(
+        self,
+        entity_ids: Sequence[uuid.UUID],
+    ) -> dict[uuid.UUID, list[MemoryEntityLink]]:
+        """Memory links per entity, one query for the whole frontier.
+
+        `bulk_get_memories_for_entities` replaces what used to be up to one
+        `get_memories_for_entity` call per entity in the walk's frontier (up to
+        `max_nodes`). Repositories that do not offer it -- the in-memory fakes,
+        mostly -- fall back to the per-entity call, still failing open.
+        """
+        bulk = getattr(self._links, "bulk_get_memories_for_entities", None)
+        if callable(bulk):
+            try:
+                links = await bulk(list(entity_ids))
+            except Exception as error:  # noqa: BLE001 - fall back to the per-entity read
+                logger.warning(
+                    "graph degree: bulk memory-link lookup failed for %d entities, "
+                    "falling back to per-entity reads: %s",
+                    len(entity_ids),
+                    error,
+                )
+            else:
+                grouped: dict[uuid.UUID, list[MemoryEntityLink]] = defaultdict(list)
+                for link in links or []:
+                    grouped[link.entity_id].append(link)
+                return dict(grouped)
+
+        grouped = defaultdict(list)
+        failures = 0
+        for entity_id in entity_ids:
+            try:
+                grouped[entity_id].extend(
+                    await self._links.get_memories_for_entity(entity_id)
+                )
+            except Exception as error:  # noqa: BLE001 - that entity contributes no degree
+                failures += 1
+                logger.warning(
+                    "graph degree: memory-link read failed for entity %s: %s",
+                    entity_id,
+                    error,
+                )
+        if failures:
+            logger.warning(
+                "graph degree: %d of %d entity link reads failed; degrees are "
+                "computed from the entities that did answer",
+                failures,
+                len(entity_ids),
+            )
+        return dict(grouped)
+
+    async def _current_memory_ids(
+        self,
+        memory_ids: Sequence[uuid.UUID],
+    ) -> set[uuid.UUID] | None:
+        """Which of `memory_ids` are current rows, or `None` if unresolvable.
+
+        Currency lives on `memory_record.valid_to`, so it has to be read from the
+        memory rows themselves -- and every one of those reads hydrates a full
+        record, embeddings included. That is why the resolve is budgeted: past
+        `MAX_CURRENT_CHECK_IDS` it is skipped and `None` is returned, which the
+        caller reads as "count every link", i.e. the behaviour before this
+        existed. A bulk id read is still far cheaper than the per-entity N+1 it
+        replaced, so the budget only bites on very large frontiers.
+        """
+        get_many = getattr(self._memories, "get_many_by_ids", None)
+        if not callable(get_many):
+            return None
+        unique_ids = list(dict.fromkeys(memory_ids))
+        if len(unique_ids) > self.MAX_CURRENT_CHECK_IDS:
+            logger.debug(
+                "graph degree: %d linked memories exceed the current-row check "
+                "budget of %d; degrees count superseded links",
+                len(unique_ids),
+                self.MAX_CURRENT_CHECK_IDS,
+            )
+            return None
+        current: set[uuid.UUID] = set()
+        for start in range(0, len(unique_ids), self.CURRENT_CHECK_CHUNK):
+            chunk = unique_ids[start : start + self.CURRENT_CHECK_CHUNK]
+            try:
+                records = await get_many(chunk)
+            except Exception as error:  # noqa: BLE001 - uncorrected degrees, as before the check
+                logger.warning(
+                    "graph degree: current-row check failed for %d memories, "
+                    "counting every link: %s",
+                    len(chunk),
+                    error,
+                )
+                return None
+            for record in records or []:
+                record_id = getattr(record, "id", None)
+                if record_id is not None and getattr(record, "valid_to", None) is None:
+                    current.add(record_id)
+        return current
 
     async def _entity_hop_distances(
         self,
@@ -1566,10 +1866,13 @@ class RetrievalEngine:
     ) -> dict[uuid.UUID, int]:
         """One `walk_entity_graph` round trip for the whole frontier.
 
-        Falls back to the seeds themselves (all at distance 0) when the edge
-        repository cannot walk. That is strictly less expansion than the old
-        BFS gave, not more, so it can only lower a graph weight; every caller
-        in this repo passes a real `EntityEdgeRepository`.
+        Without an edge repository the seeds themselves are used (all at
+        distance 0), which is the "no graph configured" case rather than a
+        failure. A walk that *raises* is a failure and returns nothing: depth 0
+        is the maximum weight, so synthesising `seed -> 0` on an outage would
+        promote every seed's memories to the best graph score available. A walk
+        that succeeded and returned no distances is a genuinely edgeless graph
+        and keeps the seed-at-zero fallback.
         """
         seeds = list(dict.fromkeys(seed_entity_ids))
         if self._edges is None or not seeds:
@@ -1578,12 +1881,21 @@ class RetrievalEngine:
         if not callable(walk):
             return {entity_id: 0 for entity_id in seeds}
         distances: dict[uuid.UUID, int] = {}
-        with suppress(Exception):
+        try:
             walked = await walk(seed_entity_ids=seeds, max_depth=max(max_depth, 0))
-            distances = {
-                entity_id: int(depth)
-                for entity_id, depth in (walked or {}).items()
-            }
+        except Exception as error:  # noqa: BLE001 - an outage contributes no weights, never max ones
+            logger.warning(
+                "graph walk failed; contributing no graph weights (seeds=%d, "
+                "max_depth=%d): %s",
+                len(seeds),
+                max_depth,
+                error,
+            )
+            return {}
+        distances = {
+            entity_id: int(depth)
+            for entity_id, depth in (walked or {}).items()
+        }
         if not distances:
             return {entity_id: 0 for entity_id in seeds}
         return distances
@@ -1622,6 +1934,22 @@ class RetrievalEngine:
                     return w[:-3] + "y"
                 return w[:-len(suffix)]
         return w
+
+    def _reported_keyword_score(self, query_text: str, memory: MemoryRecord) -> float:
+        """The lexical evidence to report, preferring PostgreSQL's own rank.
+
+        The channel is ordered by `ts_rank_cd`, so that is the score that
+        actually decided the ranking. Falling back to a separate hand-rolled
+        term-overlap ratio reported a different number on a different scale,
+        which is why the field read 0.0 for most results while the channel was
+        demonstrably returning them.
+        """
+        ranks = self._lexical_ranks
+        if ranks is not None:
+            rank = ranks.get(memory.id)
+            if rank is not None:
+                return float(rank)
+        return float(self._keyword_score(query_text, memory))
 
     def _keyword_score(self, query_text: str, memory: MemoryRecord) -> float:
         query_terms = self._terms(query_text)

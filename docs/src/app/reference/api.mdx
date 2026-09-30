@@ -335,12 +335,12 @@ Offset/limit, not cursor pagination. There is no `next_cursor` and no `cursor` p
   "tags": [], "session_id": "…", "memory_state": "active",
   "is_pinned": false, "is_archived": false,
   "valid_from": "…", "valid_to": null,
-  "fact_key": "sfx1:…",
+  "fact_key": "sfx2:…",
   "created_at": "…", "updated_at": "…", "last_accessed_at": null
 }
 ```
 
-`fact_key` being a `sfx1:<sha256>` slot key means the row occupies a structural fact slot; a bare 64-hex value is the legacy text-hash key.
+`fact_key` being a `sfx2:<sha256>` slot key means the row occupies a structural fact slot; a bare 64-hex value is the legacy text-hash key, and an `sfx1:` value is a superseded structural key from v1.5 that is still readable but is never written.
 
 ### `GET /v1/memories/{memory_id}/explain`
 

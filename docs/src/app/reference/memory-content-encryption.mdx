@@ -1,0 +1,137 @@
+# Memory content encryption at rest
+
+`memory_record.content` is sealed with authenticated encryption and a per-tenant
+key. This page is about the part that is easy to get wrong: **the seal applies
+from v1.5.1 onward, and it is not retroactive.**
+
+## What is sealed
+
+| Column | Stored as |
+| :--- | :--- |
+| `memory_record.content` | `enc:v1:<base64(nonce ‖ tag ‖ ciphertext)>` |
+| `memory_record.title` | cleartext |
+| `memory_record.search_text`, `search_vector` | cleartext |
+| `memory_record.structured_data`, `tags` | cleartext |
+| `memory_version.content` | cleartext |
+
+Only the body text is sealed. That is not an oversight in the encryption — the
+lexical channel is a PostgreSQL `tsvector` GIN predicate over `search_text`, and
+a BM25 score over ciphertext is meaningless, so the search projection has to
+hold the words themselves. If you need the title or the search projection
+sealed too, that is a schema change, not a configuration flag.
+
+## Why this note exists
+
+Until v1.5.1, `encrypt_content` was called from exactly three places, all inside
+`contexta/repositories/memory_repo.py`. The ingestion orchestrator builds its
+`MemoryRecord` rows itself and persists them with `session.add_all`, so it never
+went through `MemoryRepository.create()`. On a real development database that
+measured:
+
+```
+total 130   PLAINTEXT 116   encrypted 14
+```
+
+**~89% of stored memories were in cleartext.** The reads were unaffected, which
+is exactly why it survived: `MemoryRecord.plaintext_content` accepts both forms,
+so every route, the retrieval engine, the embedder, and deduplication kept
+working while the database quietly held sentences instead of ciphertext.
+
+v1.5.1 moves the seal from the call site to the model. `MemoryRecord` registers
+mapper-level `before_insert` and `before_update` hooks
+(`contexta/models/memory.py`), so any ORM write — the orchestrator, the
+repository, a future writer — seals its content. Sealing is idempotent: a value
+already carrying the `enc:v1:` envelope is left byte for byte alone.
+
+The key is derived per organization from `CONTEXTA_SECRET_KEY`
+(PBKDF2-HMAC-SHA256, 100,000 iterations, the organization id as the salt), so two
+tenants storing the same sentence produce unrelated ciphertext, and neither opens
+under the other's key. **Changing `CONTEXTA_SECRET_KEY` makes existing sealed
+content unreadable.** There is no recovery path; `plaintext_content` raises
+`MemoryContentDecryptionError` rather than returning garbage.
+
+## Rows written before the fix are still cleartext
+
+The fix seals new writes. It does not and cannot rewrite history. To find what is
+exposed, run this read-only query:
+
+```sql
+SELECT count(*) AS cleartext_rows
+FROM memory_record
+WHERE content IS NOT NULL
+  AND content NOT LIKE 'enc:v1:%';
+```
+
+Per-organization, and per-organization *and* user, which is the number that
+matters if you have more than one actor behind a key:
+
+```sql
+SELECT organization_id, user_id, count(*) AS cleartext_rows,
+       min(created_at) AS oldest, max(created_at) AS newest
+FROM memory_record
+WHERE content IS NOT NULL
+  AND content NOT LIKE 'enc:v1:%'
+GROUP BY organization_id, user_id
+ORDER BY cleartext_rows DESC;
+```
+
+A count of `0` means every row in that database was written by a v1.5.1-or-later
+process. A non-zero count is the exact size of the gap.
+
+The negative form is the health check to run after upgrading:
+
+```sql
+SELECT count(*) FROM memory_record WHERE content LIKE 'enc:v1:%';
+```
+
+If that number stops growing while the first one stays flat, the write path is
+sealing. Both counts are non-mutating; neither takes a lock that blocks ingestion.
+
+## What to do about it
+
+Three options, in the order most operators want them.
+
+**Re-ingest.** Replay the original observations. The content arrives as
+plaintext again and is sealed on the way in, the vectors and the graph are
+rebuilt, and truth maintenance re-reconciles. This is the only option that also
+re-derives the structural `fact_key`, so it is the one that leaves the database
+internally consistent after an `sfx1:` → `sfx2:` change. It costs extraction time
+and LLM work, and it is not idempotent: replaying an observation that has already
+been ingested produces new rows, because a rephrasing is a *different* assertion
+under `sfx2:`.
+
+**Migrate in place.** Read each row, decrypt, re-encrypt, write back, keeping the
+same `id`, `valid_from`, and `fact_key` so lineage and the
+`uq_memory_record_current_fact_slot` partial unique index are untouched. This is a
+one-off operator script and it is deliberately not shipped in this repository:
+it has to be written against your own `CONTEXTA_SECRET_KEY` handling and your own
+backup and rollback policy, and a half-applied migration over a column you cannot
+re-read is not something a library should do to you. Work on a copy first, and
+`ANALYZE memory_record` afterwards.
+
+**Accept it.** If the database is disposable — the observations are still
+upstream, or the deployment never held anything you would not put in a backup —
+re-ingesting is cheaper than the risk of a migration. What you must not do is
+assume the column is sealed, because nothing in the read path will tell you
+otherwise.
+
+## Verifying a fresh write
+
+```bash
+KEY=mk_live_... ; ORG=<organization uuid> ; ACTOR=<actor uuid>
+
+curl -s -X POST http://localhost:8000/v1/observations \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"user_id":"'"$ACTOR"'","organization_id":"'"$ORG"'",
+       "session_id":"33333333-3333-4333-8333-333333333333",
+       "messages":[{"role":"user","content":"My port is 5432 and I prefer Postgres."}]}'
+
+# extraction is asynchronous; wait for the worker, then:
+docker compose exec -T postgres psql -U postgres -d contexta -t -c \
+  "select left(content, 7) from memory_record order by created_at desc limit 1;"
+#  enc:v1:
+```
+
+Regression coverage is `tests/test_content_encryption.py`. It creates and drops a
+throwaway database, so it needs the pgvector image and nothing else; it skips
+when no PostgreSQL is reachable.

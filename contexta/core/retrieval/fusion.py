@@ -16,8 +16,10 @@ DEFAULT_UTILITY_PRIOR = 0.005
 # answer. RRF normalises against the *best possible* rank, so a top-1 hit lands
 # near 1.0 and a rank-10 hit near 0.87; the crossover where a single channel
 # stops carrying the answer is around rank 60, which scores ~0.45 after the
-# engine's 0.80/0.20 blend. Tunable, and meant to be measured before it is
-# relied on -- see `RetrievalEngine(enable_dense_escalation=...)`.
+# engine's 0.80/0.20 blend. This now gates the default retrieval path, because
+# `RetrievalEngine(enable_dense_escalation=...)` defaults to True; pass False to
+# get the previous unconditional three-channel order. Tunable, and still worth
+# measuring against a real corpus.
 DEFAULT_SUFFICIENCY_QUALITY_FLOOR = 0.45
 
 # How far the leader must clear the runner-up to count as "the" answer. A
@@ -79,19 +81,23 @@ def weighted_reciprocal_rank_fusion(
     fused = [
         FusedCandidate(
             memory=memory,
-            score=min(
-                1.0,
-                scores[memory_id] / maximum
-                + max(0.0, utility_prior)
-                * (
-                    (max(-1.0, min(1.0, getattr(memory, "utility_score", 0.0) or 0.0)) + 1.0)
-                    / 2.0
-                )
-                + max(0.0, quality_prior)
-                * (
-                    0.6 * max(0.0, min(1.0, getattr(memory, "importance", 0.0) or 0.0))
-                    + 0.4 * max(0.0, min(1.0, getattr(memory, "confidence", 0.0) or 0.0))
-                ),
+            # Clamp the normalised RRF term alone, never the sum. Clamping the
+            # sum froze every candidate whose rank-plus-priors crossed 1.0 onto
+            # an identical score: with the production priors the additive term
+            # is ~0.145, so ranks 1..11 in all channels all scored exactly 1.0
+            # and the final blend ordered them on its 0.20 term alone. The
+            # caller owns the outer clamp -- engine.py `_score_candidates`
+            # applies min(1.0, max(0.0, ...)) to the blended result.
+            score=min(1.0, scores[memory_id] / maximum)
+            + max(0.0, utility_prior)
+            * (
+                (max(-1.0, min(1.0, getattr(memory, "utility_score", 0.0) or 0.0)) + 1.0)
+                / 2.0
+            )
+            + max(0.0, quality_prior)
+            * (
+                0.6 * max(0.0, min(1.0, getattr(memory, "importance", 0.0) or 0.0))
+                + 0.4 * max(0.0, min(1.0, getattr(memory, "confidence", 0.0) or 0.0))
             ),
             channel_ranks=tuple(ranks[memory_id]),
         )

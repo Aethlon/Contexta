@@ -89,7 +89,7 @@ rather than trusting this table.
 | Redaction | `uv run --no-sync python benchmarks/redaction/run_redaction_test.py` | **0 leaks, 0 over-redactions, 59/59 idempotent** |
 | Cache / rate-limit middleware | `uv run --no-sync python -m pytest tests/test_api_middleware.py` | **11/11 pass** |
 | MCP security (unit) | `uv run --no-sync python -m pytest tests/test_mcp_security.py` | **22 pass, 2 skip** (the 2 need a live DB) |
-| MCP security (live, in-container) | `docker cp benchmarks/mcp_security_check.py memento-worker-1:/app/ && docker exec memento-worker-1 python /app/mcp_check.py` | **4/4 pass** |
+| MCP security (live, in-container) | `docker cp benchmarks/mcp_security_check.py memento-worker-1:/tmp/ && docker compose exec -T worker python /tmp/mcp_check.py` | **6/6 pass** |
 | Graph traversal | `uv run --no-sync python benchmarks/graph_endpoint_test.py` | **all endpoints 200** |
 | Go edge | `cd services/gateway; go build ./... && go test ./...` | **build ok, tests ok** |
 | Compose | `docker compose config --quiet` | **valid** |
@@ -201,8 +201,11 @@ and has not been run. Treat 100% as "learned the contract", not "generalises".
 adds API-key auth, tenant scoping, `safe_local_path` (traversal/symlink confinement),
 `safe_remote_fetch` (SSRF guard: https-only, DNS re-checked on every redirect,
 private/loopback rejection, byte cap), a rate limiter, and content/importance validation.
-The live check passes 4/4 and a probe write was confirmed to land in the injected
-tenant with the PII redacted. Remaining:
+The live check passes 6/6 and a probe write was confirmed to land in the injected
+tenant, then decrypted and confirmed to read `My email is [REDACTED] and my card is
+[REDACTED].` — the previous version of that check queried `content LIKE '%secret%'`
+against an encrypted column, matched nothing, and passed without asserting anything.
+Remaining:
 - `tests/test_mcp_security.py` has 2 DB-backed tests that cannot run on the host (see the
   port note in section 4). They pass in-container.
 - **MCP wrote its embedding to the wrong vector column.** It stored 1024 dims into
@@ -235,25 +238,59 @@ CPU torch. Moving embedding/reranking to GPU is the largest untouched latency wi
 and 17.6 s across runs, caused by concurrent benchmark load. Ratios measured
 back-to-back are trustworthy; absolute milliseconds are not. Measure on an idle box.
 
+**7.9 At-rest encryption was a claim, not a mechanism, until v1.5.1.**
+`encrypt_content` was reachable from three call sites, all inside
+`repositories/memory_repo.py`. The ingestion orchestrator builds its `MemoryRecord`
+rows itself and `session.add_all`s them, so it never went through `create()`.
+Measured: `total 130  PLAINTEXT 116  encrypted 14`. The 14 were the rows that
+happened to go through a dedup merge. `plaintext_content` accepts both forms,
+which is why every reader kept working and nothing flagged it.
+
+Fixed by moving the seal from the call site to the model: `MemoryRecord` registers
+mapper-level `before_insert` / `before_update` hooks (`models/memory.py`) that
+encrypt any plaintext `content` with the row's own organization key, idempotently.
+Regression coverage is `tests/test_content_encryption.py` (10 tests, own scratch
+database, skips without PostgreSQL). Remaining:
+- **Forward-only.** Pre-fix rows are still cleartext and nothing rewrites them.
+  Detection SQL and the three operator options are in
+  `docs/src/app/reference/memory-content-encryption.mdx`. Do not re-encrypt
+  history without an explicit operator decision.
+- **Only `content` is sealed.** `title`, `search_text`, `search_vector`,
+  `structured_data`, `tags`, and `memory_version.content` are cleartext, because
+  lexical retrieval is a `tsvector` GIN predicate over `search_text`.
+- **Two routes publish the raw column.** `api/routes/memories.py:542` (timeline)
+  builds its own `select()` and reads `m.content`; `api/routes/graph.py:158`
+  reads `mem.content` from `get_linked_to_entities`, the one repository method
+  that deliberately returns unhydrated rows. Both need `plaintext_content`.
+  `batch-get` (`memories.py:575`) is fine — `get_many_by_ids` hydrates.
+- **Core DML is invisible to the hooks.** The only content-writing Core statement
+  is `TenantScopedRepository.update_by_id`, and `MemoryRepository` seals the value
+  before handing it over.
+
 ---
 
 ## 8. Next steps, in priority order
 
-1. **Grep for other direct `MemoryRecord(...)` writes that set `embedding=`.** The MCP
+1. **Fix the two routes that publish ciphertext** (7.9): `m.content` →
+   `m.plaintext_content` at `api/routes/memories.py:542` and `api/routes/graph.py:158`.
+2. **Decide what happens to pre-fix plaintext rows** (7.9). Re-ingest is the only
+   option that also re-derives `sfx2:` fact keys; an in-place migration is possible
+   but has to be written against the operator's own key handling and rollback policy.
+3. **Grep for other direct `MemoryRecord(...)` writes that set `embedding=`.** The MCP
    path wrote 1024-dim vectors into the 1536-dim `embedding` column, so every agent
    write was failing. Any remaining `embedding=` on a direct model construction is a
    latent instance of the same bug.
-2. **Run a template-family-held-out** extraction eval to get a real generalisation number
+4. **Run a template-family-held-out** extraction eval to get a real generalisation number
    (7.1).
-3. **Decide on MCP bulk import**: keep the sandboxed `file_path`/`file_url`, or remove
+5. **Decide on MCP bulk import**: keep the sandboxed `file_path`/`file_url`, or remove
    them and force `POST /v1/artifacts`.
-4. **Move the model server to the GPU**, then re-measure retrieval cold and warm.
-5. **Split embedding and reranking** into separate processes; they currently contend.
-6. **Adaptive rerank pool** — `RERANK_POOL_SIZE = 45` through a cross-encoder is
+6. **Move the model server to the GPU**, then re-measure retrieval cold and warm.
+7. **Split embedding and reranking** into separate processes; they currently contend.
+8. **Adaptive rerank pool** — `RERANK_POOL_SIZE = 45` through a cross-encoder is
    expensive; rerank the top ~20 by RRF.
-7. **Align the SDKs with the kernel contract** — both SDKs target `/v1/observations`;
+9. **Align the SDKs with the kernel contract** — both SDKs target `/v1/observations`;
    `/v1/kernel/observe` is the richer contract and remains unused by clients.
-8. **Add a health assertion** so a `created` api/worker/beat fails loudly (3).
+10. **Add a health assertion** so a `created` api/worker/beat fails loudly (3).
 9. **Commit.** The tree has ~250 changed paths and no commit. The Go agent noted
    `list_policies` / `register_policy` / `register_schema` target routes that do not
    exist and need an API decision.

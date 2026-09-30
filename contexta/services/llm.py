@@ -20,6 +20,20 @@ _FENCE_RE = re.compile(r"^\s*```[ \t]*([A-Za-z0-9_+-]*)[ \t]*\r?\n(.*?)\r?\n?\s*
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 _ORPHAN_FENCE_RE = re.compile(r"```[ \t]*[A-Za-z0-9_+-]*[ \t]*\r?\n?", re.IGNORECASE)
 
+# Extraction body-quality thresholds. A gold claim's ``text`` must be the user's
+# own sentence quoted verbatim; these bounds are what "a sentence" means in
+# practice for the fine-tuned extractor. See `LLMService._resolve_claim_body`.
+MIN_BODY_CHARS = 3
+MIN_BODY_TOKENS = 4
+SUMMARY_BODY_RATIO = 0.5
+
+_BODY_TRIM = ".!?,;:\"'()[]"
+
+
+def _body_key(value: str) -> str:
+    """Comparison key for a claim body: spacing, case and edge punctuation aside."""
+    return re.sub(r"\s+", " ", value).strip().strip(_BODY_TRIM).casefold()
+
 
 def _balanced_json_slice(text: str) -> str | None:
     """Return the first balanced {...} or [...] span, ignoring braces in strings."""
@@ -446,13 +460,25 @@ class LLMService:
             if not isinstance(claim, dict):
                 continue
             text = str(claim.get("text") or "").strip()
-            if not text:
-                continue
             subject = str(claim.get("subject") or "the user")
             predicate = str(claim.get("predicate") or "").strip()
             object_value = str(claim.get("object") or "").strip()
-            summary = f"{subject} {predicate} {object_value}".strip()
-            summary = re.sub(r"\s+", " ", summary)
+            summary = re.sub(r"\s+", " ", f"{subject} {predicate} {object_value}".strip())
+
+            text = self._resolve_claim_body(
+                text,
+                subject,
+                summary,
+                has_triple=bool(predicate) and bool(object_value),
+            )
+            if not text:
+                continue
+
+            # A summary built from an absent predicate and object is just the
+            # subject restated, so it may not title a memory whose body is a
+            # real sentence. Title from the triple only when there is one.
+            title = summary[:120].strip() if predicate and object_value else text[:60].strip()
+
             memory_type = str(claim.get("memory_type") or "fact")
             try:
                 memory_type = MemoryType(memory_type).value
@@ -460,7 +486,7 @@ class LLMService:
                 memory_type = MemoryType.FACT.value
             memories.append(
                 {
-                    "title": (summary[:120] or text[:60]).strip(),
+                    "title": (title or text[:60]).strip(),
                     "content": text,
                     "memory_type": memory_type,
                     "source_type": "user_explicit",
@@ -478,6 +504,82 @@ class LLMService:
                 }
             )
         return memories
+
+    def _resolve_claim_body(
+        self,
+        text: str,
+        subject: str,
+        summary: str,
+        *,
+        has_triple: bool,
+    ) -> str:
+        """Return a storable body for a gold claim, or "" when there is none.
+
+        Measured on a live 10-conversation ingest (130 rows): 8 bodies were
+        literally ``"the user"``, 10 were <= 12 characters, and 71 (54.6%) were
+        <= 40 characters with a mean of 42.1. The contract asks for ``text`` to be
+        the user's own sentence quoted verbatim
+        (``contexta/contracts/extraction.py``), but the 1.2B fine-tune often
+        cannot find a complete sentence in the conversation, so it emits the one
+        token it was told to use -- the subject string it was instructed to use --
+        or an echo of the object or predicate ("6543", "is owned by"). A
+        synthesised title made those rows look structurally perfect, so the
+        degenerate body was invisible.
+
+        Policy, applied in order:
+
+        1. A body that cannot stand alone is never stored as-is.
+        2. If the triple is intact the claim is still a real fact, so the body
+           falls back to the synthesised summary. A memory whose content is
+           ``"the user distinguished value 112,000 USD"`` is strictly better than
+           one whose content is ``"the user"``, and keeping it preserves the fact
+           value, which a drop would throw away.
+        3. If the body *and* the triple are both degenerate there is nothing
+           left to store, so the claim is dropped whole. Never emit an empty or
+           contentless row.
+        """
+        if not self._is_degenerate_body(text, subject, summary):
+            return text
+
+        if has_triple:
+            logger.debug(
+                "Extraction claim body was degenerate (subject=%r, body=%r); "
+                "falling back to the synthesised summary %r.",
+                subject,
+                text,
+                summary,
+            )
+            return summary
+
+        logger.warning(
+            "Dropping extraction claim: body %r and an incomplete triple "
+            "(subject=%r) leave nothing to store.",
+            text,
+            subject,
+        )
+        return ""
+
+    @staticmethod
+    def _is_degenerate_body(text: str, subject: str, summary: str) -> bool:
+        """Whether a claim's ``text`` cannot serve as the memory body.
+
+        Four independent ways to fail, any one of which is disqualifying:
+
+        * too short to be anything but a token,
+        * the subject restated -- the fine-tune's most common failure and the
+          exact shape that produced 8 identical ``"the user"`` bodies,
+        * fewer than ``MIN_BODY_TOKENS`` whitespace tokens, which is a bare noun
+          phrase or a predicate echo rather than a sentence,
+        * shorter than ``SUMMARY_BODY_RATIO`` of the synthesised summary, meaning
+          it carries less than the triple the same claim already spells out.
+        """
+        if len(text) < MIN_BODY_CHARS:
+            return True
+        if _body_key(text) == _body_key(subject):
+            return True
+        if len(text.split()) < MIN_BODY_TOKENS:
+            return True
+        return len(text) < len(summary) * SUMMARY_BODY_RATIO
 
     async def _heuristic_extract(self, prompt: str) -> str:
         """Last-resort regex assembler. Not a substitute for the tuned model."""

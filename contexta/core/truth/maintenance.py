@@ -116,6 +116,28 @@ class TruthMaintenanceEngine:
             exclude_ids=exclude_ids,
         )
 
+    async def plan_all(
+        self,
+        memories: Sequence[MemoryRecord],
+        *,
+        actor_id: uuid.UUID | None = None,
+        now: datetime | None = None,
+        exclude_ids: Sequence[uuid.UUID] = (),
+    ) -> tuple[dict[uuid.UUID, list[PlannedSupersession]], set[uuid.UUID]]:
+        """Close the contradicted rows of a whole batch, and name the rows to skip.
+
+        Returns each memory's plan plus the ids whose fact slot still holds a
+        current row, because one current row per slot is a uniqueness constraint
+        and such a memory cannot be inserted at all. Must run before any of
+        `memories` is inserted.
+        """
+        return await self._service.plan_all(
+            memories,
+            actor_id=actor_id,
+            now=now,
+            exclude_ids=exclude_ids,
+        )
+
     async def record(
         self,
         planned: Sequence[PlannedSupersession],

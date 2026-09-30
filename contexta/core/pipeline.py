@@ -35,7 +35,6 @@ from contexta.core.temporal import (
     normalize_temporal_text,
 )
 from contexta.core.truth.maintenance import TruthMaintenanceEngine
-from contexta.core.truth.service import PlannedSupersession
 from contexta.core.types import MemoryState
 from contexta.models.memory import MemoryRecord
 from contexta.repositories.audit_repo import AuditRepository
@@ -56,15 +55,22 @@ __all__ = [
     "enqueue_embedding_generation",
     "fact_key_for_memory",
     "structural_fact_key",
+    "structural_fact_key_from_structured",
 ]
 
-# Structural fact keys are prefixed so the two key families stay tellable apart
-# in the column they share: a slot key is `sfx1:<sha256>` and a legacy text-hash
-# key is a bare 64-char hex digest. Nothing branches on the prefix -- lookups are
+# Structural fact keys are prefixed so the key families stay tellable apart in
+# the column they share: a slot key is `sfx2:<sha256>` and a legacy text-hash key
+# is a bare 64-char hex digest. Nothing branches on the prefix -- lookups are
 # exact-string matches either way -- but coverage is measurable with
-# `fact_key LIKE 'sfx1:%'`, and a structural key can never be mistaken for a
+# `fact_key LIKE 'sfx2:%'`, and a structural key can never be mistaken for a
 # legacy one by a reader that only knows the old shape.
-_STRUCTURAL_FACT_KEY_PREFIX = "sfx1:"
+#
+# The prefix is a schema version, not a label. `sfx1:` hashed subject+predicate
+# and left the object out; `sfx2:` hashes the whole triple. The two families are
+# therefore different functions and a digest can be reused by neither, so the
+# bump keeps every pre-existing structural key provably distinct from any new
+# one instead of letting a stale `sfx1:` digest alias onto an `sfx2:` slot.
+_STRUCTURAL_FACT_KEY_PREFIX = "sfx2:"
 
 
 def _canonical_component(value: Any) -> str:
@@ -80,27 +86,20 @@ def _slot_digest(slot: str) -> str | None:
     return _STRUCTURAL_FACT_KEY_PREFIX + hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
-def structural_fact_key(memory: ExtractedMemory) -> str | None:
-    """Hash the fact slot the extractor named, or None when it named none.
+def structural_fact_key_from_structured(structured_data: Any) -> str | None:
+    """Hash the fact slot named by one ``structured_data`` payload, or None.
 
-    The key is normalised before hashing so two extractions of the same slot that
-    differ only in spacing or case land in the same slot; an LLM-authored key
-    would otherwise split one fact across two slots.
+    Takes the payload rather than an `ExtractedMemory` so the write path and
+    `scripts/backfill_fact_keys.py` resolve slots through one implementation; a
+    backfill that recomputed the digest itself would drift from the pipeline the
+    moment the canonicalisation changed.
 
-    The object is deliberately excluded. A slot is "who, about what": the same
-    subject and predicate stated with a new value is a correction of that slot,
-    and a correction only supersedes if it reaches the incumbent row, which
-    `MemoryRepository.get_current_by_fact_key` can do only when the two share a
-    key. `context` is included because it scopes a slot that is only meaningful
-    alongside it.
-
-    The object is required as well as the subject and predicate. A slot with no
-    value has nothing for `fact_value` to compare, so that lookup falls back to
-    the memory's prose and a rephrasing of the same fact reads as a correction --
-    the churn a structural key exists to remove. Refusing the partial triple keeps
-    the slot and the value arriving together.
+    The slot is the canonicalised ``subject`` + ``predicate`` + ``context`` (when
+    present) + ``object``, hashed. The components are normalised before hashing
+    so two extractions that differ only in spacing or case land in the same slot;
+    an LLM-authored key would otherwise split one fact across two slots.
     """
-    structured = memory.structured_data if isinstance(memory.structured_data, dict) else {}
+    structured = structured_data if isinstance(structured_data, Mapping) else {}
     explicit = structured.get("fact_key") or structured.get("truth_key")
     if isinstance(explicit, Mapping) and explicit.get("key"):
         explicit = explicit["key"]
@@ -115,8 +114,53 @@ def structural_fact_key(memory: ExtractedMemory) -> str | None:
     if not subject or not predicate or not object_value:
         return None
     context = _canonical_component(fact.get("context"))
-    parts = [subject, predicate] + ([context] if context else [])
+    parts = [subject, predicate] + ([context] if context else []) + [object_value]
     return _slot_digest("\x1f".join(parts))
+
+
+def structural_fact_key(memory: ExtractedMemory) -> str | None:
+    """Hash the fact slot the extractor named, or None when it named none.
+
+    The slot is ``subject`` + ``predicate`` + ``context`` (when present) +
+    ``object``, canonicalised and hashed. All three of subject, predicate and
+    object are required: a partial triple cannot name a slot, and guessing one
+    would let an unrelated memory collide with a stored fact, so it returns None
+    and the caller falls back to the legacy text hash. The object is what makes
+    the slot nameable, so it is also part of the digest.
+
+    Why the object is in the digest
+    ------------------------------
+    ``sfx1:`` omitted it, on the theory that a slot is "who, about what" and a
+    new value is a correction of that slot. That only holds if the predicate is
+    exclusive -- one live value per subject and predicate. It is not, and it is
+    not even close. Measured over a 10-conversation ingest: 123 keyed rows
+    resolved to 32 slots, and `subject` was the literal string ``"the user"`` in
+    all 123, so the digest collapsed to ``sha256("the user" + <coarse verb>)``.
+    Four mutually exclusive `uses` facts shared one slot. With
+    `uq_memory_record_current_fact_slot` allowing one current row per slot, each
+    new arrival closed the previous one: 46 rows written, 28 superseded (61%),
+    18 distinct facts reachable, and of 10 sampled supersession pairs, 0 were
+    real contradictions and 8 were unrelated (a credential row closed by a code
+    snippet, `the user uses multiplication` closed by `the user uses
+    function_15`). A slot that collides on unrelated facts does not reconcile
+    truth, it deletes it.
+
+    So the slot names the whole assertion. Distinct facts get distinct slots and
+    coexist; the index stops being the thing that decides which fact survives.
+
+    The cost, stated plainly
+    -----------------------
+    A *reworded correction* no longer lands in the same slot. "Salary is 45k"
+    and "Actually the salary is $45,000" hash to different slots, so the stale
+    row is no longer automatically retired by the unique index. That is now the
+    job of `FactSlotContradictionDetector`, which refuses to close a slot unless
+    the two values are comparable corrections of the same attribute -- and of the
+    extractor's own `status` field, which is the one signal that actually says
+    which of two claims is the correction. Supersession is narrower and far less
+    frequent than it was; a missed correction shows up as two live rows, which is
+    the recoverable direction. Silent deletion of an unrelated fact is not.
+    """
+    return structural_fact_key_from_structured(memory.structured_data)
 
 
 def fact_key_for_memory(
@@ -126,14 +170,14 @@ def fact_key_for_memory(
 ) -> str:
     """Resolve which fact slot this memory occupies.
 
-    A structural key from the extractor's subject/predicate triple names the
-    *fact* ("Fatima Okafor" x "lives_in"), so two statements of that slot keep one
-    key however they are phrased and a corrected value supersedes the row it
-    replaces. The text hash below is only a proxy for the slot: a rephrasing
-    changes the key, so the row it should have superseded stays current. It
-    stays as the fallback for any extraction carrying no usable triple, which is
-    every memory written before the triple existed and any memory whose model
-    omitted it.
+    A structural key names the whole assertion the extractor made -- subject,
+    predicate, optional context and object -- so two memories that state the same
+    fact however they are phrased keep one key, and two memories that state
+    *different* facts never collide on one. The text hash below is only a proxy
+    for the slot: a rephrasing changes the key, so the row it should have
+    superseded stays current. It stays as the fallback for any extraction
+    carrying no usable triple, which is every memory written before the triple
+    existed and any memory whose model omitted it.
     """
     structural = structural_fact_key(memory)
     if structural is not None:
@@ -373,7 +417,7 @@ class FastMemoryOrchestrator:
             result.timings = timings
             return result
 
-        # ── STAGE 4: IN-MEMORY BULK ENTITY RESOLUTION & GRAPH BUILDING ────
+        # ── STAGE 4: TRUTH PLANNING, THEN ENTITY RESOLUTION & GRAPH BUILDING ─
         t2 = time.perf_counter()
         # Instantiate memory records with deterministic IDs
         mem_records_to_add: list[MemoryRecord] = []
@@ -423,6 +467,44 @@ class FastMemoryOrchestrator:
             mem_records_to_add.append(record)
             mem_pairs.append((rec_id, mem))
 
+        # Claim the fact slots this batch takes over, before anything is
+        # inserted. uq_memory_record_current_fact_slot allows one current row
+        # per slot, so the incumbent has to be closed before its replacement is
+        # inserted, and a pending insert in the session would be autoflushed
+        # ahead of the close. The version and audit rows follow the flush below,
+        # because memory_version.superseded_by_id references the new row.
+        # A sibling from this same observation is a peer, not an older truth:
+        # excluding the batch keeps the iteration order of one extraction from
+        # deciding which statement of a slot survives.
+        batch_ids = frozenset(record.id for record in mem_records_to_add)
+        planned_by_record, blocked_ids = await truth_engine.plan_all(
+            mem_records_to_add,
+            actor_id=user_id,
+            exclude_ids=batch_ids,
+        )
+
+        # A slot the engine declined to clear is a slot this row cannot enter,
+        # and inserting it anyway would abort the whole observation. This runs
+        # before the graph is built so a dropped memory leaves no orphan links or
+        # edges behind it.
+        if blocked_ids:
+            kept_records = [rec for rec in mem_records_to_add if rec.id not in blocked_ids]
+            kept_ids = {rec.id for rec in kept_records}
+            mem_records_to_add = kept_records
+            mem_pairs = [pair for pair in mem_pairs if pair[0] in kept_ids]
+            for rec_id in blocked_ids:
+                result.discarded_count += 1
+                result.details.append({
+                    "memory_id": str(rec_id),
+                    "action": "slot_occupied",
+                    "summary": "fact slot still holds a current row; not stored",
+                })
+            if not mem_records_to_add:
+                timings.entity_graph_ms = round((time.perf_counter() - t2) * 1000, 2)
+                timings.total_ms = round((time.perf_counter() - t_start) * 1000, 2)
+                result.timings = timings
+                return result
+
         bulk_resolver = BulkEntityResolver(entity_repo, link_repo, edge_repo)
         graph_res: BulkResolutionResult = await bulk_resolver.resolve_batch(
             user_id=user_id,
@@ -434,24 +516,6 @@ class FastMemoryOrchestrator:
 
         # ── STAGE 5: ATOMIC PERSISTENCE & TRUTH APPLICATION ──────────────
         t3 = time.perf_counter()
-        # 0. Claim the fact slots this batch takes over, before anything is
-        # inserted. uq_memory_record_current_fact_slot allows one current row
-        # per slot, so the incumbent has to be closed before its replacement is
-        # inserted, and a pending insert in the session would be autoflushed
-        # ahead of the close. The version and audit rows follow the flush below,
-        # because memory_version.superseded_by_id references the new row.
-        # A sibling from this same observation is a peer, not an older truth:
-        # excluding the batch keeps the iteration order of one extraction from
-        # deciding which statement of a slot survives.
-        batch_ids = frozenset(record.id for record in mem_records_to_add)
-        planned_by_record: dict[uuid.UUID, list[PlannedSupersession]] = {}
-        for rec in mem_records_to_add:
-            planned_by_record[rec.id] = await truth_engine.plan(
-                rec,
-                actor_id=user_id,
-                exclude_ids=batch_ids,
-            )
-
         # 1. Add all memory records
         session.add_all(mem_records_to_add)
 

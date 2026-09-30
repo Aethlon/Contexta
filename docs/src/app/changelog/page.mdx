@@ -28,12 +28,12 @@ stopped silently falling back to heuristics. Billing and metering code is gone.
 - Case-insensitive uniqueness on `entity (organization_id, user_id, lower(name))` plus entity-name trigram indexes. The migration merged **2,670 pre-existing duplicate entity groups to zero** and deduplicated **2,745 colliding edges**; **869 relationship types** were normalised.
 - A dedicated `TruthSupersessionService` that invalidates a contradicted memory with `valid_to = now()` and records lineage through `memory_version.superseded_by_id`, so stale facts are excluded from active retrieval instead of accumulating as contradictions. Backed by `uq_memory_record_current_fact_slot`, a partial unique index guaranteeing at most one current fact per slot.
 - A closed, validated set of relationship types enforced by a database CHECK constraint, with self-loop rejection at the storage layer.
-- Structural fact keys: a `subject` / `predicate` / `object` triple from the extractor yields an `sfx1:<sha256>` slot key, so a corrected value supersedes the row it replaces instead of duplicating it. Legacy bare-64-hex text-hash keys are still produced and still supported.
+- Structural fact keys: a `subject` / `predicate` / `object` triple from the extractor yields a slot key over the whole assertion. **The prefix was `sfx1:` in v1.5.0 and is now `sfx2:`** — see the v1.5.1 notes below for why. Legacy bare-64-hex text-hash keys are still produced and still supported.
 - `api_key.tier` with a CHECK constraint, so rate limiting meters per tier instead of one hard-coded limit.
 
 ### Added — retrieval
 
-- A **cascade retrieval mode**: lexical and graph evidence are gathered first, and the dense channel is only consulted when that primary evidence is judged insufficient by `assess_primary_sufficiency()`. Opt-in and **off by default** — the only switch is the `RetrievalEngine(enable_dense_escalation=True)` constructor argument. There is no environment variable and no request field.
+- A **cascade retrieval mode**: lexical and graph evidence are gathered first, and the dense channel is only consulted when that primary evidence is judged insufficient by `assess_primary_sufficiency()`. The only switch is the `RetrievalEngine(enable_dense_escalation=...)` constructor argument — there is no environment variable and no request field. It **shipped opt-in in v1.5.0 and is the default in v1.5.1**.
 - Precision-aware freshness scoring that honours `temporal_precision` and `temporal_basis`, so an explicitly approximate timestamp is not treated as an exact one.
 
 ### Added — extraction reliability
@@ -96,6 +96,47 @@ Full detail, including what each of revisions `015` through `020` does and a pos
 - **Revision `020` dropped tables whose ORM models still exist**, so `Base.metadata` describes tables that no longer exist. `alembic revision --autogenerate` and anything calling `create_all()` are wrong until those models are removed.
 - **Some SDK and CLI methods call removed endpoints** and will `404`: policy registration, schema registration, project listing, `keys rotate`, and `usage`.
 - **The Go gateway's rate limiter is not the one in play.** Per-key rate limiting and the response cache are the Python API's `contexta/api/middleware/{ratelimit,response_cache}.py`.
+
+---
+
+## v1.5.1 — Correctness, and the encryption write path
+
+**Release date:** September 30, 2026
+
+A patch release, but not a quiet one. Two of these are silent-data-loss classes of bug, and one of them had been shipping a security claim that was not true.
+
+### Fixed — at-rest encryption did not cover the write path
+
+**`memory_record.content` was in cleartext for ~89% of a real database.** `encrypt_content` was called from exactly three places, all inside `contexta/repositories/memory_repo.py`. The ingestion orchestrator builds its `MemoryRecord` rows itself (`contexta/core/pipeline.py`) and persists them with `session.add_all`, so it never went through `MemoryRepository.create()`. Measured on a dev database:
+
+```
+total 130   PLAINTEXT 116   encrypted 14
+```
+
+The 14 encrypted rows were exactly the ones that happened to go through a dedup merge. Every read path tolerates both forms, which is precisely why nothing flagged it: retrieval, embedding, deduplication, and the API all kept working while the column held sentences.
+
+The seal now lives on the model. `MemoryRecord` registers mapper-level `before_insert` and `before_update` hooks that encrypt any plaintext content with the row's own organization key, idempotently, so the orchestrator, `create()`, `update_by_id`, a bulk `add_all`, and any writer added later are all covered by construction rather than by remembering. Regression coverage is `tests/test_content_encryption.py`.
+
+**This is forward-only.** Rows written before the fix are still cleartext and nothing rewrites them. Detection SQL and the three operator options — re-ingest, migrate in place, or accept — are in the [memory content encryption note](/reference/memory-content-encryption). Also note that only `content` is sealed: `title`, `search_text`, `search_vector`, `structured_data`, and `tags` are cleartext, because the lexical channel is a `tsvector` predicate over `search_text`.
+
+### Fixed — the fact slot collided on unrelated facts
+
+**Structural fact keys are now `sfx2:`, not `sfx1:`.** The original formula hashed `subject` + `predicate` and deliberately left the `object` out, on the theory that a slot is "who, about what" and a new value is a correction of that slot. That holds only if the predicate is exclusive — one live value per subject and predicate — and it is not. Measured over a 10-conversation ingest: 123 keyed rows resolved to 32 slots, `subject` was the literal string `"the user"` in all 123, and four mutually exclusive `uses` facts shared one slot. With `uq_memory_record_current_fact_slot` allowing one current row per slot, each new arrival closed the previous one — 46 rows written, 28 superseded (61%), and of 10 sampled supersession pairs **0 were real contradictions and 8 were unrelated**. A slot that collides on unrelated facts does not reconcile truth, it deletes it.
+
+`sfx2:` hashes the canonicalised whole triple (`subject` + `predicate` + `context` when present + `object`). Distinct facts get distinct slots and coexist. The version bump keeps every pre-existing `sfx1:` digest provably distinct from any new one, so a stale digest can never alias onto a live slot; `sfx1:` rows are still readable and are never written again. `scripts/backfill_fact_keys.py` recomputes them, and its `LIKE 'sfx1:%'` selector is the query that finds rows to review.
+
+### Fixed — retrieval
+
+- **RRF clamped the wrong quantity.** The clamp was applied to the fused sum rather than to the normalised RRF term alone. Once the additive priors pushed the sum past `1.0`, every candidate in that band was frozen onto an identical score and the final blend ordered them on its `0.20` term alone — ranks 1 through 11 in all channels all scored exactly `1.0`. The term is now clamped and the caller owns the outer clamp.
+- **A failed graph walk failed *to zero*.** On an error, `_graph_distances` synthesised `{seed: 0}` for every seed. Depth 0 is the maximum graph weight, so a transient edge-repository outage promoted every anchor's memories to the best graph score available instead of contributing nothing. A walk that raises now contributes no graph weights at all; a walk that *succeeds* and returns no distances is a genuinely edgeless graph and keeps the seed-at-zero fallback.
+- **`GET /v1/graph/traverse` did not filter `valid_to`.** Superseded rows were walked and returned alongside current ones, which is the same class of bug as the unscoped read fixed in v1.5.0.
+- **`user` was not a stopword anywhere that mattered.** The extraction contract fixes `subject` to the literal string `"the user"`, so the token is a constant in this corpus rather than a rare term — and the SQL lexical channel, which feeds tokens to `websearch_to_tsquery` and drops stopwords, never saw the set the in-process scorer already knew was noise. `user` was indexed at tsvector weight A in every row and matched the entire corpus. The stopword lists now live in one shared module, `contexta/core/lexicon.py`, that both the SQL channel and the scorer read, so a word one path treats as noise cannot be a rare term in the other.
+- **Cascade mode is now the default channel order.** `RetrievalEngine(enable_dense_escalation=True)` is the default rather than opt-in. The channels, their weights, and the fused output are unchanged; only the order they are consulted in is different, and `assess_primary_sufficiency()` still gates the dense channel. Pass `False` for the previous unconditional-dense order.
+
+### Fixed — extraction
+
+- **A content-quality guard rejects degenerate extractions.** The extractor could return a memory whose content was a fragment, a repeat of the title, or otherwise carried no fact. The guard drops it before it costs an embedding and a graph edge.
+- **A no-op merge silently lost an observation.** A merge is reported whenever similarity clears the threshold, but the merged row is only larger when the incoming text is not already contained in the existing one. When it was contained — common once short degenerate bodies reach the store — `_merge_values` returned the row unchanged, the caller was still told `merge`, and the caller skips storing on `merge`. The incoming memory was never written anywhere. `_merge_values` now returns `None` for a merge that cannot grow the content, and that case falls through to `store`: a redundant row is recoverable, a lost one is not.
 
 ---
 

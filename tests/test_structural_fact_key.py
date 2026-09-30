@@ -1,11 +1,12 @@
 """Tests for the structural fact key that names a fact slot.
 
-A slot is "subject x predicate"; the object is the value asserted about it. Two
-memories that state the same slot share a key however they are worded, so a
-corrected value reaches the incumbent row and supersedes it instead of
-accumulating beside it. Memories whose extraction carried no usable triple keep
-the legacy text-hash key, so rows written before this change stay readable and a
-model that omits the field never costs a memory.
+A slot is the whole assertion: canonicalised subject, predicate, optional context
+and object, hashed to `sfx2:<sha256>`. Two memories that state the same fact
+however they are worded share a key; two memories that state *different* facts
+never do, which is what keeps `uq_memory_record_current_fact_slot` from picking a
+winner among mutually exclusive facts. Memories whose extraction carried no
+usable triple keep the legacy text-hash key, so rows written before this change
+stay readable and a model that omits the field never costs a memory.
 """
 
 from __future__ import annotations
@@ -54,6 +55,21 @@ def structured_fact(fact: dict[str, str]) -> ExtractedMemory:
     )
 
 
+def named_slot_fact(slot: str, value: str) -> ExtractedMemory:
+    """A memory whose extractor named the slot itself, value excluded.
+
+    The one path where two different values still land in one slot, so it is the
+    path that has to keep working supersession.
+    """
+    return ExtractedMemory(
+        memory_type=MemoryType.FACT,
+        source_type=SourceType.USER_EXPLICIT,
+        title="Compensation",
+        content=f"The user's salary is {value}.",
+        structured_data={"fact_key": slot, "fact_value": value, "status": "current"},
+    )
+
+
 def key_of(memory: ExtractedMemory, organization_id: UUID, user_id: UUID) -> str:
     return fact_key_for_memory(memory, organization_id, user_id)
 
@@ -92,8 +108,11 @@ def test_same_fact_in_different_prose_yields_one_key() -> None:
 def test_distinct_slots_do_not_collide() -> None:
     assert slot_key("Fatima Okafor", "lives_in", "Lisbon") != slot_key("Fatima Okafor", "employer", "Lisbon")
     assert slot_key("Fatima Okafor", "lives_in", "Lisbon") != slot_key("Marcus Silva", "lives_in", "Lisbon")
-    # The object is not part of the slot, only of the value inside it.
-    assert slot_key("Fatima Okafor", "lives_in", "Lisbon") == slot_key("Fatima Okafor", "lives_in", "Berlin")
+    # The object is part of the slot, so two mutually exclusive values of one
+    # attribute are two slots. Under `sfx1:` they shared one, and whichever
+    # arrived second closed the first: 28 of 46 stored rows were closed that way
+    # in a measured ingest, 8 of 10 sampled pairs being unrelated facts.
+    assert slot_key("Fatima Okafor", "lives_in", "Lisbon") != slot_key("Fatima Okafor", "lives_in", "Berlin")
     # A context qualifier scopes a slot that is ambiguous without it.
     assert slot_key("Atlas", "version", "2.1") != slot_key("Atlas", "version", "2.1", context="staging")
 
@@ -149,7 +168,7 @@ def test_flat_sibling_triple_from_the_real_extractor_yields_a_structural_key() -
     )
     key = fact_key_for_memory(memory, organization_id, user_id)
 
-    assert key.startswith("sfx1:")
+    assert key.startswith("sfx2:")
     assert not _LEGACY_KEY.match(key)
 
 
@@ -161,17 +180,25 @@ def test_partial_flat_triple_still_falls_back_instead_of_guessing() -> None:
     assert normalize_structured_fact({"structured_data": {"polarity": "positive", "status": "ok"}}) is None
 
 
-# --- a corrected object supersedes rather than duplicates -----------------
+# --- a corrected value no longer collapses into the slot it corrects -------
 
 
-def test_corrected_object_shares_the_slot_and_differes_in_value() -> None:
+def test_distinct_values_of_one_attribute_occupy_distinct_slots() -> None:
+    """The regression this file was written against, inverted.
+
+    Under `sfx1:` a corrected value hashed onto the same slot as the value it
+    corrected, which is what let the one-current-row index retire the incumbent.
+    That is now the opposite: the two coexist, and deciding which of them is
+    current is the truth engine's job -- on the value comparability gate and on
+    the extractor's own `status`, not on a digest collision.
+    """
     organization_id, user_id = uuid4(), uuid4()
     lisbon = structured_fact({"subject": "Fatima Okafor", "predicate": "lives_in", "object": "Lisbon"})
     berlin = structured_fact({"subject": "Fatima Okafor", "predicate": "lives_in", "object": "Berlin"})
 
-    # Same slot, so truth maintenance can find the incumbent at all...
-    assert key_of(lisbon, organization_id, user_id) == key_of(berlin, organization_id, user_id)
-    # ...and a different assertion, so it is treated as a correction.
+    # Different values, so the two rows can both stay current...
+    assert key_of(lisbon, organization_id, user_id) != key_of(berlin, organization_id, user_id)
+    # ...and the value each one asserts is still what the truth engine compares.
     assert fact_value(lisbon) != fact_value(berlin)
 
 
@@ -242,11 +269,21 @@ def record_for(
 
 
 async def test_corrected_value_supersedes_the_incumbent_row() -> None:
+    """Supersession still happens -- on the slot the extractor named.
+
+    With the object in the digest, a correction of a free-form attribute no
+    longer shares a slot with what it corrects. The path that still has two
+    values inside one slot is an extractor-supplied `fact_key`, and the value has
+    to be comparable for the close to be allowed at all, so the two amounts here
+    are both currency on purpose.
+    """
     organization_id, user_id = uuid4(), uuid4()
-    old_extracted = structured_fact({"subject": "Fatima Okafor", "predicate": "lives_in", "object": "Lisbon"})
-    new_extracted = structured_fact({"subject": "Fatima Okafor", "predicate": "lives_in", "object": "Berlin"})
+    old_extracted = named_slot_fact("the user|salary", "$45,000")
+    new_extracted = named_slot_fact("the user|salary", "$93,000")
     old = record_for(old_extracted, organization_id, user_id, key_of(old_extracted, organization_id, user_id))
     new = record_for(new_extracted, organization_id, user_id, key_of(new_extracted, organization_id, user_id))
+
+    assert old.fact_key == new.fact_key
 
     repository = SlotRepository(rows=[old])
     versions = Collects()

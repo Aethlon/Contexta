@@ -32,13 +32,13 @@ Before channels run, `build_query_plan` inspects the query text and the caller's
 
 `CANDIDATE_MULTIPLIER` and `MIN_CANDIDATES` size the per-channel pool, which is comfortably larger than the result page so fusion has something to work with. On the dense side `ef_search` is tuned and `hnsw.iterative_scan` is set to `relaxed_order`, because a filtered HNSW query used to collapse and silently return zero rows rather than drop the tenant constraint to get an answer.
 
-## Cascade mode (opt-in, off by default)
+## Cascade mode (on by default)
 
 ```python
 RetrievalEngine(memory_repository=repo, ..., enable_dense_escalation=True)
 ```
 
-This inverts the order. Lexical and graph gather evidence first, graph expansion anchoring off the lexical hits. Only if `assess_primary_sufficiency()` says that evidence is insufficient does the dense channel get consulted.
+This inverts the order, and it is the **default** — `enable_dense_escalation` is `True` unless you pass `False`. Lexical and graph gather evidence first, graph expansion anchoring off the lexical hits. Only if `assess_primary_sufficiency()` says that evidence is insufficient does the dense channel get consulted.
 
 The sufficiency gate is pure and pure-function testable — it reads its arguments, touches no clock, database, or embedding service, and returns a stable machine-readable `reason`:
 
@@ -53,7 +53,7 @@ The sufficiency gate is pure and pure-function testable — it reads its argumen
 
 Contract and quality are checked before depth, and depth before dominance, because "enough" is a property of the *question*, not of the ranker.
 
-**It stays off.** There is no environment variable and no request field for it — the constructor argument is the only switch. `last_escalation` is written on the engine for observability so the escalation rate can be measured before anyone relies on it. Do not add a flag without that measurement.
+There is no environment variable and no request field for it — the constructor argument is the only switch, and it is already on. `last_escalation` is written on the engine so the escalation rate is observable in production. Pass `enable_dense_escalation=False` to restore the previous order, where dense is gathered unconditionally. Do not add a flag without a measurement.
 
 ## Reranking
 

@@ -6,7 +6,8 @@ containing:
 
   - headline accuracy + retrieval latency percentiles
   - per-category table (accuracy + p50/p95 latency)
-  - ingestion panel: what was extracted, stored, skipped, and the full list of
+  - ingestion panel: the async 202/outbox drain log per session, an explicit note
+    on which per-session counters the API cannot expose, and the full list of
     memory rows Contexta persisted
   - a searchable per-question audit log showing, for every question:
       question | category | verdict
@@ -124,6 +125,19 @@ document.addEventListener('DOMContentLoaded',function(){
 
 def esc(text: Any) -> str:
     return html.escape(str(text if text is not None else ""))
+
+
+def cell(value: Any) -> str:
+    """Render a value, or 'n/a' when the API cannot expose it.
+
+    The ingestion counters the old in-process harness read out of
+    MemoryPipelineResult do not exist in any HTTP response body, so the summary
+    carries null for them. Rendering null as 0 would read as "zero extracted",
+    which is a claim the benchmark can no longer make.
+    """
+    if value is None:
+        return "<span class='dim'>n/a</span>"
+    return esc(value)
 
 
 def latest_tag() -> str | None:
@@ -246,6 +260,7 @@ tokens:   {rec.get('tokens',{}).get('prompt',0)} in / {rec.get('tokens',{}).get(
 
 
 def build_html(records: list[dict], summary: dict, ingest: dict, tag: str) -> str:
+    empty_sessions_row = "<tr><td colspan='10' class='dim'>no sessions</td></tr>"
     t = summary.get("totals", {})
     lat = summary.get("latency", {})
     r_ms = lat.get("retrieve_ms", {})
@@ -265,7 +280,8 @@ def build_html(records: list[dict], summary: dict, ingest: dict, tag: str) -> st
     <div class="n">p99 {r_ms.get('p99',0)} ms</div></div>
   <div class="card"><div class="k">Answer p50</div><div class="v">{a_ms.get('p50',0)}<span style="font-size:13px"> ms</span></div>
     <div class="n">{esc(meta.get('answer_model','?'))}</div></div>
-  <div class="card"><div class="k">Memories stored</div><div class="v">{ing.get('memories_stored',0)}</div>
+  <div class="card"><div class="k">Memories stored</div>
+    <div class="v">{ing.get('memories_delta_by_drain', 0)}</div>
     <div class="n">from {ing.get('chunks',0)} chunks</div></div>
   <div class="card"><div class="k">Hallucinations</div>
     <div class="v {'fail' if flags.get('hallucinated',0) else 'pass'}">{flags.get('hallucinated',0)}</div>
@@ -294,11 +310,27 @@ def build_html(records: list[dict], summary: dict, ingest: dict, tag: str) -> st
     session_rows = "".join(
         f"<tr><td class='mono'>{esc(s.get('session_key'))}</td>"
         f"<td>{esc(s.get('domain'))}</td><td class='mono'>{esc(s.get('chunks'))}</td>"
-        f"<td class='mono'>{esc(s.get('ingest_ms'))} ms</td>"
-        f"<td class='mono'>{esc(s.get('extracted'))}</td><td class='mono'>{esc(s.get('stored'))}</td>"
-        f"<td class='mono'>{esc(s.get('skipped'))}</td>"
-        f"<td>{esc(s.get('error',''))}</td></tr>"
+        f"<td class='mono'>{esc(s.get('accept_ms'))} ms</td>"
+        f"<td class='mono'>{esc(s.get('drain_ms'))} ms</td>"
+        f"<td><span class='pill {'pass' if s.get('status')=='completed' else 'fail'}'>"
+        f"{esc(s.get('status') or 'not accepted')}</span></td>"
+        f"<td class='mono'>{esc(s.get('attempt_count'))}</td>"
+        f"<td class='mono'>{esc(s.get('outbox_status'))}</td>"
+        f"<td class='mono'>{esc(s.get('memories_delta'))}</td>"
+        f"<td>{esc(s.get('last_error') or s.get('error',''))}</td></tr>"
         for s in per_session
+    )
+    unobservable = ing.get("unobservable_via_api", [])
+    unobservable_note = (
+        "<div class='box' style='margin-top:12px'><div class='lbl'>Not observable through the API</div>"
+        f"<div class='val'>{esc(', '.join(unobservable))}</div>"
+        "<div class='val dim' style='margin-top:6px'>Ingestion is asynchronous: "
+        "POST /v1/observations returns 202 and the Celery worker reports no counts back. "
+        "Per-session <em>memories delta</em> below is derived by diffing "
+        "GET /v1/memories at each drain boundary, and the vector count comes from "
+        "GET /v1/memories/search?threshold=0.0.</div></div>"
+        if unobservable
+        else ""
     )
 
     return f"""<!doctype html>
@@ -309,7 +341,8 @@ def build_html(records: list[dict], summary: dict, ingest: dict, tag: str) -> st
 <header>
   <h1>CHIMERA &mdash; Contexta memory evaluation</h1>
   <div class="sub">tag {esc(tag)} &middot; ran {esc(meta.get('ran_at',''))} &middot;
-  rerank {esc(meta.get('rerank','off'))} &middot; db {esc(meta.get('db_url',''))} &middot;
+  rerank {esc(meta.get('rerank','off'))} &middot; api {esc(meta.get('api_url',''))} &middot;
+  org {esc(meta.get('organization_id',''))} &middot; actor {esc(meta.get('actor_user_id',''))} &middot;
   model {esc(meta.get('answer_model',''))} &middot; k={esc(meta.get('retrieval_limit',''))}</div>
 </header>
 <main>
@@ -320,16 +353,24 @@ def build_html(records: list[dict], summary: dict, ingest: dict, tag: str) -> st
   <section><h2>Ingestion</h2>
     <div class="cards">
       <div class="card"><div class="k">Sessions</div><div class="v">{ing.get('sessions',0)}</div>
-        <div class="n">{ing.get('failures',0)} failures</div></div>
-      <div class="card"><div class="k">Memories extracted</div><div class="v">{ing.get('memories_extracted',0)}</div>
-        <div class="n">{ing.get('skipped',0)} skipped</div></div>
-      <div class="card"><div class="k">Mean session</div><div class="v">{ing.get('mean_session_ms',0)}<span style="font-size:13px"> ms</span></div>
-        <div class="n">max {ing.get('max_session_ms',0)} ms</div></div>
+        <div class="n">{ing.get('observations_completed',0)} completed &middot;
+          {ing.get('observations_failed',0)} failed</div></div>
+      <div class="card"><div class="k">Memories added by drain</div>
+        <div class="v">{ing.get('memories_delta_by_drain',0)}</div>
+        <div class="n">extracted / stored: {cell(ing.get('memories_extracted'))} via API</div></div>
+      <div class="card"><div class="k">With vectors</div>
+        <div class="v">{cell(ing.get('memories_with_vectors'))}</div>
+        <div class="n">{cell(ing.get('memories_without_vectors'))} without</div></div>
+      <div class="card"><div class="k">Mean drain</div>
+        <div class="v">{ing.get('mean_drain_ms',0)}<span style="font-size:13px"> ms</span></div>
+        <div class="n">max {ing.get('max_drain_ms',0)} ms</div></div>
     </div>
-    <h3 style="margin:16px 0 8px;font-size:13px">Per-session extraction log</h3>
+    {unobservable_note}
+    <h3 style="margin:16px 0 8px;font-size:13px">Per-session async drain log</h3>
     <div class="scroll"><table><thead><tr><th>Session</th><th>Domain</th><th>Chunks</th>
-      <th>Ingest (ms)</th><th>Extracted</th><th>Stored</th><th>Skipped</th><th>Error</th></tr></thead>
-      <tbody>{session_rows or '<tr><td colspan="8" class="dim">no sessions</td></tr>'}</tbody></table></div>
+      <th>Accept (ms)</th><th>Drain (ms)</th><th>Status</th><th>Attempts</th>
+      <th>Outbox</th><th>Memories &Delta;</th><th>Error</th></tr></thead>
+      <tbody>{session_rows or empty_sessions_row}</tbody></table></div>
     <h3 style="margin:16px 0 8px;font-size:13px">Memory rows persisted in the database ({len(ingest.get('stored_memories',[]))})</h3>
     <div class="scroll"><table><thead><tr><th>Type</th><th>Title</th><th>Content</th>
       <th>State</th><th>Importance</th></tr></thead>

@@ -31,6 +31,7 @@ from contexta.core.types import EntityType
 
 # Imports will resolve once task 1.3 completes the model definitions.
 from contexta.models.entity import Entity, EntityEdge, MemoryEntityLink
+from contexta.models.memory import MemoryRecord
 from contexta.repositories.base import TenantScopedRepository
 
 # Minimum pg_trgm similarity for two entity names to be considered the same
@@ -735,6 +736,47 @@ class MemoryEntityLinkRepository(TenantScopedRepository["MemoryEntityLink"]):
         stmt = self._scope_select(stmt)
         result = await self._session.execute(stmt)
         return result.scalars().all()
+
+    async def bulk_current_memory_ids_by_entity(
+        self,
+        entity_ids: Sequence[uuid.UUID],
+    ) -> dict[uuid.UUID, list[uuid.UUID]]:
+        """Current memory ids per entity, for a whole frontier, in one query.
+
+        `bulk_get_memories_for_entities` counts superseded links, because the
+        links themselves carry no validity: currency lives on
+        `memory_record.valid_to`, on the far side of the junction. A graph walk
+        that weights an entity by how many memories mention it cannot afford to
+        resolve those ids one at a time -- that is a hydrated `MemoryRecord` per
+        id, 1024 dimensions and all -- so it either hydrates them in a budgeted
+        loop or over-counts every entity a fact has since been corrected away
+        from. This joins to the memory table once, filters `valid_to IS NULL`, and
+        returns the ids alone.
+
+        Both sides are tenant-scoped: the link's `organization_id` is a
+        denormalised copy the foreign keys do not enforce, and the memory row it
+        points at is the row whose validity is being trusted here.
+
+        Entities with no current link are absent from the mapping rather than
+        mapped to an empty list, matching `count_memories_per_entity`, so callers
+        must read it with a zero default.
+        """
+        if not entity_ids:
+            return {}
+        stmt = (
+            select(self._model.entity_id, self._model.memory_id)
+            .join(MemoryRecord, self._model.memory_id == MemoryRecord.id)
+            .where(self._model.entity_id.in_(entity_ids))
+            .where(MemoryRecord.valid_to.is_(None))
+            .where(MemoryRecord.organization_id == self._tenant_id)
+            .order_by(self._model.entity_id, self._model.memory_id)
+        )
+        stmt = self._scope_select(stmt)
+        result = await self._session.execute(stmt)
+        grouped: dict[uuid.UUID, list[uuid.UUID]] = {}
+        for entity_id, memory_id in result:
+            grouped.setdefault(entity_id, []).append(memory_id)
+        return grouped
 
     async def count_memories_per_entity(
         self,

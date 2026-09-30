@@ -1,0 +1,136 @@
+{
+  "meta": {
+    "tag": "apirun_20260930-024451",
+    "ran_at": "2026-09-30T02:48:47.464391+00:00",
+    "answer_model": "contexta-lfm-extract:latest",
+    "answer_endpoint": "http://localhost:8002/v1/chat/completions",
+    "rerank": "off",
+    "rerank_mode": "off",
+    "api_url": "http://localhost:8000",
+    "organization_id": "28ab6ff0-4d19-478b-8cff-cb75e0cd648e",
+    "actor_user_id": "8a7b5207-9055-42c1-b577-b4a3d000f38f",
+    "api_key_name": "chimera2",
+    "retrieval_limit": 20,
+    "question_source": "C:\\Users\\jenit\\Desktop\\mono-repo\\Memento\\benchmarks\\CHIMERA\\data\\questions.jsonl",
+    "transport": "http-only (no in-process contexta import)",
+    "contexta_config": {
+      "api_base_url": "http://localhost:8000",
+      "api_version": "1.5.0",
+      "api_status": "ok",
+      "engine_mode": "offline",
+      "active_engine": "local_qwen",
+      "embedding_provider": "local",
+      "embedding_profile": "offline-qwen3-1024",
+      "embedding_model": "Qwen/Qwen3-Embedding-0.6B",
+      "embedding_dimensions": 1024,
+      "embedding_status": "ready",
+      "embedding_backend": "qwen3",
+      "extraction_model": "contexta-lfm-extract",
+      "extraction_status": "ready",
+      "reranker_model": "Qwen/Qwen3-Reranker-0.6B",
+      "reranker_status": "ready",
+      "answer_model": "contexta-lfm-extract:latest",
+      "answer_endpoint": "http://localhost:8002/v1/chat/completions"
+    }
+  },
+  "totals": {
+    "questions": 5,
+    "passed": 0,
+    "failed": 5,
+    "accuracy": 0.0,
+    "retrieved_results_with_dense_score": 90
+  },
+  "latency": {
+    "retrieve_ms": {
+      "p50": 1716.77,
+      "p95": 1846.99,
+      "p99": 1855.73,
+      "mean": 1505.22,
+      "min": 564.63,
+      "max": 1857.92
+    },
+    "answer_ms": {
+      "p50": 27585.9,
+      "p95": 45399.68,
+      "mean": 29990.63
+    }
+  },
+  "ingestion": {
+    "sessions": 10,
+    "chunks": 53,
+    "observations_accepted_202": 10,
+    "observations_completed": 10,
+    "observations_failed": 0,
+    "observations_dead_letter": 0,
+    "observations_timed_out": 0,
+    "memories_extracted": null,
+    "memories_stored": null,
+    "skipped": null,
+    "discarded": null,
+    "memories_delta_by_drain": 28,
+    "memories_with_vectors": 18,
+    "memories_without_vectors": 0,
+    "dense_probe": {
+      "available": true,
+      "count": 18,
+      "limit": 1000,
+      "threshold": 0.0
+    },
+    "total_s": 179.25,
+    "accept_total_s": 6.65,
+    "mean_drain_ms": 17924.69,
+    "max_drain_ms": 81136.7,
+    "unobservable_via_api": [
+      "extracted",
+      "stored",
+      "skipped",
+      "discarded",
+      "orchestrator timings",
+      "embedding_memory_ids"
+    ]
+  },
+  "by_category": {
+    "distractor_density": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 1803.25,
+      "retrieve_p95_ms": 1803.25
+    },
+    "multi_hop_sessions": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 1857.92,
+      "retrieve_p95_ms": 1857.92
+    },
+    "negative_recall": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 1716.77,
+      "retrieve_p95_ms": 1716.77
+    },
+    "temporal_contradiction": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 1583.52,
+      "retrieve_p95_ms": 1583.52
+    },
+    "update_vs_append": {
+      "total": 1,
+      "pass": 0,
+      "accuracy": 0.0,
+      "retrieve_p50_ms": 564.63,
+      "retrieve_p95_ms": 564.63
+    }
+  },
+  "flags": {
+    "hallucinated": 1,
+    "abstained": 2,
+    "leaked": 0,
+    "partial": 1,
+    "errors": 0
+  }
+}

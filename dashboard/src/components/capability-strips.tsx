@@ -73,7 +73,7 @@ function EnclaveDiagram() {
           <rect x={x - 62} y={34} width={124} height={12} rx={6} fill={i === 1 ? "rgba(59,130,246,0.5)" : "rgba(255,255,255,0.08)"} transform="translate(5,-3) skewX(-24)" />
           <circle cx={x - 40} cy={72} r={4} fill={["#10B981", "#3B82F6", "#8B5CF6"][i]} />
           <text x={x + 4} y={76} fontSize="10" fill="#D1D5DB" fontFamily="monospace">tenant_{["acme", "lc-prod", "cursor"][i]}</text>
-          <text x={x} y={98} textAnchor="middle" fontSize="9" fill="#3D4450" fontFamily="monospace">AES-256 • ISOLATED</text>
+          <text x={x} y={98} textAnchor="middle" fontSize="9" fill="#3D4450" fontFamily="monospace">ENCRYPTED • ISOLATED</text>
         </g>
       ))}
       <line x1={202} y1={75} x2={238} y2={75} stroke="#EF4444" strokeWidth={1.4} strokeDasharray="3 4" />
@@ -158,8 +158,8 @@ const STRIPS: Strip[] = [
     n: "03",
     label: "TENANT ISOLATION",
     title: "Strict enclave schemas",
-    body: "Hard PostgreSQL schema boundaries per tenant. Zero cross-tenant bleeding, AES-256 at rest, SOC2 / GDPR posture.",
-    metric: "AES-256",
+    body: "Hard PostgreSQL schema boundaries per tenant. Zero cross-tenant bleeding, encrypted content at rest, SOC2 / GDPR posture.",
+    metric: "ENCRYPTED",
     diagram: <EnclaveDiagram />,
   },
   {

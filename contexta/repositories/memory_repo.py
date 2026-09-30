@@ -8,12 +8,13 @@ Requirements: 14.1, 14.2, 14.3, 14.4, 14.5
 
 from __future__ import annotations
 
+import logging
 import math
 import re
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, overload
 
 from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy import inspect as sa_inspect
@@ -29,11 +30,14 @@ from contexta.config.settings import (
 )
 from contexta.core.crypto.vault import encrypt_content
 from contexta.core.errors import AuthorizationError
+from contexta.core.lexicon import informative_terms
 from contexta.core.schemas import ExtractedMemory
 from contexta.core.types import MemoryState, MemoryType
 from contexta.models.entity import Entity, EntityEdge, MemoryEntityLink
 from contexta.models.memory import MemoryRecord
 from contexta.repositories.base import TenantScopedRepository
+
+logger = logging.getLogger(__name__)
 
 # pgvector explores at most hnsw.ef_search candidates per query, so never
 # configure a breadth below the engine default of 40.
@@ -46,6 +50,76 @@ _IDENTITY_COLUMNS = frozenset({"fact_key", "valid_from", "valid_to"})
 
 class MemoryFactKeyMutationError(ValueError):
     """Raised when a caller tries to re-point a memory at another fact slot."""
+
+
+class LexicalSearchResult(Sequence):
+    """Lexical candidates that still behave like the old bare record sequence.
+
+    `MemoryRepository.get_by_lexical_similarity` orders rows by
+    `ts_rank_cd(search_vector, ts_query, 32)` and used to throw that number away,
+    so the engine had to re-measure lexical relevance with a second, unrelated
+    scorer (a different tokenizer, a different stemmer, a different scale) before
+    it could report a `keyword_score`. This object carries the number the
+    database actually ranked on, keyed by memory id.
+
+    It is a `Sequence[MemoryRecord]` first: iteration, indexing, `len()`, and
+    truthiness are unchanged, so every existing caller keeps working untouched.
+    The rank is opt-in (`include_ranks=True` on the query) and additive.
+    """
+
+    __slots__ = ("_ranks", "_records")
+
+    def __init__(
+        self,
+        records: Sequence[MemoryRecord],
+        ranks: Mapping[uuid.UUID, float] | None = None,
+    ) -> None:
+        self._records: list[MemoryRecord] = list(records)
+        self._ranks: dict[uuid.UUID, float] = dict(ranks or {})
+
+    def __len__(self) -> int:
+        return len(self._records)
+
+    @overload
+    def __getitem__(self, index: int) -> MemoryRecord: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> LexicalSearchResult: ...
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            records = self._records[index]
+            # Narrow the rank map to the rows the slice kept. `ranks` documents
+            # itself as the scores for *this* result, and a caller that pages
+            # with `result[:n]` then reads `ranks` would otherwise be told about
+            # rows that are no longer in front of it. Keying by id is what makes
+            # this safe to do at all -- a positional parallel list could not be
+            # trimmed without realigning every score after the cut.
+            kept = {record.id for record in records}
+            return LexicalSearchResult(records, {k: v for k, v in self._ranks.items() if k in kept})
+        return self._records[index]
+
+    def __iter__(self) -> Iterator[MemoryRecord]:
+        return iter(self._records)
+
+    @property
+    def ranks(self) -> dict[uuid.UUID, float]:
+        """`{memory_id: ts_rank_cd}` for the rows this call returned."""
+        return dict(self._ranks)
+
+    def rank_for(self, record: MemoryRecord | uuid.UUID) -> float:
+        """The `ts_rank_cd` value for one candidate, or 0.0 if it was not ranked.
+
+        Accepts either the record or its id so callers holding a fused or filtered
+        result can look the score up without carrying a parallel list around.
+        """
+        identifier = record if isinstance(record, uuid.UUID) else record.id
+        return float(self._ranks.get(identifier, 0.0))
+
+    @property
+    def ranked(self) -> list[tuple[MemoryRecord, float]]:
+        """`(record, ts_rank_cd)` pairs in the order the database returned them."""
+        return [(record, self.rank_for(record)) for record in self._records]
 
 
 class MemoryRepository(TenantScopedRepository["MemoryRecord"]):
@@ -556,8 +630,22 @@ class MemoryRepository(TenantScopedRepository["MemoryRecord"]):
         project_id: uuid.UUID | None = None,
         session_id: uuid.UUID | None = None,
     ) -> Sequence[MemoryRecord]:
-        """Retrieve memories for a specific user within the tenant."""
-        stmt = select(self._model).where(self._model.user_id == user_id)
+        """Retrieve a user's current memories within the tenant.
+
+        This is the Python fallback for both the dense and the lexical channel
+        and the MCP "active memory context" read, so it must not become a
+        different question from the SQL channels: superseded facts are closed
+        rows (`valid_to` set) that a correction has already replaced, and
+        returning them here put them back in front of a user who asked what is
+        true now. Ordering is newest-first with an id tiebreak so a truncated
+        page (the engine asks for `max(limit * 2, 1000)` rows) is deterministic
+        instead of whatever order Postgres happened to return.
+        """
+        stmt = (
+            select(self._model)
+            .where(self._model.user_id == user_id)
+            .where(self._model.valid_to.is_(None))
+        )
         stmt = self._apply_scope_filters(
             stmt,
             memory_user_id=memory_user_id,
@@ -565,7 +653,11 @@ class MemoryRepository(TenantScopedRepository["MemoryRecord"]):
             project_id=project_id,
             session_id=session_id,
         )
-        stmt = stmt.offset(offset).limit(self._bounded_limit(limit))
+        stmt = (
+            stmt.order_by(self._model.created_at.desc(), self._model.id.asc())
+            .offset(offset)
+            .limit(self._bounded_limit(limit))
+        )
         stmt = self._scope_select(stmt)
         result = await self._session.execute(stmt)
         return self._hydrate_records(result.scalars().all())
@@ -577,12 +669,18 @@ class MemoryRepository(TenantScopedRepository["MemoryRecord"]):
         user_id: uuid.UUID | None = None,
         limit: int | None = None,
     ) -> Sequence[MemoryRecord]:
-        """Retrieve the memories linked to any of `entity_ids`, scoped to the tenant.
+        """Retrieve the current memories linked to any of `entity_ids`.
 
         Both sides of the junction are scoped, not just the link row: the link's
         `organization_id` is a denormalized copy the two foreign keys do not
         enforce, so a link stamped with the caller's organization can still
         point at another organization's memory.
+
+        Superseded rows are excluded in SQL. `valid_to IS NULL` is what every
+        other retrieval path filters on, and this one did not, so the graph
+        traverse route published closed facts as if they were current -- on the
+        reference corpus 41% of the rows it returned had been superseded. The
+        response shape is unchanged; the row set is not.
 
         The rows are returned with their stored column values rather than
         hydrated. The graph routes have always published `content` exactly as
@@ -594,6 +692,7 @@ class MemoryRepository(TenantScopedRepository["MemoryRecord"]):
             select(self._model)
             .join(MemoryEntityLink, self._model.id == MemoryEntityLink.memory_id)
             .where(MemoryEntityLink.entity_id.in_(entity_ids))
+            .where(self._model.valid_to.is_(None))
             .distinct()
         )
         if user_id is not None:
@@ -665,8 +764,11 @@ class MemoryRepository(TenantScopedRepository["MemoryRecord"]):
         session_id: uuid.UUID | None = None,
         as_of: datetime | None = None,
     ) -> Sequence[MemoryRecord]:
-        """Vector-similarity search, optionally restricted to what was true at `as_of`."""
-        """Retrieve candidates from the vector column matching the query profile."""
+        """Vector-similarity search over the query profile's vector column.
+
+        Candidates come back ordered by cosine distance to `embedding`, optionally
+        restricted to what was true at `as_of`.
+        """
         dimensions = self._vector_length(embedding, "query_embedding", user_id)
         try:
             values = [float(value) for value in embedding]
@@ -680,15 +782,28 @@ class MemoryRepository(TenantScopedRepository["MemoryRecord"]):
         vector_column = getattr(self._model, vector_column_name)
         other_column_name = "embedding" if vector_column_name == "embedding_1024" else "embedding_1024"
         other_column = getattr(self._model, other_column_name)
-        exact_metadata = (
+        # The hard predicate is the vector *space*: which column holds the vector
+        # and how wide it is. `embedding_model` and `embedding_version` identify
+        # the encoder that produced the numbers inside that space, and they are
+        # deliberately not part of the predicate.
+        #
+        # They used to be, and a version bump -- a routine thing to do when the
+        # local model server is re-pinned -- silently emptied this query: no
+        # rows matched, no exception, no log line, so the dense channel
+        # contributed nothing to any request and the corpus looked empty. Rows
+        # stored by the previous encoder are still in the same column at the
+        # same width, and their neighbours are still approximately where they
+        # were, so they are ranked and the drift is reported by
+        # `_log_embedding_metadata_drift` instead. Re-embedding stays an
+        # explicit, reviewed backfill; it just no longer has to be a
+        # prerequisite for retrieval returning anything at all.
+        vector_space = (
             (self._model.embedding_profile == resolved_profile.name)
-            & (self._model.embedding_model == resolved_profile.model)
-            & (self._model.embedding_version == resolved_profile.version)
             & (self._model.embedding_dimensions == resolved_profile.dimensions)
         )
         if include_legacy:
             metadata_filter = or_(
-                exact_metadata,
+                vector_space,
                 and_(
                     self._model.embedding_profile.is_(None),
                     self._model.embedding_model.is_(None),
@@ -700,7 +815,7 @@ class MemoryRepository(TenantScopedRepository["MemoryRecord"]):
                 ),
             )
         else:
-            metadata_filter = exact_metadata
+            metadata_filter = vector_space
         stmt = (
             select(self._model)
             .where(self._model.valid_to.is_(None))
@@ -734,31 +849,135 @@ class MemoryRepository(TenantScopedRepository["MemoryRecord"]):
         stmt = stmt.order_by(vector_column.cosine_distance(values)).limit(limit)
         await self._apply_hnsw_search_settings(limit)
         result = await self._session.execute(stmt)
-        return self._hydrate_records(result.scalars().all())
+        records = result.scalars().all()
+        if not records:
+            await self._log_embedding_metadata_drift(resolved_profile, user_id)
+        return self._hydrate_records(records)
 
-    _LEXICAL_STOPWORDS = frozenset(
-        {
-            "a", "about", "after", "all", "am", "an", "and", "are", "as",
-            "at", "be", "been", "being", "by", "did", "do", "does", "for",
-            "from", "had", "has", "have", "how", "i", "in", "into", "is",
-            "it", "me", "my", "of", "on", "or", "our", "out", "she", "so",
-            "than", "that", "the", "their", "them", "there", "these", "they",
-            "this", "to", "was", "we", "were", "what", "when", "where",
-            "which", "who", "why", "with", "would", "you", "your",
-        }
-    )
+    async def _log_embedding_metadata_drift(
+        self,
+        resolved_profile: EmbeddingProfile,
+        user_id: uuid.UUID | None,
+    ) -> None:
+        """Say out loud why a dense query came back empty.
+
+        Only runs when the vector query found nothing, which is the case this
+        exists for: a corpus that has rows but that the query cannot see is
+        indistinguishable from an empty corpus, and the difference used to be
+        unobservable. One aggregate read, no rows hydrated, and it fails open --
+        a broken diagnostic never breaks the retrieval request that triggered it.
+        """
+        vector_column = getattr(self._model, resolved_profile.storage_column)
+        other_column_name = "embedding" if resolved_profile.storage_column == "embedding_1024" else "embedding_1024"
+        # "This tenant has vectors, they are just not in the space I queried" is
+        # the whole question, so the probe looks at both columns. Scoping it to
+        # the queried column would make the most likely cause -- an online 1536
+        # corpus queried with the offline profile -- report as an empty tenant.
+        has_any_vector = or_(
+            vector_column.is_not(None),
+            getattr(self._model, other_column_name).is_not(None),
+        )
+        drifted = func.count().filter(
+            (self._model.embedding_profile == resolved_profile.name)
+            & (self._model.embedding_dimensions == resolved_profile.dimensions)
+            & vector_column.is_not(None)
+            & or_(
+                self._model.embedding_model.is_distinct_from(resolved_profile.model),
+                self._model.embedding_version.is_distinct_from(resolved_profile.version),
+            )
+        )
+        other_space = func.count().filter(
+            has_any_vector
+            & or_(
+                self._model.embedding_profile.is_distinct_from(resolved_profile.name),
+                self._model.embedding_dimensions.is_distinct_from(resolved_profile.dimensions),
+            )
+        )
+        unlabelled = func.count().filter(
+            has_any_vector
+            & self._model.embedding_profile.is_(None)
+            & self._model.embedding_dimensions.is_(None)
+        )
+        stmt = select(drifted, other_space, unlabelled).where(
+            self._model.valid_to.is_(None),
+            has_any_vector,
+        )
+        if user_id is not None:
+            stmt = stmt.where(self._model.user_id == user_id)
+        stmt = self._scope_select(stmt)
+        try:
+            row = (await self._session.execute(stmt)).one_or_none()
+        except Exception as error:  # noqa: BLE001 - diagnostics never fail a request
+            logger.debug("dense retrieval drift probe failed: %s", error)
+            return
+        if row is None:
+            return
+        drifted_count, other_space_count, unlabelled_count = (int(value or 0) for value in row)
+        if drifted_count:
+            logger.warning(
+                "dense retrieval returned no rows for profile %r but %d stored vectors in that "
+                "space were produced by a different embedding model/version (query model %r, "
+                "version %r); they are being ranked with the query vector. Re-embed or pass "
+                "include_legacy to widen the filter.",
+                resolved_profile.name,
+                drifted_count,
+                resolved_profile.model,
+                resolved_profile.version,
+            )
+        if other_space_count:
+            logger.warning(
+                "dense retrieval returned no rows for profile %r and %d stored vectors belong to "
+                "another embedding profile; pass an explicit profile to query that space.",
+                resolved_profile.name,
+                other_space_count,
+            )
+        if unlabelled_count:
+            logger.warning(
+                "dense retrieval returned no rows for profile %r and %d stored vectors carry no "
+                "embedding metadata; pass include_legacy=True to search them.",
+                resolved_profile.name,
+                unlabelled_count,
+            )
+        if not (drifted_count or other_space_count or unlabelled_count):
+            # Nothing to warn about: this really is an empty space. Said at debug
+            # so "why did dense contribute nothing" has an answer that is not a
+            # guess, without a warning on every empty result.
+            logger.debug(
+                "dense retrieval returned no rows for profile %r and the tenant has no stored "
+                "vectors in any embedding space",
+                resolved_profile.name,
+            )
 
     @classmethod
     def _lexical_tsquery_text(cls, query_text: str) -> str | None:
-        terms: list[str] = []
-        for term in re.findall(r"[a-z0-9]+", query_text.casefold()):
-            if len(term) < 2 or term in cls._LEXICAL_STOPWORDS:
-                continue
-            if term not in terms:
-                terms.append(term)
+        """Build the OR-joined tsquery text, or `None` if nothing can discriminate.
+
+        The vocabulary is `core.lexicon.LEXICAL_STOPWORDS`, shared with the
+        in-process scorer. This module used to keep a private copy that was
+        missing `user`, which is not a rare term in this corpus but a constant:
+        the extraction contract fixes `subject` to the literal string "the user",
+        so `user` sits in every stored title at tsvector weight A. A tsquery
+        containing it matches every row in the tenant, `ts_rank_cd` gives the
+        bulk of them the same 0.5833 floor, and the `created_at DESC` tiebreak
+        decides the rest -- the channel returns "everything, newest first"
+        instead of evidence, and the graph channel inherits the garbage because
+        it seeds itself from this channel's top 5.
+
+        Returning `None` for a stopword-only query is the fail-closed half of the
+        same fix: a query made entirely of noise has no honest lexical answer,
+        and the caller's degraded path (the Python keyword scorer over
+        `get_by_user`) is a better approximation than the whole corpus.
+
+        Sanitisation is unchanged and stays a hard boundary: only `[a-z0-9]+`
+        runs of two or more characters reach Postgres, and they reach it as a
+        bound parameter. There is no injection surface here and this must not
+        become one.
+        """
+        tokens = re.findall(r"[a-z0-9]+", query_text.casefold())
+        terms = [token for token in informative_terms(tokens) if len(token) >= 2]
         if not terms:
             return None
-        return " OR ".join(terms)
+        return " OR ".join(dict.fromkeys(terms))
 
     async def get_by_lexical_similarity(
         self,
@@ -775,12 +994,20 @@ class MemoryRepository(TenantScopedRepository["MemoryRecord"]):
         project_id: uuid.UUID | None = None,
         session_id: uuid.UUID | None = None,
         as_of: datetime | None = None,
+        include_ranks: bool = False,
     ) -> Sequence[MemoryRecord]:
-        """Lexical search, optionally restricted to what was true at `as_of`."""
+        """Lexical search, optionally restricted to what was true at `as_of`.
+
+        Pass `include_ranks=True` to get a `LexicalSearchResult` back instead of a
+        bare record list: the same objects in the same order, plus the
+        `ts_rank_cd` value each row was ordered by (`result.ranks`,
+        `result.rank_for(record)`, `result.ranked`). The default keeps the old
+        return type, so callers that only want candidates are unaffected.
+        """
         search_vector = getattr(self._model, "search_vector", None)
         tsquery_text = self._lexical_tsquery_text(query_text)
         if search_vector is None or tsquery_text is None:
-            return []
+            return LexicalSearchResult([]) if include_ranks else []
 
         # One bound query text feeds both the match predicate and the rank. `@@` is
         # what the GIN index can serve; ranking a scalar function in the WHERE
@@ -790,8 +1017,9 @@ class MemoryRepository(TenantScopedRepository["MemoryRecord"]):
         # score into (0, 1] and is strictly monotonic, so the ordering below is
         # unchanged.
         rank = func.ts_rank_cd(search_vector, ts_query, 32)
+        columns = (self._model, rank.label("ts_rank_cd")) if include_ranks else (self._model,)
         stmt = (
-            select(self._model)
+            select(*columns)
             .where(self._model.user_id == user_id)
             .where(self._model.valid_to.is_(None))
             .where(search_vector.op("@@")(ts_query))
@@ -821,7 +1049,15 @@ class MemoryRepository(TenantScopedRepository["MemoryRecord"]):
         stmt = self._apply_as_of_filter(stmt, as_of=as_of)
         stmt = self._scope_select(stmt)
         result = await self._session.execute(stmt)
-        return self._hydrate_records(result.scalars().all())
+        if not include_ranks:
+            return self._hydrate_records(result.scalars().all())
+        # The rank is keyed by id, not by position, so hydration dropping a row
+        # cannot silently misalign one score onto the wrong memory.
+        rows = result.all()
+        return LexicalSearchResult(
+            self._hydrate_records([row[0] for row in rows]),
+            {row[0].id: float(row[1] or 0.0) for row in rows if row[0] is not None},
+        )
 
     async def persist(
         self,

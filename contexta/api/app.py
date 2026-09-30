@@ -89,13 +89,20 @@ def create_app() -> FastAPI:
     # Store settings on app state for route access
     app.state.settings = settings
 
-    # Middleware is executed last-added-first, so the effective request order is:
-    #   Authentication -> Tenant -> ResponseCache -> RateLimit -> GZip -> CORS -> logging
-    # The cache and limiter sit inside auth/tenant because they need the resolved
-    # organization, actor and API key, and outside GZip so a cached entry replays
-    # with its content-encoding intact. The cache is outside the limiter on
-    # purpose: a served-from-cache read should not consume the caller's quota.
-    app.add_middleware(RequestLoggingMiddleware)
+    # `add_middleware` inserts at the front of the stack, so the LAST call is the
+    # OUTERMOST layer. Effective request order is therefore:
+    #   RequestLogging -> GZip -> CORS -> Authentication -> Tenant -> RateLimit
+    #   -> ResponseCache -> route
+    # GZip has to sit outside ResponseCache. The cache drains and rebuilds the
+    # response body and drops content-encoding, so if it ever sees a body that
+    # GZip already compressed it stores compressed bytes and then serves them
+    # with no content-encoding header -- an undecodable payload on both the miss
+    # and the hit path. Keeping GZip outermost means the cache only ever stores
+    # plain bytes and compression happens once, on the way out.
+    app.add_middleware(ResponseCacheMiddleware)
+    app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(TenantMiddleware)
+    app.add_middleware(AuthenticationMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_allowed_origins,
@@ -104,10 +111,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.add_middleware(GZipMiddleware, minimum_size=1000)
-    app.add_middleware(RateLimitMiddleware)
-    app.add_middleware(ResponseCacheMiddleware)
-    app.add_middleware(TenantMiddleware)
-    app.add_middleware(AuthenticationMiddleware)
+    app.add_middleware(RequestLoggingMiddleware)
 
     # Configure Prometheus metrics instrumentation
     Instrumentator().instrument(app).expose(app, endpoint="/metrics")

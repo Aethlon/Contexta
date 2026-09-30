@@ -155,7 +155,7 @@ async def traverse_graph(
             linked_memories.append({
                 "id": str(mem.id),
                 "title": mem.title,
-                "content": mem.content,
+                "content": mem.plaintext_content,
                 "memory_type": mem.memory_type,
                 "created_at": mem.created_at.isoformat() if mem.created_at else None,
             })

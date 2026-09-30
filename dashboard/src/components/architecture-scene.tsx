@@ -118,7 +118,7 @@ const ARCHITECTURE_LAYERS: LayerSpec[] = [
     name: "PERSISTENCE LAYER",
     category: "CRYPTOGRAPHIC STORAGE",
     title: "PostgreSQL 16 & Cryptographic Enclaves",
-    description: "Battle-tested ACID persistence with hard database schema isolation per tenant. Zero cross-tenant data contamination with AES-256 encrypted storage.",
+    description: "Battle-tested ACID persistence with hard database schema isolation per tenant. Zero cross-tenant data contamination with encrypted content storage.",
     specs: [
       { label: "DATABASE ENGINE", value: "PostgreSQL 16 + pgvector" },
       { label: "ISOLATION LEVEL", value: "Tenant-Scoped Schemas" },

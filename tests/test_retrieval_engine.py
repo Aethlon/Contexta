@@ -305,7 +305,7 @@ async def test_retrieval_uses_independent_lexical_candidates_without_filler() ->
         dense=[dense],
         lexical=[lexical],
     )
-    engine = RetrievalEngine(repository)
+    engine = RetrievalEngine(repository, enable_dense_escalation=False)
 
     results = await engine.retrieve(
         query(user_id, organization_id),
@@ -493,7 +493,14 @@ async def test_graph_expansion_uses_top_five_dense_and_lexical_anchors() -> None
         lexical=lexical,
     )
     link_repository = ExpandingLinkRepository(memory_links, {})
-    engine = RetrievalEngine(repository, link_repository=link_repository)
+    # The cascade is the default now, and a sufficient primary pass never fetches
+    # dense candidates, so there would be no dense anchors to widen the graph
+    # from. This test is about the 5+5 anchor set, so it opts out explicitly.
+    engine = RetrievalEngine(
+        repository,
+        link_repository=link_repository,
+        enable_dense_escalation=False,
+    )
 
     await engine.retrieve(query(user_id, organization_id), query_embedding=[1.0, 0.0])
 

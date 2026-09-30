@@ -828,6 +828,226 @@ def _retrieval_engine(
     return engine, entity_repository, edge_repository
 
 
+# Bitemporal and fact-identity columns every retrieval response must carry.
+# `MemoryRecord` mixes naive `DateTime` columns (`valid_from`, `valid_to`,
+# `last_accessed_at`) with `TIMESTAMPTZ` ones (`event_at`, `observed_at`), so
+# nothing here may assume an offset is attached.
+_BITEMPORAL_DATETIME_FIELDS = (
+    "valid_from",
+    "valid_to",
+    "event_at",
+    "observed_at",
+    "last_accessed_at",
+)
+_TEMPORAL_TEXT_FIELDS = (
+    "temporal_precision",
+    "temporal_basis",
+    "fact_key",
+)
+_CHANNEL_NAMES = ("dense", "lexical", "graph")
+
+
+def _iso_or_none(value: Any) -> str | None:
+    """ISO-8601 for any datetime, naive or tz-aware; `None` stays `None`.
+
+    `isoformat()` is total over both kinds of datetime, so a naive
+    `valid_from` serialises exactly as well as an aware `event_at`. The guard
+    only stops an unexpected value from turning a debug field into a 500.
+    """
+    if value is None:
+        return None
+    isoformat = getattr(value, "isoformat", None)
+    if callable(isoformat):
+        with suppress(Exception):
+            return isoformat()
+    return str(value)
+
+
+def _text_or_none(value: Any) -> str | None:
+    """String or `None`, never a bare non-string where a string is expected."""
+    if value is None:
+        return None
+    return value if isinstance(value, str) else str(value)
+
+
+def _is_current(memory: Any) -> bool:
+    """One derivation of currentness, shared by every serialiser.
+
+    A row is current when nothing has closed its validity interval. The agentic
+    serialiser already derived it this way inline; both now call this so the two
+    responses can never disagree about whether a fact is open.
+    """
+    return _memory_value(memory, "valid_to") is None
+
+
+def _memory_temporal_payload(memory: Any) -> dict[str, Any]:
+    """Bitemporal and fact-identity fields for one memory.
+
+    Always every key, with `None` where the column is null: a caller debugging
+    supersession needs to see `valid_to: null` (still open) as clearly as
+    `valid_to: "2026-01-01T00:00:00"` (closed), and `fact_key` because that is
+    the identity the truth engine uses to decide whether two rows are the same
+    fact.
+    """
+    payload: dict[str, Any] = {
+        name: _iso_or_none(getattr(memory, name, None))
+        for name in _BITEMPORAL_DATETIME_FIELDS
+    }
+    payload.update(
+        {
+            name: _text_or_none(getattr(memory, name, None))
+            for name in _TEMPORAL_TEXT_FIELDS
+        }
+    )
+    payload["is_current"] = _is_current(memory)
+    return payload
+
+
+def _optional_bool(value: Any) -> bool | None:
+    return value if isinstance(value, bool) else None
+
+
+def _optional_int(value: Any) -> int | None:
+    # `bool` is an `int` subclass, so it is rejected before the int check.
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def _optional_float(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def _optional_text(value: Any) -> str | None:
+    return value if isinstance(value, str) else None
+
+
+def _optional_text_list(value: Any) -> list[str] | None:
+    if not isinstance(value, (list, tuple)):
+        return None
+    return [item for item in value if isinstance(item, str)]
+
+
+def _coerce_weights(value: Any) -> dict[str, float] | None:
+    """The three channel weights, or `None` if `value` is not a weight mapping.
+
+    Every channel must be present and numeric. A partial or non-numeric mapping
+    is reported as unavailable rather than half-reported, so the caller never
+    sees a weights block that implies a channel was left at zero.
+    """
+    if not isinstance(value, Mapping):
+        return None
+    weights: dict[str, float] = {}
+    for name in _CHANNEL_NAMES:
+        weight = value.get(name)
+        if isinstance(weight, bool) or not isinstance(weight, (int, float)):
+            return None
+        weights[name] = float(weight)
+    return weights
+
+
+def _effective_channel_weights(engine: Any) -> dict[str, float] | None:
+    """The weights the engine's RRF pass actually fused with.
+
+    `RetrievalEngine._channel_weights` is the engine's own accessor for the
+    weights in force (it boosts one channel when the cortex classifies the
+    query), so it is preferred over the class default, which is only the
+    starting point. Both are read defensively: a test double must degrade to
+    `None` rather than leak a `Mock` into a JSON response.
+    """
+    resolver = getattr(engine, "_channel_weights", None)
+    if callable(resolver):
+        weights = None
+        with suppress(Exception):
+            weights = _coerce_weights(resolver(None))
+        if weights is not None:
+            return weights
+    for source in (engine, RetrievalEngine):
+        weights = _coerce_weights(getattr(source, "DEFAULT_CHANNEL_WEIGHTS", None))
+        if weights is not None:
+            return weights
+    return None
+
+
+def _sufficiency_payload(assessment: Any) -> dict[str, Any] | None:
+    """The gate's verdict, or `None` when the engine recorded no assessment."""
+    if assessment is None:
+        return None
+    return {
+        "sufficient": _optional_bool(getattr(assessment, "sufficient", None)),
+        "reason": _optional_text(getattr(assessment, "reason", None)),
+        "result_count": _optional_int(getattr(assessment, "result_count", None)),
+        "required_result_count": _optional_int(
+            getattr(assessment, "required_result_count", None)
+        ),
+        "covered_entities": _optional_text_list(
+            getattr(assessment, "covered_entities", None)
+        ),
+        "required_entities": _optional_text_list(
+            getattr(assessment, "required_entities", None)
+        ),
+        "missing_evidence_ids": _optional_text_list(
+            getattr(assessment, "missing_evidence_ids", None)
+        ),
+        "top_score": _optional_float(getattr(assessment, "top_score", None)),
+        "runner_up_score": _optional_float(getattr(assessment, "runner_up_score", None)),
+        "margin": _optional_float(getattr(assessment, "margin", None)),
+    }
+
+
+def _channel_diagnostics(engine: Any, *, returned_results: int) -> dict[str, Any]:
+    """Per-channel observability for one retrieval.
+
+    Everything reported here is read off `RetrievalEngine.last_escalation`,
+    which the engine sets once per `retrieve()`. The route builds a fresh engine
+    per request, so reading it after the call is race-free.
+
+    A candidate count is reported only when the engine recorded a real one. The
+    engine tracks only `dense_candidates`; lexical and graph counts are not
+    exposed anywhere, so they are emitted as `null` and listed in
+    `unavailable_candidate_counts` rather than guessed or derived. That
+    distinction is the whole point of the block: `0` means the channel was
+    measured, `null` means it was never measured, and RRF silently drops a
+    zero-candidate channel and renormalises the remaining weights over it
+    (`weighted_reciprocal_rank_fusion`, fusion.py), so a three-layer request can
+    quietly answer from two.
+
+    `dense: 0` is ambiguous on its own and must be read with
+    `dense_escalation.escalated`: it is 0 both when dense was never consulted
+    (cascade enabled and the gate said lexical + graph sufficed) and when it was
+    consulted and matched nothing (escalation disabled, so dense always runs).
+
+    `returned_results` is post-tenant-filter, so it separates "the engine found
+    nothing" from "the scope filter dropped everything the engine found".
+    """
+    escalation = getattr(engine, "last_escalation", None)
+    candidates: dict[str, int | None] = {
+        name: _optional_int(getattr(escalation, f"{name}_candidates", None))
+        for name in _CHANNEL_NAMES
+    }
+    return {
+        "weights": _effective_channel_weights(engine),
+        "candidates": candidates,
+        "unavailable_candidate_counts": [
+            name for name, count in candidates.items() if count is None
+        ],
+        "fused_candidates": _optional_int(
+            getattr(escalation, "fused_candidates", None)
+        ),
+        "returned_results": returned_results,
+        "dense_escalation": {
+            "enabled": _optional_bool(getattr(escalation, "enabled", None)),
+            "escalated": _optional_bool(getattr(escalation, "escalated", None)),
+            "reason": _optional_text(getattr(escalation, "reason", None)),
+            "sufficiency": _sufficiency_payload(
+                getattr(escalation, "assessment", None)
+            ),
+        },
+    }
+
+
 def _serialize_result(item: Any) -> dict[str, Any]:
     memory = item.memory
     return {
@@ -844,6 +1064,7 @@ def _serialize_result(item: Any) -> dict[str, Any]:
             "is_archived": memory.is_archived,
             "memory_state": memory.memory_state,
             "created_at": memory.created_at.isoformat() if memory.created_at else None,
+            **_memory_temporal_payload(memory),
         },
         "score": item.score,
         "semantic_score": item.semantic_score,
@@ -860,7 +1081,13 @@ async def retrieve(
     query: ScopedRetrievalQuery,
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
-    """Retrieve memories using hybrid semantic, keyword, recency, importance, and graph scoring."""
+    """Retrieve memories using hybrid semantic, keyword, recency, importance, and graph scoring.
+
+    The response carries a top-level `channels` block with the per-channel
+    candidate counts, the weights that were fused, and the dense-escalation
+    decision, so a caller can see which of the three retrieval layers actually
+    contributed instead of inferring it from the ranking.
+    """
     scope = _scope_for(request, query)
     scoped_query = _authoritative_query(query, scope)
     embedding_service = EmbeddingService()
@@ -876,6 +1103,8 @@ async def retrieve(
     return {
         "status": "success",
         "query": query.query_text,
+        "count": len(serialized_results),
+        "channels": _channel_diagnostics(engine, returned_results=len(serialized_results)),
         "results": serialized_results,
     }
 
@@ -914,6 +1143,7 @@ async def retrieve_batch(
         return {
             "query": query.query_text,
             "count": len(serialized),
+            "channels": _channel_diagnostics(engine, returned_results=len(serialized)),
             "results": serialized,
         }
 
@@ -980,8 +1210,8 @@ async def retrieve_investigate(
                 "content": item.memory.content,
                 "memory_type": item.memory.memory_type,
                 "score": item.score,
-                "is_current": item.memory.valid_to is None,
-                "created_at": item.memory.created_at.isoformat() if item.memory.created_at else None,
+                "created_at": item.created_at.isoformat() if item.created_at else None,
+                **_memory_temporal_payload(item.memory),
             }
             for item in memories
         ],

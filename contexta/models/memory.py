@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -20,12 +21,21 @@ from sqlalchemy import (
     String,
     Text,
     desc,
+    event,
+    inspect,
     text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, synonym, validates
 
 from contexta.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+
+# Envelope prefix written by `contexta.core.crypto.vault.encrypt_content`.
+# `encrypt_content` itself does not check it -- only `decrypt_content` does --
+# so handing it an already-sealed value nests one envelope inside the second and
+# decrypts to the inner token rather than to the sentence. Every seal path in
+# this module therefore checks the prefix first.
+ENCRYPTED_CONTENT_PREFIX = "enc:v1:"
 
 
 def _coerce_scope_uuid(value: object, field_name: str) -> uuid.UUID | None:
@@ -43,6 +53,49 @@ def _coerce_scope_uuid(value: object, field_name: str) -> uuid.UUID | None:
 
 class MemoryContentDecryptionError(RuntimeError):
     pass
+
+
+def seal_content_for_storage(record: MemoryRecord) -> None:
+    """Encrypt ``record.content`` in place, once, keyed by its own organization.
+
+    Called from the mapper-level flush hooks at the bottom of this module so that
+    *every* ORM write path seals its content: the ingestion orchestrator's
+    ``session.add_all``, ``MemoryRepository.create``, a later in-session content
+    change, and any writer added after this fix. The guarantee belongs to the
+    model rather than to a call site, because a call-site guarantee is exactly
+    what let the orchestrator persist cleartext for 89% of stored memories while
+    the code and the docs advertised authenticated at-rest encryption.
+
+    Idempotent, and a no-op for ``None`` and for non-text values. The prefix
+    check is what keeps a caller that already sealed its own value --
+    ``MemoryRepository.create`` and ``update_by_id`` both do -- from nesting a
+    second envelope inside the first.
+    """
+    content = record.content
+    if content is None or not isinstance(content, str):
+        return
+    if content.startswith(ENCRYPTED_CONTENT_PREFIX):
+        return
+
+    from contexta.core.crypto.vault import encrypt_content
+
+    organization_id = record.organization_id
+    record.content = encrypt_content(
+        content,
+        str(organization_id) if organization_id is not None else None,
+    )
+
+
+def _seal_content_before_insert(mapper: Any, connection: Any, target: MemoryRecord) -> None:
+    seal_content_for_storage(target)
+
+
+def _seal_content_before_update(mapper: Any, connection: Any, target: MemoryRecord) -> None:
+    # Only a content value this flush is actually writing needs sealing. Without
+    # the history check every update to any column would re-seal an untouched
+    # content column with a fresh nonce, rewriting bytes nobody changed.
+    if inspect(target).attrs.content.history.has_changes():
+        seal_content_for_storage(target)
 
 
 class MemoryRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -72,7 +125,7 @@ class MemoryRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
             raise MemoryContentDecryptionError(
                 f"Memory {self.id} has non-text content; verify CONTEXTA_SECRET_KEY and the tenant key."
             )
-        if not raw_content.startswith("enc:v1:"):
+        if not raw_content.startswith(ENCRYPTED_CONTENT_PREFIX):
             return raw_content
         try:
             value = decrypt_content(raw_content, str(self.organization_id))
@@ -287,3 +340,34 @@ class MemoryRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
             "valid_to",
         ),
     )
+
+
+# Sealing content is a property of the column, not of any writer. Registered at
+# the mapper rather than on a session's `before_flush` for two reasons:
+#
+# 1. A `before_flush` listener attached to `contexta.db.AsyncSessionFactory`
+#    only sees sessions that factory built. `contexta/mcp/service.py`, the
+#    LoCoMo and LongMemEval harnesses, and the CHIMERA runner each construct
+#    their own sessionmaker, and a factory-scoped hook would let every one of
+#    them write cleartext without complaint.
+# 2. Mapper hooks fire per row at the moment the INSERT/UPDATE parameters are
+#    collected, so the sealed value is the value that reaches the wire, and
+#    mutating the attribute there is a documented, supported operation. A
+#    `before_flush` listener mutates objects the unit of work has already
+#    planned, and would need a second `flush()` to be sure of the result.
+#
+# Neither can see Core DML -- `session.execute(insert(MemoryRecord), ...)` or
+# `update(MemoryRecord).values(content=...)` -- which bypasses the ORM
+# entirely. The single content-writing Core statement in the tree is
+# `TenantScopedRepository.update_by_id`, and `MemoryRepository` seals the value
+# before handing it over, so that path is covered by construction rather than
+# by an event.
+event.listen(MemoryRecord, "before_insert", _seal_content_before_insert)
+event.listen(MemoryRecord, "before_update", _seal_content_before_update)
+
+__all__ = [
+    "ENCRYPTED_CONTENT_PREFIX",
+    "MemoryContentDecryptionError",
+    "MemoryRecord",
+    "seal_content_for_storage",
+]

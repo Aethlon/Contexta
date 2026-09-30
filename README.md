@@ -95,7 +95,7 @@ Every observation walks the same nine stages, in `contexta/core/pipeline.py` and
 | 1 | **Ingest** | `POST /v1/observations` persists a tenant-scoped observation, its ordered source turns, and a durable outbox event, then returns `202` | An in-memory queue loses observations on restart. The outbox claims rows with `SKIP LOCKED`, so concurrent workers never double-process and a crashed claim is retried rather than dropped. |
 | 2 | **Redact** | `contexta/core/extraction/sensitive_filter.py` scrubs API keys, JWTs, bearer tokens, passwords, OTPs, session cookies, and card numbers | Secrets must never reach the extractor, the LLM, or the database. The gate is **fail-closed**: if it errors, the observation is rejected rather than forwarded unredacted. |
 | 3 | **Extract** | The fine-tuned extractor on `:8002` returns discrete facts with a type, confidence, and explicit temporal precision | Free-form conversation is not memory. A typed fact with a provenance timestamp is something you can supersede later; a paragraph is not. |
-| 4 | **Dedup** | Near-duplicate merge within the batch and against existing rows | Two phrasings of one fact become two rows, two vectors, and two chances to rank each other. A `subject`/`predicate`/`object` triple also yields a structural slot key `sfx1:<sha256>`, so a rephrasing lands in the *same* slot. |
+| 4 | **Dedup** | Near-duplicate merge within the batch and against existing rows | Two phrasings of one fact become two rows, two vectors, and two chances to rank each other. A `subject`/`predicate`/`object` triple also yields a structural slot key `sfx2:<sha256>` over the whole assertion, so unrelated facts can no longer collide into one slot. |
 | 5 | **Score** | Importance from emphasis, decision impact, and mention count; confidence from source type | A low-value extraction should be dropped *before* it costs an embedding and a graph edge. Ranking everything equally is how a memory layer turns into a noise store. |
 | 6 | **Graph** | `BulkEntityResolver` resolves entities and typed edges in memory, then writes them | A fact is often reachable only through the people and projects around it. "What did the Fatima Okafor project ship?" needs the edge, not a better embedding. |
 | 7 | **Reconcile** | `TruthSupersessionService` closes the contradicted row and records lineage via `memory_version.superseded_by_id` | This is the stage that makes memory *true* rather than merely accumulated. `uq_memory_record_current_fact_slot` — a partial unique index over `(organization_id, user_id, fact_key)` restricted to `valid_to IS NULL` — means a correction **must** supersede; it cannot coexist. |
@@ -112,7 +112,7 @@ Every observation walks the same nine stages, in `contexta/core/pipeline.py` and
 
 Fusion is weighted Reciprocal Rank Fusion with `k = 60` (`contexta/core/retrieval/fusion.py`), plus a small quality prior from `importance`/`confidence`.
 
-**Cascade mode exists but is off.** `RetrievalEngine(enable_dense_escalation=True)` inverts the order: lexical and graph gather evidence first, and `assess_primary_sufficiency()` decides whether the dense channel is needed at all. There is no environment variable and no request field for it — the constructor argument is the only switch. It stays off until the escalation rate is measured.
+**Cascade mode is the default.** `RetrievalEngine(enable_dense_escalation=True)` inverts the order: lexical and graph gather evidence first, and `assess_primary_sufficiency()` decides whether the dense channel is needed at all. There is no environment variable and no request field for it — the constructor argument is the only switch, and it is already on. Pass `enable_dense_escalation=False` for the previous order, where dense is gathered unconditionally.
 
 ---
 
@@ -301,6 +301,20 @@ Online BYOK mode (OpenAI / DeepSeek / Anthropic) is opt-in via `./entrypoint.sh 
 
 ---
 
+## 🔐 Memory Content at Rest
+
+`memory_record.content` is sealed with authenticated encryption under a key derived per organization from `CONTEXTA_SECRET_KEY` (PBKDF2-HMAC-SHA256, 100k iterations, organization id as salt). Two tenants storing the same sentence get unrelated ciphertext, and neither opens under the other's key. `plaintext_content` decrypts on read and raises rather than returning garbage if the key does not match.
+
+**From v1.5.1 onward this holds on every ORM write path.** Before that, encryption was called from three places inside `MemoryRepository`, and the ingestion orchestrator writes its rows directly — so on a measured dev database **116 of 130 memories were in cleartext** while the code and the docs advertised at-rest encryption. The reads tolerated both forms, which is why nobody noticed. The seal now lives on the model (`contexta/models/memory.py`, mapper `before_insert` / `before_update`), not at a call site.
+
+> **Rows written before the fix are still cleartext, and the fix does not rewrite them.** Find them with `select count(*) from memory_record where content is not null and content not like 'enc:v1:%';` and then either re-ingest the original observations or migrate the rows in place. Both are operator decisions, and the detection query plus all three options are in [`docs/src/app/reference/memory-content-encryption.mdx`](docs/src/app/reference/memory-content-encryption.mdx).
+>
+> **Only the body text is sealed.** `title`, `search_text` / `search_vector`, `structured_data`, `tags`, and `memory_version.content` are cleartext, because the lexical channel is a `tsvector` GIN predicate over `search_text` and BM25 over ciphertext is meaningless. Treat the search projection as readable by anyone with database access.
+
+Changing `CONTEXTA_SECRET_KEY` makes existing sealed content unreadable. There is no recovery path.
+
+---
+
 ## 📦 SDKs
 
 Both SDKs are in-repo and installable from source. `Contexta` / `AsyncContexta` are the canonical class names; the older lowercase `contexta` / `Asynccontexta` still import and work but emit a deprecation warning.
@@ -445,7 +459,7 @@ On Windows with the checked-in virtualenv:
 .venv\Scripts\python.exe -m pytest tests/ -q
 ```
 
-Current result: **392 passed, 0 failed, 0 skipped.**
+Current result: **574 passed, 0 failed, 1 skipped.** The skip is a pre-existing `requires_db` guard; it needs the Contexta PostgreSQL.
 
 The focused gate for temporal grounding, durable ingestion, and canonical retrieval:
 
@@ -460,6 +474,13 @@ Tenant-isolation regressions — read these before touching any query:
 ```bash
 uv run pytest tests/test_graph_traverse_is_tenant_scoped.py tests/test_mcp_security.py -q
 # 31 passed
+```
+
+The at-rest encryption write path:
+
+```bash
+uv run pytest tests/test_content_encryption.py -q
+# 10 passed
 ```
 
 Lint and build:

@@ -61,7 +61,7 @@ This is the revision that makes supersession *mandatory* rather than a conventio
 Two deliberate non-actions:
 
 - The reconciliation is **not** reversed by `downgrade()`. Reopening a row would resurrect a belief the system has already stopped asserting.
-- `memory_version` is **not** written for the closed rows. `content` is encrypted at rest with a per-tenant key the migration has no access to, so any snapshot it wrote would hold ciphertext no reader can decrypt.
+- `memory_version` is **not** written for the closed rows. `content` is sealed at rest with a per-tenant key the migration has no access to, so any snapshot it wrote would hold ciphertext no reader can decrypt.
 
 `fact_key IS NOT NULL` is part of the index predicate on purpose: the key is still a text hash for any extraction with no structural triple, and `NULL` keys all mean "no key" rather than one shared slot.
 
@@ -138,11 +138,15 @@ Set `CONTEXTA_DASHBOARD_AUTH=on` to restore the NextAuth v5 credentials flow. `d
 
 ### Structural fact keys
 
-An extracted `subject` / `predicate` / `object` triple now yields a slot key of the form `sfx1:<sha256>` over `subject` + `predicate` (+ `context` when present). The object is deliberately excluded: a slot is "who, about what", and the same slot stated with a new value is a correction, which only supersedes if it reaches the incumbent row — and it can only do that if both rows share a key.
+An extracted `subject` / `predicate` / `object` triple now yields a slot key of the form `sfx2:<sha256>` over the canonicalised `subject` + `predicate` (+ `context` when present) + `object`.
 
-A partial triple is refused rather than half-keyed, so the slot and its value always arrive together. Legacy bare-64-hex text-hash keys are still produced for any extraction with no usable triple — which is every memory written before the triple existed — and are still supported.
+> **The object is in the digest.** v1.5.0 shipped `sfx1:`, which hashed subject + predicate and left the object out, on the theory that a slot is "who, about what" and the same slot stated with a new value is a correction. That only holds if the predicate is exclusive — one live value per subject and predicate — and it is not. Measured over a 10-conversation ingest: 123 keyed rows resolved to 32 slots, and `subject` was the literal string `"the user"` in all 123, so the digest collapsed to `sha256("the user" + <coarse verb>)` and four mutually exclusive `uses` facts shared one slot. With `uq_memory_record_current_fact_slot` allowing one current row per slot, each new arrival closed the previous one: 46 rows written, 28 superseded (61%), 18 distinct facts reachable, and of 10 sampled supersession pairs **0 were real contradictions and 8 were unrelated** — a credential row closed by a code snippet, `the user uses multiplication` closed by `the user uses function_15`. A slot that collides on unrelated facts does not reconcile truth, it deletes it. Under `sfx2:` the slot names the whole assertion, distinct facts get distinct slots, and both survive.
 
-Coverage is measurable with `fact_key LIKE 'sfx1:%'`.
+`sfx2:` is a new prefix rather than a re-hash of the old formula, so an `sfx1:` digest can never alias onto a live `sfx2:` slot. `sfx1:` keys are still readable and are never written again; `scripts/backfill_fact_keys.py` recomputes them, and its `LIKE 'sfx1:%'` selector is what identifies rows to review.
+
+A partial triple is refused rather than half-keyed, so an extraction that cannot name a slot falls back to the legacy text hash instead of guessing. Legacy bare-64-hex text-hash keys are still produced for any extraction with no usable triple — which is every memory written before the triple existed — and are still supported.
+
+Coverage is measurable with `fact_key LIKE 'sfx2:%'`.
 
 ### Extraction no longer silently degrades
 
@@ -159,9 +163,9 @@ Session-level extraction success went from roughly **17% to 87.5%**.
 
 **If you run a custom OpenAI-compatible base URL that is not recognisably Ollama**, it will not receive a schema constraint. Point the endpoint at Ollama directly, or expect unconstrained output.
 
-### Cascade retrieval is opt-in and off
+### Cascade retrieval is now the default
 
-`RetrievalEngine(enable_dense_escalation=True)` inverts the channel order: lexical and graph gather evidence first, and `assess_primary_sufficiency()` decides whether the dense channel is needed. It is a constructor argument only — no environment variable, no request field. It stays off until the escalation rate is measured, so nothing about your deployment changes unless you construct the engine yourself.
+`RetrievalEngine(enable_dense_escalation=True)` inverts the channel order: lexical and graph gather evidence first, and `assess_primary_sufficiency()` decides whether the dense channel is needed. It is a constructor argument only — no environment variable, no request field — and it now **defaults to on**. The channels themselves and their weights are unchanged; only the order they are consulted in is different, and the fused result is fused either way. Pass `enable_dense_escalation=False` to get the old order back.
 
 ### Vector dimensions are unchanged
 
@@ -203,7 +207,11 @@ curl -H "Authorization: Bearer $CONTEXTA_API_KEY" http://localhost:8000/v1/syste
 
 # 5. Structural fact keys are landing
 docker compose exec -T postgres psql -U postgres -d contexta -t -c \
-  "select count(*) from memory_record where fact_key like 'sfx1:%';"
+  "select count(*) from memory_record where fact_key like 'sfx2:%';"
+
+# 5b. No memory content is left in cleartext (see the encryption note)
+docker compose exec -T postgres psql -U postgres -d contexta -t -c \
+  "select count(*) from memory_record where content not like 'enc:v1:%';"
 
 # 6. Test suite
 uv run pytest tests/ -q     # 392 passed

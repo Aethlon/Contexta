@@ -134,8 +134,19 @@ class MemoryDeduplicator:
             )
 
         if best_similarity >= self.MERGE_THRESHOLD:
-            await self._snapshot_pre_merge(best_candidate, now)
             merged_values = self._merge_values(best_candidate, memory, now)
+            if merged_values is None:
+                # A merge that would not grow the existing content is not a
+                # merge. Reporting one made the caller drop the incoming memory
+                # as "already merged" while nothing was actually merged, which
+                # silently lost an observation. Store it separately instead: a
+                # redundant row is recoverable, a lost one is not.
+                return DeduplicationResult(
+                    action="store",
+                    memory=memory,
+                    similarity=best_similarity,
+                )
+            await self._snapshot_pre_merge(best_candidate, now)
             await self._repository.update_by_id(existing_id, merged_values)
             return DeduplicationResult(
                 action="merge",
@@ -244,13 +255,27 @@ class MemoryDeduplicator:
         existing: object,
         incoming: ExtractedMemory,
         updated_at: datetime,
-    ) -> dict:
+    ) -> dict | None:
+        """Build the merged row, or None when a merge would add nothing.
+
+        Returns None rather than a dict whenever the merge cannot strictly grow
+        the existing content -- when the incoming text is empty, or is already a
+        substring of it. Both are common once degenerate short bodies reach the
+        store: with ``existing.content == "the user"`` and an incoming body that
+        is also short, the substring test succeeds, the concatenation is skipped,
+        and the caller is handed an unchanged row while still being told
+        ``"merge"``. The caller skips storing on ``"merge"``, so the new memory
+        was never written anywhere. Merging must incorporate new evidence or it
+        must not be claimed.
+        """
         existing_content = str(getattr(existing, "content", "")).strip()
         incoming_content = incoming.content.strip()
         if incoming_content and incoming_content not in existing_content:
             content = f"{existing_content}\n\n{incoming_content}".strip()
         else:
             content = existing_content
+        if len(content) <= len(existing_content):
+            return None
 
         existing_tags = list(getattr(existing, "tags", None) or [])
         tags = list(dict.fromkeys([*existing_tags, *incoming.tags]))
